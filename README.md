@@ -13,7 +13,8 @@ New here? See **[SETUP.md](SETUP.md)** for step-by-step install and token setup.
 | **Everyone** (foundation) | `argo-core` | `redcap-api` + reference docs | Shared REDCap API conventions, safety rules, and reference tables (MDC codes, standard roles, data-dictionary spec). Required by every other plugin. |
 | **Builder** | `argo-build` | `redcap-build`, `redcap-admin` | Construct a data dictionary from a Word questionnaire (or audit/correct an existing one); manage user rights and roles on live projects. |
 | **QA** | `argo-qa` | `redcap-qa` | Branching-logic-aware completeness QA — per-site (per-DAG) Excel worklists of applicable-but-blank fields for RAs to resolve in REDCap. |
-| **Analyst** | `argo-analysis` | `data-export`, `run-analysis` | Export a cohort from REDCap (`data-export`), then run reproducible, auditable analysis on the local export — interview-driven plan, saved commented scripts, organized outputs (`run-analysis`). |
+| **Data management** | `argo-data` | `data-export`, `study-linkage` | The token-holding role. Export/import records, metadata, files, audit logs via the API (`data-export`); link records across studies/sources with safe diff-only write-back (`study-linkage`). |
+| **Analyst** | `argo-analysis` | `run-analysis` | Reproducible, auditable analysis on a **local** export (no API token) — interview-driven plan, saved commented scripts (Python/R/Stata), organized outputs. |
 | **Admins** (2 seats) | `argo-pm` | `study-portfolio`, `study-intake` | Weekly status dashboard across the admin REDCaps; triage a new study request into the build pipeline. |
 
 `argo-core` is a **library** (references only) and is required by every other plugin.
@@ -32,8 +33,10 @@ argo-build/redcap-admin       ← assign roles, manage user rights on live proje
    ↓
 argo-qa/redcap-qa             ← continuous completeness QA on the live database
    ↓
-argo-analysis/data-export     ← export a cohort to disk
-argo-analysis/run-analysis    ← reproducible, auditable analysis on the local export
+argo-data/data-export         ← export a cohort to disk (and import/push back)
+argo-data/study-linkage       ← link records across studies; safe diff-only write-back
+   ↓
+argo-analysis/run-analysis    ← analysis on the local export (no token needed)
 ```
 
 `argo-pm` is the front door for the admins. `argo-build` does both construction and verification
@@ -59,7 +62,8 @@ set -a; source ~/.argo/.env; set +a
 /plugin install argo-pm@argo-redcap        # admins
 /plugin install argo-build@argo-redcap     # builder
 /plugin install argo-qa@argo-redcap        # QA
-/plugin install argo-analysis@argo-redcap  # analyst
+/plugin install argo-data@argo-redcap      # data management (export/import/linkage)
+/plugin install argo-analysis@argo-redcap  # analyst (local analysis, no token)
 ```
 
 `.env` is gitignored — never commit tokens. See **[SETUP.md](SETUP.md)** for which tokens each

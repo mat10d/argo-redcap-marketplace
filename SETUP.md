@@ -43,7 +43,8 @@ The variable names in `.env.example` are the exact names the skills read — don
 | Admins | `argo-pm` | `REDCAP_URL`, `ARGO_PM_ROOT`, and the admin tokens: `STUDY_INITIATION_REQUEST`, `STUDY_PERSONELL_REQUEST`, `DATA_LINKING_REQUEST`, `DATA_REQUEST`, `SUPPORT_TICKET_REQUEST`, `PATHPRESENTER_INITIATION` |
 | Builder | `argo-build` | `REDCAP_URL` + the token for the project you're building/administering (e.g. `CRC_TOKEN`). Study intake also uses `STUDY_INITIATION_REQUEST`. |
 | QA | `argo-qa` | `REDCAP_URL` + one `<NAME>_TOKEN` per cohort you QA (e.g. `CRC_TOKEN`); pass it with `--token-env CRC_TOKEN` |
-| Analyst | `argo-analysis` | `REDCAP_URL` + the `<NAME>_TOKEN` for the cohort you're exporting |
+| Data management | `argo-data` | `REDCAP_URL` + one `<NAME>_TOKEN` per project you export/import/link (e.g. `CRC_TOKEN`) |
+| Analyst | `argo-analysis` | **No token** — works on an export + data dictionary already on disk. Ask the data-management seat (or `argo-data`) for the export. |
 
 **Cohort/study token convention:** add one line per project, named `<NAME>_TOKEN`
 (e.g. `CRC_TOKEN=...`). QA scripts take it as `--token-env CRC_TOKEN`; data exports reference it
@@ -62,7 +63,8 @@ as `$CRC_TOKEN`.
 /plugin install argo-pm@argo-redcap        # admins
 /plugin install argo-build@argo-redcap     # builder
 /plugin install argo-qa@argo-redcap        # QA
-/plugin install argo-analysis@argo-redcap  # analyst
+/plugin install argo-data@argo-redcap      # data management (export/import/linkage)
+/plugin install argo-analysis@argo-redcap  # analyst (local analysis, no token)
 ```
 
 ## 6. Verify it works
@@ -88,6 +90,7 @@ marketplace centrally via **claude.ai → Admin Settings → Claude Code → Man
     "argo-core@argo-redcap": true,
     "argo-pm@argo-redcap": true,
     "argo-build@argo-redcap": true,
+    "argo-data@argo-redcap": true,
     "argo-qa@argo-redcap": true,
     "argo-analysis@argo-redcap": true
   }

@@ -1,6 +1,6 @@
 {
   "name": "argo-analysis",
   "version": "0.1.0",
-  "description": "REDCap analysis tools — export a cohort to disk (data-export), then run reproducible, auditable analyses on the local export with saved, well-commented scripts and organized outputs (run-analysis).",
+  "description": "Analysis on a local REDCap export — no API token required. Interview-driven analysis plan, saved well-commented scripts (Python/R/Stata), and organized, auditable outputs (run-analysis). For API export/import and cross-study linkage, see argo-data.",
   "author": { "name": "ARGO" }
 }

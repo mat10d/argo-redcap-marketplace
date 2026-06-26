@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "AI-augmented research workflow plugins for the African Research Group for Oncology. Built around REDCap as the system of record for multi-site oncology cohorts.",
-    "version": "0.2.2"
+    "version": "0.3.0"
   },
   "plugins": [
     {
@@ -30,9 +30,14 @@
       "description": "Continuous data quality assurance for active REDCap cohorts. Branching-logic-aware completeness worklists per site (per-DAG) for RAs to resolve."
     },
     {
+      "name": "argo-data",
+      "source": "./plugins/argo-data",
+      "description": "Data management — the token-holding role. Export/import REDCap records, metadata, files, and audit logs (data-export), and link records across studies/sources with safe diff-only write-back (study-linkage)."
+    },
+    {
       "name": "argo-analysis",
       "source": "./plugins/argo-analysis",
-      "description": "REDCap analysis tools — export a cohort to disk (data-export), then run reproducible, auditable analyses on it with interview-driven plans, saved commented scripts, and organized outputs (run-analysis)."
+      "description": "Analysis on a local REDCap export — no API token needed. Interview-driven analysis plan, saved well-commented scripts, and organized, auditable outputs (run-analysis)."
     }
   ]
 }
