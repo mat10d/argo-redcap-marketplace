@@ -1,0 +1,6 @@
+{
+  "name": "argo-build",
+  "version": "0.1.0",
+  "description": "Build, audit, and administer REDCap studies. One entry point for constructing a data dictionary from a Word questionnaire AND for reviewing/correcting an existing one. Separate skill for user-rights/role administration on live projects.",
+  "author": { "name": "ARGO" }
+}

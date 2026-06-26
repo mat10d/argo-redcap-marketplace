@@ -1,0 +1,38 @@
+{
+  "name": "argo-redcap",
+  "owner": {
+    "name": "ARGO",
+    "url": "https://argo-cancer.org"
+  },
+  "metadata": {
+    "description": "AI-augmented research workflow plugins for the African Research Group for Oncology. Built around REDCap as the system of record for multi-site oncology cohorts.",
+    "version": "0.2.0"
+  },
+  "plugins": [
+    {
+      "name": "argo-core",
+      "source": "./plugins/argo-core",
+      "description": "Shared REDCap API conventions and reference material. Required by the other ARGO plugins."
+    },
+    {
+      "name": "argo-pm",
+      "source": "./plugins/argo-pm",
+      "description": "Project management and study intake. Global view across admin REDCaps, triages new study/personnel requests, hands off to argo-build."
+    },
+    {
+      "name": "argo-build",
+      "source": "./plugins/argo-build",
+      "description": "Build, audit, and administer REDCap studies. One skill (redcap-build) covers de novo construction AND review/audit. A second skill (redcap-admin) covers user rights and role management on live projects."
+    },
+    {
+      "name": "argo-qa",
+      "source": "./plugins/argo-qa",
+      "description": "Continuous data quality assurance for active REDCap cohorts. Branching-logic-aware completeness worklists per site (per-DAG) for RAs to resolve."
+    },
+    {
+      "name": "argo-analysis",
+      "source": "./plugins/argo-analysis",
+      "description": "REDCap data access layer for analysis — export/import records, metadata, files, and audit logs via the API to feed downstream tables and figures."
+    }
+  ]
+}

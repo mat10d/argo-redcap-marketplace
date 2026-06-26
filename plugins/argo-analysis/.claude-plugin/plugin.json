@@ -1,0 +1,6 @@
+{
+  "name": "argo-analysis",
+  "version": "0.1.0",
+  "description": "REDCap data access layer for analysis — export/import records, metadata, files, and audit logs via the API. Delivers cleaned cohort exports for downstream tables and figures.",
+  "author": { "name": "ARGO" }
+}

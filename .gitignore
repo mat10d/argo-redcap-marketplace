@@ -1,0 +1,17 @@
+# Secrets — never commit tokens
+.env
+.env.local
+.argo/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+
+# Stale / generated
+*.legacy
+portfolio-snapshots/
+*.snapshot.json

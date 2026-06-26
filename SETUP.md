@@ -1,0 +1,99 @@
+# Setup guide
+
+Step-by-step setup for the ARGO REDCap plugins. Aimed at teammates who don't write code — you
+only need to copy a few commands.
+
+## 1. Prerequisites
+
+- **Claude Code** installed and signed in.
+- **Python 3.9+** (`python3 --version`). The plugins use only the standard library, except
+  `argo-qa` which needs `pandas` and `openpyxl`:
+  ```bash
+  python3 -m pip install pandas openpyxl
+  ```
+
+## 2. Get your REDCap API tokens
+
+A token is a per-user, per-project password for the REDCap API. In REDCap, open a project →
+**API** (left menu) → request/copy your token. You need a token for each project you work on.
+Tokens are secrets — never paste them into chats, scripts, or git.
+
+## 3. Create your `.env`
+
+```bash
+mkdir -p ~/.argo
+cp .env.example ~/.argo/.env
+chmod 600 ~/.argo/.env        # readable only by you
+$EDITOR ~/.argo/.env          # paste your tokens after each =
+```
+
+Then load it (do this once per terminal session, before running ARGO skills):
+
+```bash
+set -a; source ~/.argo/.env; set +a
+```
+
+The variable names in `.env.example` are the exact names the skills read — don't rename them.
+
+## 4. Which tokens does each role need?
+
+| Role | Plugin | Tokens needed in `~/.argo/.env` |
+|---|---|---|
+| Everyone | `argo-core` | `REDCAP_URL` (no tokens — it's reference material) |
+| Admins | `argo-pm` | `REDCAP_URL`, `ARGO_PM_ROOT`, and the admin tokens: `STUDY_INITIATION_REQUEST`, `STUDY_PERSONELL_REQUEST`, `DATA_LINKING_REQUEST`, `DATA_REQUEST`, `SUPPORT_TICKET_REQUEST`, `PATHPRESENTER_INITIATION` |
+| Builder | `argo-build` | `REDCAP_URL` + the token for the project you're building/administering (e.g. `CRC_TOKEN`). Study intake also uses `STUDY_INITIATION_REQUEST`. |
+| QA | `argo-qa` | `REDCAP_URL` + one `<NAME>_TOKEN` per cohort you QA (e.g. `CRC_TOKEN`); pass it with `--token-env CRC_TOKEN` |
+| Analyst | `argo-analysis` | `REDCAP_URL` + the `<NAME>_TOKEN` for the cohort you're exporting |
+
+**Cohort/study token convention:** add one line per project, named `<NAME>_TOKEN`
+(e.g. `CRC_TOKEN=...`). QA scripts take it as `--token-env CRC_TOKEN`; data exports reference it
+as `$CRC_TOKEN`.
+
+## 5. Install the plugins
+
+```bash
+# Register the marketplace — from a local clone of this repo:
+/plugin marketplace add .
+# ...or once it's published to GitHub:
+/plugin marketplace add mat10d/argo-redcap-marketplace
+
+# Install argo-core (everyone) plus the plugin(s) for your role:
+/plugin install argo-core@argo-redcap
+/plugin install argo-pm@argo-redcap        # admins
+/plugin install argo-build@argo-redcap     # builder
+/plugin install argo-qa@argo-redcap        # QA
+/plugin install argo-analysis@argo-redcap  # analyst
+```
+
+## 6. Verify it works
+
+In a Claude Code session, ask in plain English — e.g. *"build a REDCap data dictionary from this
+Word questionnaire"* (builder), *"generate QA worklists for the CRC cohort"* (QA), or *"give me
+the weekly study portfolio status"* (admin). The matching skill should activate.
+
+If a skill reports a missing token or `ARGO_PM_ROOT is not set`, you haven't sourced `~/.argo/.env`
+in that terminal — re-run `set -a; source ~/.argo/.env; set +a`.
+
+## Team distribution (for the org owner)
+
+To preload these for everyone on a Claude for Teams/Enterprise (nonprofit) account, push the
+marketplace centrally via **claude.ai → Admin Settings → Claude Code → Managed settings**:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "argo-redcap": { "source": { "source": "github", "repo": "mat10d/argo-redcap-marketplace" } }
+  },
+  "enabledPlugins": {
+    "argo-core@argo-redcap": true,
+    "argo-pm@argo-redcap": true,
+    "argo-build@argo-redcap": true,
+    "argo-qa@argo-redcap": true,
+    "argo-analysis@argo-redcap": true
+  }
+}
+```
+
+Teammates who sign in with org OAuth then get the marketplace and plugins automatically — they
+still create their own `~/.argo/.env` with their personal tokens (step 3). This requires the
+marketplace to be on GitHub; no MDM needed.
