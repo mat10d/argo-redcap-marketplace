@@ -1,6 +1,6 @@
 {
   "name": "argo-pm",
   "version": "0.1.0",
-  "description": "Project management and study intake for ARGO. Provides a global view across the 5 admin REDCaps and triages new study/personnel requests into the build pipeline.",
+  "description": "Project management for ARGO admins. Draft the new-study document package from canonical templates to relieve the PM bottleneck (study-setup), get a global weekly view across the admin REDCaps (study-portfolio), and triage new study/personnel requests into the build pipeline (study-intake).",
   "author": { "name": "ARGO" }
 }

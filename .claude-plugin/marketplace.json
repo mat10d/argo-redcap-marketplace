@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "AI-augmented research workflow plugins for the African Research Group for Oncology. Built around REDCap as the system of record for multi-site oncology cohorts.",
-    "version": "0.3.0"
+    "version": "0.4.0"
   },
   "plugins": [
     {
@@ -17,7 +17,7 @@
     {
       "name": "argo-pm",
       "source": "./plugins/argo-pm",
-      "description": "Project management and study intake. Global view across admin REDCaps, triages new study/personnel requests, hands off to argo-build."
+      "description": "Project management for admins. Draft the new-study document package to relieve the PM bottleneck (study-setup), weekly view across admin REDCaps (study-portfolio), and triage new study/personnel requests into the build pipeline (study-intake)."
     },
     {
       "name": "argo-build",
