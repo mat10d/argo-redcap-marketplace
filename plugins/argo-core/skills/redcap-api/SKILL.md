@@ -7,6 +7,14 @@ description: Base conventions for talking to REDCap APIs across ARGO projects �
 
 Shared API conventions used by every other ARGO plugin. If you are reading this directly you probably want a more specific skill (`redcap-build`, `data-export`, `study-portfolio`, etc.) — but the rules below apply universally.
 
+## Tokens are optional — never block on one
+
+REDCap tokens are scarce and admin-gated; requesting one per study doesn't scale. **No skill may
+hard-require a token.** Check whether a token for the target project is present — if it is, use the
+API; if not, take the no-token path (work from an on-disk export/download and produce files the
+user applies in the REDCap UI) and say so. Never error out demanding a token. This is the single
+most important cross-cutting rule — see **[[token-optional]]** for the per-operation fallback table.
+
 ## Critical safety rules
 
 ### 1. Confirm the target project token before any write
@@ -22,6 +30,7 @@ Truncate to last 4 chars when echoing. Never write tokens to files committed to 
 
 These live in `references/` and are linked from skills in `argo-build`, `argo-pm`, etc. Update them here, not in the downstream skills:
 
+- [[token-optional]] — **cross-cutting:** use the API only when a token is present; else fall back to files + UI
 - [[mdc-rules]] — Missing Data Codes by field type
 - [[standard-roles]] — ARGO's four standard REDCap roles
 - [[dd-column-spec]] — Data dictionary CSV column reference
