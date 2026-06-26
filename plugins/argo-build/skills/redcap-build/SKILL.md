@@ -68,10 +68,34 @@ where `<field_name>` is one of the 7 yes/no `build_tracking` fields (see checkli
 ## Workflow
 1. Find the Word document with `Glob *.docx`
 2. Extract text: `textutil -convert txt -stdout "filename.docx"`
-3. Parse the structure (patterns below)
-4. Generate CSV with all 18 columns (see [[dd-column-spec]])
-5. Save the CSV in the same directory: `ProjectName_DataDictionary_YYYY-MM-DD.csv`
+3. Parse the structure (patterns below) into a field list
+4. **Emit the DD with `dd_builder.py` — do NOT hand-write the 18-column CSV.** The helper lays out
+   all 18 columns and applies Missing Data Codes by construction, which eliminates the single most
+   common build error. Import it and add fields, or feed it a JSON field spec:
+   ```bash
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-build/dd_builder.py fields.json out.csv
+   ```
+5. Save as `<ProjectName>_DataDictionary_YYYY-MM-DD.csv` in the same directory
 6. Validate: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-build/validate_dd.py <csv_file>` — fix all errors before delivering
+
+> ### MDC goes on EVERY non-exempt field — not just clinical Yes/No fields
+> Per [[mdc-rules]]: every radio/dropdown/checkbox gets the four MDC **choices**; every
+> text/notes field gets the text-format MDC **field-note**; date fields get the date-format MDC
+> note. Only the **record-ID field** and **descriptive/calc/file** types are exempt. This is the
+> #1 thing builders forget — hand-write a DD and the validator will flag dozens of fields.
+> `dd_builder.py` applies all of this automatically.
+
+## Multiple SIRs with the same title
+
+Several SIR records can share a title and PI without being duplicates (build-pitfalls #17).
+**Decide from the underlying questionnaires, not the title.** Compare each record's attached
+questionnaire(s):
+- **Different questionnaires** → genuinely separate builds (distinct sites or substudies). Build
+  each, and ask the user how to distinguish the projects (e.g. a site/country/substudy suffix in
+  the title) — the SIR title alone won't carry it.
+- **Same questionnaire across all** → possible accidental resubmission; flag to the user before
+  building N identical projects.
+Never infer "duplicate" or "four sites" from the title match alone.
 
 ## Parsing the Word document
 
@@ -92,6 +116,14 @@ where `<field_name>` is one of the 7 yes/no `build_tracking` fields (see checkli
   - Paragraph descriptions -> `notes`
   - Short answer -> `text`
 
+### Matrix groups
+When the questionnaire has a **grid** of questions that share one answer scale — e.g. a block of
+items all rated Yes/No/Not-Sure, or a run of 1–5 Likert items — model them as a REDCap **matrix
+group**: give each field the same `Matrix Group Name` and identical choices. Tell-tale signs: a
+table with question rows and a shared header of options, or consecutively numbered items with the
+same response scale. Individual radios also work, but a matrix matches the source layout and is
+easier to enter. (All fields in a matrix must share the exact same choice set.)
+
 ### Branching logic detection
 - `Yes -> follow-up text` shows only when parent = Yes: `[parent_field] = '1'`
 - `Other... (Input Answer)` shows when Other is selected
@@ -106,6 +138,13 @@ where `<field_name>` is one of the 7 yes/no `build_tracking` fields (see checkli
 - Must match the Word document text EXACTLY
 - No paraphrasing, summarizing, or modifying
 - Preserve exact wording, punctuation, capitalization
+
+### Choice codes vs labels — normalize broken codes, never the text
+Real questionnaires have inconsistent **coding**: duplicate option numbers (two "4."s),
+non-sequential numbers, missing codes. Keep the **label text verbatim**, but fix the **choice
+codes** so they're unique and sequential (e.g. renumber a second "4. Unemployed" to `5`, use `99`
+for "Other"). Treat every such renumbering as a non-mechanical decision: note it and surface it to
+the user per [[decision-protocol]] — do not silently re-code clinically meaningful values.
 
 ### Rich text for complex labels
 When a question has bullet-point sub-items, format using HTML:
