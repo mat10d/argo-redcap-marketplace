@@ -57,7 +57,7 @@ When the user picks a record to act on:
 - **SIR record (study to build)** → [[study-intake]] to triage and download docs → [[redcap-build]] (in argo-build) to construct the DD
 - **SPR record (personnel request)** → [[redcap-admin]] (in argo-build) to assign roles
 - **DATA_LINKING** → linkage workflow (TBD, may live under `argo-analysis/linkages`)
-- **DATA_REQUEST** → extraction via [[redcap-data]]
+- **DATA_REQUEST** → extraction via [[data-export]]
 - **SUPPORT_TICKET** → triage manually; if technical, route to [[redcap-admin]]
 
 ## Weekly cadence

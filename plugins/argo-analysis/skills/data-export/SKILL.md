@@ -1,10 +1,10 @@
 ---
-name: redcap-data
+name: data-export
 description: Export and import records, metadata, files, and audit logs from REDCap projects via the API. The data layer for analysis — pull a cleaned cohort export for downstream tables, figures, or manuscripts.
 allowed-tools: Read, Bash, Write, Glob, Edit, Grep
 ---
 
-# redcap-data
+# data-export
 
 Read/write to REDCap projects via the REST API. Export records, metadata, files, audit trails; import records and files.
 

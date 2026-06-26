@@ -5,7 +5,7 @@ description: Base conventions for talking to REDCap APIs across ARGO projects �
 
 # redcap-api
 
-Shared API conventions used by every other ARGO plugin. If you are reading this directly you probably want a more specific skill (`redcap-build`, `redcap-data`, `study-portfolio`, etc.) — but the rules below apply universally.
+Shared API conventions used by every other ARGO plugin. If you are reading this directly you probably want a more specific skill (`redcap-build`, `data-export`, `study-portfolio`, etc.) — but the rules below apply universally.
 
 ## Critical safety rules
 
