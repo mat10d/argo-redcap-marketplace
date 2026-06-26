@@ -114,6 +114,6 @@ SIR's `pi_first_name` may contain "DR." or "PROF." — strip before deriving the
 | `argo-build/redcap-build` Path A | Before starting a new DD construction — items 1, 2, 3, 4, 5 |
 | `argo-build/redcap-build` Path B | Before auditing an existing DD — items 1-5 plus 8, 11 |
 | Importing external/historical data | Before designing an import pass — items 6-11 |
-| `argo-pm/study-intake` | Before generating a paste box / triaging a SIR — items 12, 13, 14, 17, 18, 19 |
+| `argo-build/study-intake` | Before generating a paste box / triaging a SIR — items 12, 13, 14, 17, 18, 19 |
 | `argo-build/redcap-admin` | Before any live-project write — items 12, 13, 14 |
 | All skills | Item 15 + 16 (decision protocol) always applies |

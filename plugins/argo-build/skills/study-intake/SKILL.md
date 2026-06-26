@@ -1,6 +1,6 @@
 ---
 name: study-intake
-description: Triage a Study Initiation Request (SIR) or Study Personnel Request (SPR) record into the build pipeline. Pulls record details, downloads attached files, generates the paste-ready "Create New REDCap Project" value sheet, and hands off to argo-build. Until a Super API Token is granted, REDCap project creation is manual UI work — this skill prepares every value so the human paste step is trivial.
+description: The builder's intake gate. Triage a Study Initiation Request (SIR) or Study Personnel Request (SPR) record — pull it, evaluate whether there's enough to build, download attached files, and generate the paste-ready "Create New REDCap Project" value sheet, then proceed to redcap-build. Until a Super API Token is granted, REDCap project creation is manual UI work — this skill prepares every value so the human paste step is trivial. Use when picking up a submitted study request to assess readiness and start a build.
 allowed-tools: Read, Bash, Write, Glob, Edit, Grep, Agent
 ---
 

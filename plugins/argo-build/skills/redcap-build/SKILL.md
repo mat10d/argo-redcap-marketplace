@@ -271,4 +271,4 @@ Categorize by severity:
 
 # Where this fits in the full study build
 
-This skill covers the questionnaire build (the `dd_uploaded` step) and any review/correction of the resulting DD. See the **Canonical per-study build checklist** above for the full 7-step `build_tracking` workflow. When invoked from `argo-pm/study-intake`, the intake skill orchestrates the steps and calls back to this skill for the DD step.
+This skill covers the questionnaire build (the `dd_uploaded` step) and any review/correction of the resulting DD. See the **Canonical per-study build checklist** above for the full 7-step `build_tracking` workflow. When invoked from `study-intake`, the intake skill orchestrates the steps and calls back to this skill for the DD step.

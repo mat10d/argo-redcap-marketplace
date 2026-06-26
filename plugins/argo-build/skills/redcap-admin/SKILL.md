@@ -161,5 +161,5 @@ See [[study-intake]] Step 8 for the full per-step push protocol.
 ## When to invoke this skill
 
 - After `redcap-build` finishes a new DD and the study is ready for users
-- From `argo-pm/study-intake` when an SPR (Study Personnel Request) needs role assignment on an existing project
+- From `study-intake` when an SPR (Study Personnel Request) needs role assignment on an existing project
 - For any ad-hoc rights change on a live project
