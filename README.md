@@ -13,7 +13,7 @@ New here? See **[SETUP.md](SETUP.md)** for step-by-step install and token setup.
 | **Everyone** (foundation) | `argo-core` | `redcap-api` + reference docs | Shared REDCap API conventions, safety rules, and reference tables (MDC codes, standard roles, data-dictionary spec). Required by every other plugin. |
 | **Builder** | `argo-build` | `redcap-build`, `redcap-admin` | Construct a data dictionary from a Word questionnaire (or audit/correct an existing one); manage user rights and roles on live projects. |
 | **QA** | `argo-qa` | `redcap-qa` | Branching-logic-aware completeness QA — per-site (per-DAG) Excel worklists of applicable-but-blank fields for RAs to resolve in REDCap. |
-| **Analyst** | `argo-analysis` | `data-export` | The data layer for analysis — export/import records, metadata, files, and audit logs via the API; pull a cleaned cohort export for tables and figures. |
+| **Analyst** | `argo-analysis` | `data-export`, `run-analysis` | Export a cohort from REDCap (`data-export`), then run reproducible, auditable analysis on the local export — interview-driven plan, saved commented scripts, organized outputs (`run-analysis`). |
 | **Admins** (2 seats) | `argo-pm` | `study-portfolio`, `study-intake` | Weekly status dashboard across the admin REDCaps; triage a new study request into the build pipeline. |
 
 `argo-core` is a **library** (references only) and is required by every other plugin.
@@ -32,7 +32,8 @@ argo-build/redcap-admin       ← assign roles, manage user rights on live proje
    ↓
 argo-qa/redcap-qa             ← continuous completeness QA on the live database
    ↓
-argo-analysis/data-export     ← export cleaned cohorts for tables, figures, manuscripts
+argo-analysis/data-export     ← export a cohort to disk
+argo-analysis/run-analysis    ← reproducible, auditable analysis on the local export
 ```
 
 `argo-pm` is the front door for the admins. `argo-build` does both construction and verification
@@ -93,5 +94,5 @@ These are intended additions, deliberately not shipped as empty skills:
   unit reconciliation, and controlled-vocabulary lookups.
 - **QA depth** (QA): cross-form logic checks, outlier/impossible-value detection, source-document
   audit verification, and a PM-side blocker view that QA flags feed into.
-- **Analysis depth** (analyst): descriptive-table (Table 1) and survival-analysis skills on top of
-  `data-export` exports.
+- **Analysis depth** (analyst): `run-analysis` provides the reproducible analysis workflow today;
+  canned Table 1 and survival-analysis templates on top of it are the next additions.

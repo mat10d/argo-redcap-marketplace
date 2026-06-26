@@ -1,6 +1,6 @@
 {
   "name": "argo-analysis",
   "version": "0.1.0",
-  "description": "REDCap data access layer for analysis — export/import records, metadata, files, and audit logs via the API. Delivers cleaned cohort exports for downstream tables and figures.",
+  "description": "REDCap analysis tools — export a cohort to disk (data-export), then run reproducible, auditable analyses on the local export with saved, well-commented scripts and organized outputs (run-analysis).",
   "author": { "name": "ARGO" }
 }
