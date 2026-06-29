@@ -115,7 +115,11 @@ values, so the manual work is copy-paste-and-click. It covers:
   questionnaire docs, each **renamed with the study moniker**, into Study Documents vs IRB/Ethics.
 - **Data Access Groups:** one per institution (`inst_name_*`) for multi-site studies; assign users.
 - **Weekly reports:** from `weekly_stat` / `category` (skip/confirm with PM if blank).
-- **Survey mode:** if the instrument is a respondent questionnaire, enable it as a survey.
+- **Form vs survey:** default to **data-entry forms** — ARGO's standard model is paper
+  questionnaire → RA enters. Only enable **survey mode** if the protocol/methods explicitly say
+  respondents *self-complete* (online link / app). Don't infer "survey" from the instrument being a
+  questionnaire — check the proposal. (Likewise, study **design** — repeated rounds, arms — lives in
+  the proposal, not the questionnaire; model repeated interviews as separate instruments or events.)
 Flag anything the SIR leaves blank (PM not named, roles for co-investigators, etc.) as TODO.
 
 ## Steps 7–8 — Review → Production
