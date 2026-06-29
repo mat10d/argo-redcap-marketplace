@@ -158,6 +158,35 @@ python3 .../argo-build/skills/redcap-build/sir_update.py <SIR_RID> \
 
 See [[redcap-build]] for the full per-step push protocol.
 
+## Adding study personnel — the SPR (PID 221)
+
+New users for a study are recorded in the **Study Personnel Request** admin REDCap (**PID 221**),
+one record per user. Don't just send a loose account-request message — create the SPR record(s) so
+the request is tracked and resolvable.
+
+**Token-optional** ([[token-optional]]): with the SPR token (`STUDY_PERSONELL_REQUEST`), create
+records via API import; without it, submit the SPR survey in the UI for each user.
+
+**One record per user. Key fields + dropdown codes:**
+- `redcap_instance` — REDCap to add the user to: `1` OAUTHC, `2` MSKCC (OAU studies → `1`).
+- `first_name`, `last_name`, `email`, `whatsapp_phone`
+- `institution` — `1` MSKCC, `2` OAUTHC, `3` Other (+ `institution_other`)
+- `user_role` — `1` Study/QA Manager, `2` RA, `3` PI, `4` Other (+ `user_role_other`).
+  **No "Co-Investigator" option** → use `4` Other with `user_role_other="Co-Investigator"`.
+- `account_justification` — name the study here (e.g. "New personnel for HPV self-sampling study,
+  SIR 109 / PID 250").
+- Triage fields the PM fills: `assigned_to`, `assignment_date`, `completed`, `resolution_date`, `notes`.
+
+**Only request accounts for users who don't already have one** — exclude existing accounts.
+
+**Workflow:** create the SPR record(s) → admin creates the REDCap account(s) (no API for account
+creation at OAU) → assign each user to a role in the study project (roles section above) → mark the
+SPR record `completed`.
+
+**Known gap:** the SPR `study_title` dropdown is still a placeholder ("populate with active
+studies"), so the specific study isn't selectable — record it in `account_justification` until that
+dropdown is populated.
+
 ## When to invoke this skill
 
 - After `redcap-build` finishes a new DD and the study is ready for users
