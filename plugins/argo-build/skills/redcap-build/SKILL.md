@@ -1,313 +1,157 @@
 ---
 name: redcap-build
-description: Build or audit a REDCap data dictionary. One skill, two directions — Path A constructs a DD CSV from a Word questionnaire; Path B reviews and corrects an existing DD CSV against its Word source. Use for de novo builds, review/audit, or any DD correction work. For user rights / role assignment, use redcap-admin instead.
+description: Build a REDCap study end to end from a Study Initiation Request (SIR) — triage readiness, prep project creation, construct or audit the data dictionary, set up roles and files, and flip the Study Tracker's build_tracking flags as each step lands so the tracker improves iteratively. Token-optional. Use to build a new study, audit an existing data dictionary, or pick up a submitted SIR record.
 allowed-tools: Read, Bash, Write, Glob, Edit, Grep
 ---
 
 # redcap-build
 
-One skill covers both directions of data-dictionary work because building and verifying require the same expertise applied in reverse. Pick a path based on what's in the working directory:
+One skill for the whole build pipeline: **SIR record → live study.** It merges what used to be two
+skills (intake triage + DD build). The spine is a feedback loop — **every pipeline step you finish
+lets you flip one `build_tracking` flag on the Study Tracker, so the portfolio gets more accurate
+in real time.** Mark as you go; never batch at the end.
 
-- **Path A (build)** — Word doc present, no CSV → construct the DD
-- **Path B (verify)** — CSV already exists → audit and correct against the Word source
+## Token-optional (read first)
+Per [[token-optional]]: never block on an API token. If the SIR token (`STUDY_INITIATION_REQUEST`)
+is present, mark flags via `sir_update.py`; if not, set the same `build_tracking` fields by hand in
+the Study Tracker UI. Project creation and DD upload are UI steps regardless (OAU has no Super
+Token — [[project-no-super-token]]).
 
-If the user says "review", "audit", "check", or "fix", use Path B regardless of what's in the directory.
+## The pipeline ↔ tracker loop
 
-## Shared references (from argo-core)
+| # | Step | Do this | Script | → flip `build_tracking` |
+|---|---|---|---|---|
+| 1 | **Triage** | Pull the SIR; is there enough to build? | `sir_update.py --pull` | *(gate — no flag)* |
+| 2 | **Create project** | Paste sheet → create in UI | `fill_new_project.py` | `project_created` (+ `--pid`) |
+| 3 | **Build DD** | Construct (Path A) or audit (Path B) → upload | `dd_builder.py`, `validate_dd.py` | `dd_uploaded` |
+| 4 | **Roles & users** | Roles CSV + assign users | `make_roles_csv.py` (redcap-admin) | `user_rights_complete` |
+| 5 | **Data import** | Map + import, or mark prospective | `validate_import.py` | `data_imported` (1 / 2) |
+| 6 | **Setup** | File Repository, weekly reports, DAGs | *(MANUAL_SETUP_BRIEF)* | *(part of setup)* |
+| 7 | **Review** | Internal QA, then PI sign-off | — | `review_internal`, `review_pi` |
+| 8 | **Production** | Move project to Production | — | `study_production` |
 
-All MDC rules, role definitions, DD column specs, and API safety conventions live in `argo-core/references/` and are linked here. Do not restate them in this skill.
-
-- [[build-pitfalls]] — **READ FIRST.** Consolidated gotchas from real ARGO builds.
-- [[mdc-rules]] — Missing Data Code conventions by field type
-- [[dd-column-spec]] — Full 18-column DD CSV reference, field types, validation, branching syntax, annotation tags
-- [[record-id-safety]] — Record ID field is not always `record_id`
-- [[token-confirmation]] — Confirm target project before any API write
-- [[redcap-date-import]] — Import format YYYY-MM-DD vs display DD-MM-YYYY
-- [[redcap-api-gotchas]] — Write-side traps: date format, overwriteBehavior, choice codes, record_id non-renameability
+After each step: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-build/sir_update.py <RID> --mark-step <flag>`
+(token), **or** set that yes/no field on the record in the Study Tracker UI (no token).
 
 ---
 
-# Invocation from a SIR record
-
-When kicked off from `study-intake` (or by hand), the build skill operates on one **SIR record_id** — the record that came from an investigator's submission to the Study Initiation Request form. All study inputs live on that record's `study_initiation_request` form (97 fields); all build-progress writes go back to the same record's `build_tracking` form; long-term state lands on `study_metadata`.
-
-## Pull the SIR record
-
+## Step 1 — Triage (is there enough to build?)
 ```bash
 set -a; source ~/.argo/.env; set +a
-python3 .../argo-pm/skills/study-intake/sir_update.py <SIR_RID> --pull > intake.json
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-build/sir_update.py <RID> --pull > intake.json
 ```
+`--pull` returns the full record (intake + `build_tracking` + `study_metadata`). The build-readiness
+gate: a **questionnaire attached** (the linchpin for Path A), plus PI and IRB number. If the
+questionnaire is missing, flag back to the PM — don't build. Don't re-ask for anything the SIR
+already captured. Key fields drive later steps:
 
-`--pull` returns the full record (intake + build_tracking + study_metadata) as JSON. Use this as the canonical input — do not re-ask the user for anything the intake already captured.
-
-## Map intake fields → build decisions
-
-| Intake field(s) | Drives |
+| SIR field(s) | Drives |
 |---|---|
-| `project_title`, `pi_*`, `irb_number`, `irb_approval_expires`, `review_status` | Step 1 — Main project settings |
-| `quest_universal`, `quest_univ_file`, `quest_site_1..10` | Step 2 input — questionnaire source for Path A |
-| `missing_data_codes` (checkbox) | Step 2 — which MDCs to apply per [[mdc-rules]] |
-| `data_collection` (dropdown) | Drives `data_imported` decision (retrospective vs prospective) |
-| `num_institutions`, `inst_name_*`, `irb_file_*`, `consent_file_*`, `consent_prof_*`, `sop`, `eligibility_checklist` | Step 1 — File Repository uploads (rename with study moniker before upload) |
-| `weekly_stat`, `category` | Weekly reports config (substep of DD) |
-| `pm_name`/`pm_email`, `ra_name`/`ra_email`, `pi_user_name`/`pi_user_email`, `addl_users` | Step 3 — User rights (Who→Role table) |
-| `qa_variables` | QA cohort prep |
+| `quest_universal`, `quest_univ_file`, `quest_site_1..10` | Step 3 questionnaire source |
+| `data_collection` | Step 5 (`data_imported`: retrospective vs prospective) |
+| `num_institutions`, `inst_name_*`, `irb_file_*`, `consent_file_*`, `sop`, `eligibility_checklist` | Step 6 File Repository + DAGs |
+| `weekly_stat`, `category` | Step 6 weekly reports |
+| `pm_*`, `ra_*`, `pi_user_*`, `addl_users` | Step 4 user roles |
 
-## Loop: build a step, then push
-
-After each build step lands in the new REDCap project, immediately push to SIR before moving on:
+## Step 2 — Create project → `project_created`
 ```bash
-python3 .../argo-pm/skills/study-intake/sir_update.py <SIR_RID> --mark-step <field_name>
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-build/fill_new_project.py <RID> [<RID> ...]
 ```
-where `<field_name>` is one of the 7 yes/no `build_tracking` fields (see checklist below). The push step is non-batchable per [[feedback-push-sir-each-step]].
+Outputs a paste-ready "Create New Project" box per record (Empty project; title, purpose,
+sub-category, PI cited, IRB, folder, notes all pre-derived). The user pastes it into REDCap → New
+Project. Once it exists, mark: `sir_update.py <RID> --pid <PID> --mark-step project_created`.
 
----
+**Multiple SIRs, same title:** decide from the *questionnaires*, not the title (build-pitfalls #17).
+Different questionnaires → separate builds (ask the user for a site/substudy suffix); identical
+questionnaire across all → flag possible resubmission before building N copies.
 
-# Path A: De Novo Build (Word to DD CSV)
+## Step 3 — Build the data dictionary → `dd_uploaded`
 
-## Workflow
-1. Find the Word document with `Glob *.docx`
-2. Extract text: `textutil -convert txt -stdout "filename.docx"`
-3. Parse the structure (patterns below) into a field list
-4. **Emit the DD with `dd_builder.py` — do NOT hand-write the 18-column CSV.** The helper lays out
-   all 18 columns and applies Missing Data Codes by construction, which eliminates the single most
-   common build error. Import it and add fields, or feed it a JSON field spec:
-   ```bash
-   python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-build/dd_builder.py fields.json out.csv
-   ```
-5. Save as `<ProjectName>_DataDictionary_YYYY-MM-DD.csv` in the same directory
-6. Validate: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-build/validate_dd.py <csv_file>` — fix all errors before delivering
+**Path A (construct from Word)** vs **Path B (audit an existing CSV)**. If the user says "review",
+"audit", "check", or "fix", use Path B.
 
-> ### MDC goes on EVERY non-exempt field — not just clinical Yes/No fields
+> ### MDC goes on EVERY non-exempt field — not just clinical Yes/No
 > Per [[mdc-rules]]: every radio/dropdown/checkbox gets the four MDC **choices**; every
-> text/notes field gets the text-format MDC **field-note**; date fields get the date-format MDC
-> note. Only the **record-ID field** and **descriptive/calc/file** types are exempt. This is the
-> #1 thing builders forget — hand-write a DD and the validator will flag dozens of fields.
-> `dd_builder.py` applies all of this automatically.
+> text/notes field gets the text-format MDC **field-note**; date fields the date-format note. Only
+> the **record-ID field** and **descriptive/calc/file** types are exempt. `dd_builder.py` applies
+> this automatically — hand-write a DD and the validator will flag dozens of fields.
 
-## Multiple SIRs with the same title
+**Path A workflow:**
+1. `Glob *.docx`; extract: `textutil -convert txt -stdout "file.docx"`.
+2. Parse into a field list (instruments → forms; bullets → fields; sub-bullets → choices). Labels
+   must match the Word text **EXACTLY**; but normalize broken choice **codes** (duplicate/non-
+   sequential numbers, `99` for Other) and flag those per [[decision-protocol]]. Grids of same-scale
+   items → a REDCap **matrix group** (shared `Matrix Group Name` + identical choices).
+3. Emit with `dd_builder.py` (do NOT hand-write the CSV) — import its `DD` class or feed a JSON spec:
+   `python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-build/dd_builder.py fields.json out.csv`
+4. Save `<Project>_DataDictionary_<YYYY-MM-DD>.csv`; first field is the record ID (meaningful name,
+   not always `record_id` — [[record-id-safety]]). Patient-level DDs also get `hospital_number`
+   (identifier); surveys/non-patient-level skip it.
+5. Validate: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-build/validate_dd.py <csv>` — clean before upload.
 
-Several SIR records can share a title and PI without being duplicates (build-pitfalls #17).
-**Decide from the underlying questionnaires, not the title.** Compare each record's attached
-questionnaire(s):
-- **Different questionnaires** → genuinely separate builds (distinct sites or substudies). Build
-  each, and ask the user how to distinguish the projects (e.g. a site/country/substudy suffix in
-  the title) — the SIR title alone won't carry it.
-- **Same questionnaire across all** → possible accidental resubmission; flag to the user before
-  building N identical projects.
-Never infer "duplicate" or "four sites" from the title match alone.
+**Path B (audit):** run `validate_dd.py`, then compare field-by-field against the Word source.
+Categorize CRITICAL / ERROR / WARNING, present, fix via Edit (justify each), re-validate to clean.
+Check: duplicate/missing fields, choice-code mismatches, MDC gaps, `yesno` (convert to radio),
+branching, identifier flags, exact labels. Sister studies (same PI/HREC, separate SIRs) must share
+instrument structure — run `make_roles_csv.py` on both and compare `Forms detected`.
 
-## Parsing the Word document
+User uploads the clean CSV via Designer → Upload Data Dictionary. Then mark `dd_uploaded`. **Full DD
+column reference: [[dd-column-spec]]. Read [[build-pitfalls]] first.**
 
-### Instrument detection
-- Pattern: `Instrument N – Name` or `Instrument N (Survey) – Name`
-- form_name = name lowercased with underscores
-- Example: "Instrument 1 – Awardee Details" -> `awardee_details`
+## Step 4 — Roles & users → `user_rights_complete`
+Use **[[redcap-admin]]**: `make_roles_csv.py <dd.csv>` builds the 4 standard ARGO roles
+([[standard-roles]]) as a CSV (no token) → user uploads via User Rights → User Roles. Then assign
+PM / RA / PI / additional users to roles. Mark `user_rights_complete`.
 
-### Field detection
-- Fields appear as bullet points with labels
-- Sub-bullets indicate dropdown/radio options
-- Cues:
-  - `(Required)` -> Required Field = `y`
-  - `(Select Year)` / `(Select ... from dropdown)` -> `dropdown`
-  - `File Upload` in label -> `file`
-  - Yes/No only -> `radio` with `1, Yes | 0, No` + MDC (never `yesno` — cannot hold MDC)
-  - Multiple options -> `radio` (up to 5) or `dropdown` (more)
-  - Paragraph descriptions -> `notes`
-  - Short answer -> `text`
+## Step 5 — Data import → `data_imported`
+Prospective study (`data_collection` = prospective) → no historical data: `--set data_imported=2`.
+Retrospective data exists → map source → `import_ready.csv`, validate with `validate_import.py`
+(branching-aware), import via `content=record`, then `--set data_imported=1`.
 
-### Matrix groups
-When the questionnaire has a **grid** of questions that share one answer scale — e.g. a block of
-items all rated Yes/No/Not-Sure, or a run of 1–5 Likert items — model them as a REDCap **matrix
-group**: give each field the same `Matrix Group Name` and identical choices. Tell-tale signs: a
-table with question rows and a shared header of options, or consecutively numbered items with the
-same response scale. Individual radios also work, but a matrix matches the source layout and is
-easier to enter. (All fields in a matrix must share the exact same choice set.)
+## Step 6 — Setup: File Repository, weekly reports, DAGs (the MANUAL_SETUP_BRIEF)
+Produce a `MANUAL_SETUP_BRIEF.md` in the build folder — the per-study UI checklist with pre-filled
+values, so the manual work is copy-paste-and-click. It covers:
+- **File Repository:** the `irb_file_*` / `consent_file_*` / `sop` / `eligibility_checklist` /
+  questionnaire docs, each **renamed with the study moniker**, into Study Documents vs IRB/Ethics.
+- **Data Access Groups:** one per institution (`inst_name_*`) for multi-site studies; assign users.
+- **Weekly reports:** from `weekly_stat` / `category` (skip/confirm with PM if blank).
+- **Survey mode:** if the instrument is a respondent questionnaire, enable it as a survey.
+Flag anything the SIR leaves blank (PM not named, roles for co-investigators, etc.) as TODO.
 
-### Branching logic detection
-- `Yes -> follow-up text` shows only when parent = Yes: `[parent_field] = '1'`
-- `Other... (Input Answer)` shows when Other is selected
-- Use REDCap syntax (see [[dd-column-spec]] for full reference)
-
-### Section headers
-- Sub-sections WITHIN a form only — not for the first field
-- Do not use the instrument name as a section header
-- Only when the Word doc has explicit sub-groupings
-
-### Field labels — CRITICAL
-- Must match the Word document text EXACTLY
-- No paraphrasing, summarizing, or modifying
-- Preserve exact wording, punctuation, capitalization
-
-### Choice codes vs labels — normalize broken codes, never the text
-Real questionnaires have inconsistent **coding**: duplicate option numbers (two "4."s),
-non-sequential numbers, missing codes. Keep the **label text verbatim**, but fix the **choice
-codes** so they're unique and sequential (e.g. renumber a second "4. Unemployed" to `5`, use `99`
-for "Other"). Treat every such renumbering as a non-mechanical decision: note it and surface it to
-the user per [[decision-protocol]] — do not silently re-code clinically meaningful values.
-
-### Rich text for complex labels
-When a question has bullet-point sub-items, format using HTML:
-```html
-<div class="rich-text-field-label"><p>Main question:</p> <ul> <li>Sub item 1</li> <li>Sub item 2</li> </ul></div>
-```
-Escape inner double quotes as `""` in the CSV.
-
-### Variable naming
-- snake_case, lowercase, no punctuation
-- Common abbreviations: PI -> `pi`, Institution -> `institution`/`inst`, Date -> `date`
-- Under 26 characters when possible
-- Prefix with context if ambiguous (`midterm_pi_first` vs `final_pi_first`)
-
-### Identifier flags
-Set `Identifier? = y` for: emails, phone numbers, bank details, names (when PII), DOB, addresses. See [[dd-column-spec]] for full list.
-
-## Output
-Save at `<ProjectName>_DataDictionary_<YYYY-MM-DD>.csv`. The first field is the record identifier — give it a meaningful name (`registry_id`, `study_id`, etc.). See [[record-id-safety]].
-
-## Push to SIR after upload
-
-After the DD is uploaded to the new REDCap project AND validates clean, **immediately mark the SIR**:
-
-```bash
-python3 .../argo-pm/skills/study-intake/sir_update.py <SIR_RID> --mark-step dd_uploaded
-```
-
-If this is the first action after project creation, also push the new PID + project_created flag:
-
-```bash
-python3 .../argo-pm/skills/study-intake/sir_update.py <SIR_RID> \
-    --pid <NEW_PID> --mark-step project_created --mark-step dd_uploaded
-```
-
-The mark-step values map 1:1 to `build_tracking` yes/no fields on SIR (see "Canonical per-study build checklist" below). See [[study-intake]] for the full per-step push protocol.
-
-## ARGO-standard fields (include in every patient-level DD)
-
-These are not in the Word questionnaire but ARGO convention requires them. Add them when building Path A; the validator does not enforce their presence (yet), so it's on the builder to remember:
-
-| Field | Position | Type | Identifier? | Why |
-|---|---|---|---|---|
-| `<study>_id` (e.g., `hepatectomy_id`) | 1st (record ID) | text | no | Per [[record-id-safety]] — first field is always the record identifier |
-| `hospital_number` | 2nd | text | **y** | Patient identifier across ARGO studies. Source data often lacks it (e.g., retrospective DBs); leave blank, Alatise's team or equivalent backfills later. |
-
-Studies that are explicitly **non-patient-level** (training programs, research-capacity surveys, biobank specimen tracking without patient linkage) may skip `hospital_number` — document the deviation in the Active Databases sheet.
-
-## Canonical per-study build checklist
-
-The build workflow maps 1:1 to `build_tracking` fields on the SIR record. Each step closes with `sir_update.py --mark-step <name>` (per the "push SIR each step" rule).
-
-| # | `build_tracking` field | What lands | Notes |
-|---|---|---|---|
-| 1 | `project_created` | New REDCap project exists; PID known | Push PID via `sir_update.py --pid <NEW_PID> --mark-step project_created`. Project settings (title, purpose, PI, IRB) drawn from the SIR intake form (see "Invocation from a SIR record" above) |
-| 2 | `dd_uploaded` | Validator-clean DD live on new project | Covers the questionnaire build (Path A), MDCs (per [[mdc-rules]]), hospital_number, file-import fields, and any rich-text labels. All folded into the DD, not separate steps. |
-| 3 | `user_rights_complete` | Roles CSV uploaded + users assigned via UI | See `redcap-admin` skill. Who→Role rendered as a table — no user-assignment CSV per [[feedback-dont-generate-user-assignments-csv]] |
-| 4 | `data_imported` | Radio: `1` = historical data imported; `2` = prospective, N/A | Only relevant if intake's `data_collection` indicates retrospective data exists |
-| 5 | `review_internal` | Internal QA pass on built project | |
-| 6 | `review_pi` | PM/PI sign-off | |
-| 7 | `study_production` | Project moved to Production status in REDCap | Final flag — portfolio dashboard treats this as "done" |
-
-Substeps folded into step 2 (DD): MDCs, hospital_number, weekly_reports config (per SIR's `weekly_stat` / `category`), file-import fields. File Repository uploads (IRB, consent, SOP, questionnaire from intake's `irb_file_*`/`consent_file_*`/`sop`/`quest_*` fields) are part of step 1's project setup — rename with study moniker per [[feedback-rename-files-with-study-moniker]] before upload.
-
-Long-term study state (cancer_type, funding, IRB expiries, personnel) lands on the `study_metadata` form — not part of the per-build flow; set once at production and maintained over the study lifecycle.
-
-**Not in per-study build flow** (admin/governance, handled separately):
-- SOP / SIV verification
-- Active Databases is deprecated — that metadata now lives on `study_metadata` (see [[feedback-active-dbs-deprecated]])
-
-The `MANUAL_SETUP_BRIEF.md` generated by `study-intake` for each build walks through these in order with file paths and pre-filled values pulled from the SIR record. See [[study-intake]].
-
-## Example
-Word:
-```
-Instrument 1 – Contact Information
-- Email Address
-- Phone Number
-- Institution (Select from dropdown)
-  - Hospital A
-  - Hospital B
-  - Other... (Input Answer)
-- Other Institution (specify)
-```
-
-CSV:
-```
-email_address,contact_information,,text,"Email Address",,,email,,,y,,,,,,,
-phone_number,contact_information,,text,"Phone Number",,,,,,y,,,,,,,
-institution,contact_information,,dropdown,Institution,"1, Hospital A | 2, Hospital B | 3, Other",,,,,,,,,,,,
-institution_other,contact_information,,text,"Other Institution (specify)",,,,,,,"[institution] = '3'",,,,,,
-```
+## Steps 7–8 — Review → Production
+Internal QA pass (`review_internal`), PM/PI sign-off (`review_pi`), then Project Setup → Move to
+Production (`study_production` — the portfolio's "done" signal).
 
 ---
 
-# Path B: Review / Audit (DD CSV to corrected DD CSV)
+## sir_update.py — the Study Tracker tool
+All build-state writes go through it (confirms the project is the Study Tracker before writing;
+shows a diff and pauses). Dates are `YYYY-MM-DD` on import ([[redcap-date-import]]).
 
-## Workflow
-1. Run the validator:
-   ```bash
-   python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-build/validate_dd.py <csv_file>
-   ```
-   Record all errors and warnings.
-2. Extract the Word source (if available): `textutil -convert txt -stdout "source.docx"`
-3. Read the full CSV and compare field-by-field against the Word doc.
-4. Categorize findings (see below).
-5. Present to the user, await confirmation.
-6. Apply fixes via Edit. **Justify each change** — cite Word doc text, validator rule, or logic that motivates it. No silent edits.
-7. Re-run the validator until clean.
+```bash
+# mark steps as they land
+python3 .../skills/redcap-build/sir_update.py <RID> --pid 242 --mark-step project_created
+python3 .../skills/redcap-build/sir_update.py <RID> --mark-step dd_uploaded
+python3 .../skills/redcap-build/sir_update.py <RID> --mark-step user_rights_complete --set data_imported=2
+# IRB backfill any time
+python3 .../skills/redcap-build/sir_update.py <RID> --irb-number IPH/OAU/12/3275 --irb-expires 2027-04-16
+# close out the whole build
+python3 .../skills/redcap-build/sir_update.py <RID> --mark-built
+```
+Flags: `--pull`, `--pid`, `--status`, `--mark-step <field>` (the 7 canonical flags), `--set F=V`,
+`--irb-number/--irb-expires`, `--close` (production + open to accrual), `--mark-built` (all 7 +
+production + forms complete), `--reopen`. **No token → set these `build_tracking` fields in the UI.**
 
-## What to check
+## Scripts in this skill
+`fill_new_project.py` (Step 2 paste sheet) · `dd_builder.py` + `validate_dd.py` (Step 3 build) ·
+`validate_import.py` (Step 5) · `sir_update.py` (the tracker tool) ·
+`backfill_sir_from_csv.py` (one-time SIR migration from a portfolio CSV — not part of the per-study loop).
 
-### Structural
-- Duplicate fields (same question, different variable names)
-- Missing fields (in Word, not in CSV)
-- Extra fields (in CSV, not in Word — may be intentional, flag for user)
-- Wrong form assignment
+## Not here
+- **User-rights / role mechanics and SPR (personnel) requests** → [[redcap-admin]].
+- **Surfacing which studies are unbuilt** → `study-portfolio` (argo-pm).
 
-### Choices and values
-- Choice value mismatches (Word says `0. No`, CSV says `2, No`)
-- Missing choice options
-- Wrong choice labels
-
-### Missing Data Codes
-See [[mdc-rules]] for the authoritative table. Common failure modes:
-- Missing MDC suffix on radio/dropdown/checkbox choices
-- Wrong MDC format on date fields (must use date-format codes, not numeric)
-- `yesno` field type anywhere — convert to `radio` with `1, Yes | 0, No` + MDC
-- MDC applied to exempt fields (descriptive/calc/file or admin fields like `hospital_site`)
-
-### Prohibited field types
-`yesno` must be converted to `radio` (cannot hold MDC). See [[mdc-rules]].
-
-### Branching logic
-- Missing branching on conditional fields
-- References to non-existent variables
-- Choice code mismatches (`= '39'` when the choice is coded `49`)
-
-### Identifier flags
-Names, DOB, phone, email, addresses must have `Identifier? = y`.
-
-### Label accuracy
-Labels must match the Word doc EXACTLY. Watch for paraphrasing.
-
-### Variable naming
-- Typos (`nonmodal` vs `nonnodal`)
-- Length over 26 chars (warning, not blocking)
-
-### Sister-study consistency (Path B-only check)
-When a build folder contains **sister studies** (same PI, same HREC/protocol, two separate SIRs for different procedures or arms), the instrument structure must match across them. Word proformas can have different visual organization that misleads parallel build agents into picking different instrument vs. section structures.
-
-Examples encountered: RIDs 17 (Hepatectomy) + 18 (Whipple) both under HREC `IPH/OAU/12/3275` — the parallel agents produced 1-instrument vs 6-instrument structures respectively. Reconciled to 5 instruments each.
-
-When auditing, run `make_roles_csv.py` on both DDs; if the `Forms detected` lists differ in shape (single vs multi), flag for the user.
-
-## Report format
-Categorize by severity:
-- **CRITICAL** — will cause import failure or data loss (validator errors, duplicate variables)
-- **ERROR** — will cause incorrect behavior (wrong branching, missing MDC, choice mismatches)
-- **WARNING** — non-blocking but should be fixed (long variable names, missing identifiers)
-
----
-
-# Where this fits in the full study build
-
-This skill covers the questionnaire build (the `dd_uploaded` step) and any review/correction of the resulting DD. See the **Canonical per-study build checklist** above for the full 7-step `build_tracking` workflow. When invoked from `study-intake`, the intake skill orchestrates the steps and calls back to this skill for the DD step.
+## References
+[[build-pitfalls]] (READ FIRST) · [[mdc-rules]] · [[dd-column-spec]] · [[token-optional]] ·
+[[token-confirmation]] · [[record-id-safety]] · [[redcap-date-import]] · [[redcap-api-gotchas]] ·
+[[standard-roles]] · [[decision-protocol]]

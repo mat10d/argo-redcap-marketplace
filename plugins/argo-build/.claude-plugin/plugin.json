@@ -1,6 +1,6 @@
 {
   "name": "argo-build",
   "version": "0.1.0",
-  "description": "Build, audit, and administer REDCap studies. Triage a submitted study request and assess build-readiness (study-intake), construct a data dictionary from a Word questionnaire or review/correct an existing one (redcap-build), and administer user rights/roles on live projects (redcap-admin).",
+  "description": "Build REDCap studies end to end. redcap-build runs the whole pipeline from a submitted SIR — triage readiness, construct or audit the data dictionary, set up files, and flip the Study Tracker's build_tracking flags as each step lands. redcap-admin administers user rights and roles on live projects.",
   "author": { "name": "ARGO" }
 }

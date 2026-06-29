@@ -145,21 +145,21 @@ Path A is appropriate when:
 Once both the roles CSV is uploaded AND users are assigned to roles in the new REDCap project, **immediately mark the SIR** so the portfolio dashboard reflects the build state:
 
 ```bash
-python3 .../argo-pm/skills/study-intake/sir_update.py <SIR_RID> --mark-step user_rights_complete
+python3 .../argo-build/skills/redcap-build/sir_update.py <SIR_RID> --mark-step user_rights_complete
 ```
 
 If the build is at the point where it's ready for live use, also push:
 
 ```bash
-python3 .../argo-pm/skills/study-intake/sir_update.py <SIR_RID> \
+python3 .../argo-build/skills/redcap-build/sir_update.py <SIR_RID> \
     --mark-step user_rights_complete \
     --mark-step study_production --status production
 ```
 
-See [[study-intake]] Step 8 for the full per-step push protocol.
+See [[redcap-build]] for the full per-step push protocol.
 
 ## When to invoke this skill
 
 - After `redcap-build` finishes a new DD and the study is ready for users
-- From `study-intake` when an SPR (Study Personnel Request) needs role assignment on an existing project
+- For an SPR (Study Personnel Request) needing role assignment on an existing project
 - For any ad-hoc rights change on a live project

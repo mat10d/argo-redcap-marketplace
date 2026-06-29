@@ -14,12 +14,12 @@ the PM reviews and finalizes instead of starting from scratch each time.
 
 **Scope: documents only.** This skill does not submit the SIR for you (the PM still does the
 initiation survey today). It produces the Word package that feeds it. After the PM submits the
-SIR, [[study-intake]] triages it and [[redcap-build]] builds the database from the questionnaire.
+SIR, [[redcap-build]] (argo-build) triages the SIR and builds the database from the questionnaire.
 
 ## Pipeline position
 
 ```
-study-setup  → (PM submits SIR survey) → study-intake → redcap-build
+study-setup  → (PM submits SIR survey) → redcap-build
 draft docs       initiate on REDCap        triage SIR     build the DD
 ```
 
@@ -81,7 +81,7 @@ site and the File Repository.
    profile into its placeholders, and flag remaining `[TODO]`s.
 4. **Render** — drive the **docx** skill to produce each `.docx` in `outputs/<study-slug>/`.
 5. **Hand off** — tell the PM the package is drafted; next step is the SIR survey on REDCap,
-   then [[study-intake]] → [[redcap-build]].
+   then [[redcap-build]].
 
 ## Templates
 
@@ -92,7 +92,6 @@ templates), each with `[PLACEHOLDER]` slots:
 
 ## See also
 
-- [[study-intake]] — triages the SIR once the PM submits it (next step in the pipeline)
-- [[redcap-build]] (argo-build) — builds the data dictionary from the questionnaire
+- [[redcap-build]] (argo-build) — the next step: triages the submitted SIR and builds the database from the questionnaire
 - [[dd-column-spec]], [[mdc-rules]] — keep the questionnaire buildable
 - docx skill — used to render the Word deliverables

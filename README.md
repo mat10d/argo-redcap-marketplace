@@ -11,7 +11,7 @@ New here? See **[SETUP.md](SETUP.md)** for step-by-step install and token setup.
 | Role | Plugin | Skills | What it does |
 |---|---|---|---|
 | **Everyone** (foundation) | `argo-core` | `redcap-api` + reference docs | Shared REDCap API conventions, safety rules, and reference tables (MDC codes, standard roles, data-dictionary spec). Required by every other plugin. |
-| **Builder** | `argo-build` | `study-intake`, `redcap-build`, `redcap-admin` | Triage a submitted study request — assess if there's enough to build, then build (`study-intake`); construct a data dictionary from a Word questionnaire or audit/correct an existing one (`redcap-build`); manage user rights and roles on live projects (`redcap-admin`). |
+| **Builder** | `argo-build` | `redcap-build`, `redcap-admin` | Build a study end to end from a submitted request — triage readiness, construct/audit the data dictionary, set up files, and flip the Study Tracker's `build_tracking` flags as each step lands (`redcap-build`); manage user rights and roles on live projects (`redcap-admin`). |
 | **QA** | `argo-qa` | `redcap-qa` | Branching-logic-aware completeness QA — per-site (per-DAG) Excel worklists of applicable-but-blank fields for RAs to resolve in REDCap. |
 | **Data management** | `argo-data` | `data-export`, `study-linkage` | The token-holding role. Export/import records, metadata, files, audit logs via the API (`data-export`); link records across studies/sources with safe diff-only write-back (`study-linkage`). |
 | **Analyst** | `argo-analysis` | `run-analysis` | Reproducible, auditable analysis on a **local** export (no API token) — interview-driven plan, saved commented scripts (Python/R/Stata), organized outputs. |
@@ -26,8 +26,7 @@ argo-pm/study-setup           ← draft the new-study document package (question
    ↓  (PM submits the Study Initiation Request survey on REDCap)
 argo-pm/study-portfolio       ← weekly dashboard; surfaces which studies are still unbuilt
    ↓
-argo-build/study-intake       ← triage a study request: enough to build? → build
-argo-build/redcap-build       ← construct DD from Word (Path A) OR audit existing CSV (Path B)
+argo-build/redcap-build       ← triage SIR → build DD (Path A/B) → mark Study Tracker flags as steps land
 argo-build/redcap-admin       ← assign roles, manage user rights on live projects
    ↓
 (manual import)               ← load historical data, if any (dedicated ingest skill on roadmap)

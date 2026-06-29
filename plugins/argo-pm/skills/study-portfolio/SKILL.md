@@ -46,7 +46,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/study-portfolio/portfolio.py --diff     # a
 | Artifact | Path |
 |---|---|
 | Snapshots | `REDCap/PM/portfolio-snapshots/snapshot-<ISO timestamp>.json` |
-| Per-ticket working dirs | `REDCap/PM/tickets/<ticket-id>/` (created by [[study-intake]]) |
+| Per-ticket working dirs | `REDCap/PM/tickets/<ticket-id>/` (created by [[redcap-build]]) |
 | Tokens | `~/.argo/.env` (user-specific, mode 600, never committed) |
 
 Override `ARGO_PM_ROOT` to point to a different operational root if needed.
@@ -54,7 +54,7 @@ Override `ARGO_PM_ROOT` to point to a different operational root if needed.
 ## Hand-off to other skills
 
 When the user picks a record to act on:
-- **SIR record (study to build)** → [[study-intake]] to triage and download docs → [[redcap-build]] (in argo-build) to construct the DD
+- **SIR record (study to build)** → [[redcap-build]] (argo-build) to triage, build the DD, and mark build progress
 - **SPR record (personnel request)** → [[redcap-admin]] (in argo-build) to assign roles
 - **DATA_LINKING** → linkage workflow (TBD, may live under `argo-analysis/linkages`)
 - **DATA_REQUEST** → extraction via [[data-export]]
@@ -67,12 +67,12 @@ Recommended use: run with `--diff` every Monday morning.
 ```
 Mon AM:  python3 portfolio.py --diff
          → review new submissions, assign to participant
-         → drill into each pending-build SIR via study-intake
+         → drill into each pending-build SIR via redcap-build
 Tue–Fri: builds + admin happen via argo-build
 Following Mon: re-run --diff, items completed last week show as "newly done"
 ```
 
 ## See also
-- [[study-intake]] — triages a specific record from this portfolio
+- [[redcap-build]] (argo-build) — triages and builds a specific record from this portfolio
 - [[redcap-build]], [[redcap-admin]] — downstream hand-offs in argo-build
 - [[token-confirmation]] (argo-core) — applied automatically by `portfolio.py` before every fetch

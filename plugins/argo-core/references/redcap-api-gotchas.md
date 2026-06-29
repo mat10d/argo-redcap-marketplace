@@ -17,7 +17,7 @@ Compiled from real ARGO bulk imports. Each item below was discovered the hard wa
 
 Every silent-failure mode in this document was hit during the 2026-06 CRC push: a verify step that reported "0 conflicts" while staging 19 real overwrites, orphan writes into gated-off fields, and the REDCap UI Data Import Tool dropping **all** checkbox columns without error.
 
-**Scope.** This restricts *cohort patient-data record imports* (`content=record` writes to a study/cohort project). It does NOT restrict admin-REDCap writes (e.g. `study-intake` lifecycle tracking) or project-structure writes (data dictionary / user rights) — those are a separate, lower-risk class.
+**Scope.** This restricts *cohort patient-data record imports* (`content=record` writes to a study/cohort project). It does NOT restrict admin-REDCap writes (e.g. `redcap-build` lifecycle tracking) or project-structure writes (data dictionary / user rights) — those are a separate, lower-risk class.
 
 **Cohort record import is migration-only.** If legacy data genuinely must be bulk-loaded, treat it as a separate, deliberate one-off migration — REDCap-native import with validation ON, a decode-and-categorize preview (FILL / RECODE / OVERWRITE / HIDDEN-orphan / ALREADY) reviewed by a human, and a fresh `snapshot_project.py` first — never a step in the routine cycle. The `redcap-qa` write-back scripts (`push_updates.py`, `verify_push.py`) are **deprecated** under this policy; `snapshot_project.py` (read-only export) is retained.
 

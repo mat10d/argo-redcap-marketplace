@@ -27,7 +27,7 @@ For any operation a skill performs:
 | Operation | With a token (API) | Without a token (default-safe) |
 |---|---|---|
 | **Read records / metadata** | `content=record` / `content=metadata` export | Work from an export/download the user provides on disk (CSV + data dictionary). This is the [[run-analysis]] model. |
-| **Create a project** | (needs a Super Token — ARGO has none) | Generate the paste-ready "Create New Project" sheet; the user creates it in the UI ([[study-intake]]). |
+| **Create a project** | (needs a Super Token — ARGO has none) | Generate the paste-ready "Create New Project" sheet; the user creates it in the UI ([[redcap-build]]). |
 | **Upload a data dictionary** | API import | Save the validated DD CSV; the user uploads it via Designer ([[redcap-build]]). |
 | **Set roles / user rights** | `content=userRole` API | Generate the roles CSV; the user uploads it (User Rights → Upload). `redcap-admin` already supports this CSV path. |
 | **Write/back-fill records** | diff-only API import | Emit the update/conflict CSVs for the user to import via the UI ([[study-linkage]] diff_payload). |
