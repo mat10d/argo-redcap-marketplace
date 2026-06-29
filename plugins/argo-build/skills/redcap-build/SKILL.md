@@ -33,6 +33,14 @@ Token — [[project-no-super-token]]).
 After each step: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-build/sir_update.py <RID> --mark-step <flag>`
 (token), **or** set that yes/no field on the record in the Study Tracker UI (no token).
 
+> ### Two kinds of flags — treat them differently
+> - **Mechanical** (`project_created`, `dd_uploaded`, `data_imported`): objective facts about what
+>   happened. The agent marks these directly as each step lands.
+> - **Sign-off / go-live gates** (`review_internal`, `review_pi`, `study_production`): these assert
+>   that a *human* reviewed/approved, or that the study is live. **Never auto-flip them.** Set them
+>   only on explicit confirmation from the responsible person (internal QA done / PI signed off /
+>   cleared for production). Flipping them early puts false state in a live tracker — and is wrong.
+
 ---
 
 ## Step 1 — Triage (is there enough to build?)
@@ -58,8 +66,10 @@ already captured. Key fields drive later steps:
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-build/fill_new_project.py <RID> [<RID> ...]
 ```
 Outputs a paste-ready "Create New Project" box per record (Empty project; title, purpose,
-sub-category, PI cited, IRB, folder, notes all pre-derived). The user pastes it into REDCap → New
-Project. Once it exists, mark: `sir_update.py <RID> --pid <PID> --mark-step project_created`.
+sub-category, PI cited, IRB, folder, notes all pre-derived). **Save it** to the build folder
+(`CREATE_NEW_PROJECT_<RID>.txt`) — don't just print it. The SIR title is often ALL-CAPS; normalize
+to sentence case (preserve acronyms/proper nouns) for the project title. The user pastes it into
+REDCap → New Project. Once it exists, mark: `sir_update.py <RID> --pid <PID> --mark-step project_created`.
 
 **Multiple SIRs, same title:** decide from the *questionnaires*, not the title (build-pitfalls #17).
 Different questionnaires → separate builds (ask the user for a site/substudy suffix); identical
@@ -75,6 +85,15 @@ questionnaire across all → flag possible resubmission before building N copies
 > text/notes field gets the text-format MDC **field-note**; date fields the date-format note. Only
 > the **record-ID field** and **descriptive/calc/file** types are exempt. `dd_builder.py` applies
 > this automatically — hand-write a DD and the validator will flag dozens of fields.
+
+> ### Build the instruments the questionnaire defines — don't over-materialize
+> Build exactly what the questionnaire in front of you contains. A multi-section questionnaire
+> usually becomes **one instrument per section** (Section A/B/C…). Do NOT fabricate extra
+> instruments for follow-up rounds, time-points, or study arms that the questionnaire itself
+> doesn't contain — those live in the proposal's *design* narrative, and the follow-up interviews
+> are typically a **separate instrument from a separate source**, built separately. Read the
+> proposal to understand administration mode (form vs survey, Step 6) and design, but materialize
+> only the instrument(s) the questionnaire actually defines.
 
 **Path A workflow:**
 1. `Glob *.docx`; extract: `textutil -convert txt -stdout "file.docx"`.
@@ -118,13 +137,23 @@ values, so the manual work is copy-paste-and-click. It covers:
 - **Form vs survey:** default to **data-entry forms** — ARGO's standard model is paper
   questionnaire → RA enters. Only enable **survey mode** if the protocol/methods explicitly say
   respondents *self-complete* (online link / app). Don't infer "survey" from the instrument being a
-  questionnaire — check the proposal. (Likewise, study **design** — repeated rounds, arms — lives in
-  the proposal, not the questionnaire; model repeated interviews as separate instruments or events.)
+  questionnaire — check the proposal. (Check the proposal for study **design** too, but build only
+  what the questionnaire contains — see Step 3's over-materialize note.)
 Flag anything the SIR leaves blank (PM not named, roles for co-investigators, etc.) as TODO.
 
+The build folder should end up self-contained for handoff: the DD CSV, the roles CSV, the
+`CREATE_NEW_PROJECT_<RID>.txt` paste sheet, the renamed File Repository docs, and the
+`MANUAL_SETUP_BRIEF.md`.
+
 ## Steps 7–8 — Review → Production
-Internal QA pass (`review_internal`), PM/PI sign-off (`review_pi`), then Project Setup → Move to
-Production (`study_production` — the portfolio's "done" signal).
+These are **human sign-off / go-live gates** (see the flag note above) — confirm with the
+responsible person before flipping each; never auto-mark them.
+- `review_internal` — internal QA pass on the built project.
+- `review_pi` — PM/PI sign-off.
+- **Before `study_production`:** check `irb_approval_expires` against today's date — if it's
+  **past**, the approval has lapsed: flag for renewal and do NOT move to production until confirmed
+  (backfill the renewed date via `--irb-expires`). Also confirm `user_rights_complete`. Then Project
+  Setup → Move to Production (`study_production` — the portfolio's "done" signal).
 
 ---
 
