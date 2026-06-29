@@ -46,7 +46,7 @@ MDC_EXEMPT_FORMS = {
     "library_record_id",
 }
 # Administrative/system variable names exempt from MDC (not patient-reported clinical data)
-MDC_EXEMPT_VARS = {"hospital_site"}
+MDC_EXEMPT_VARS = {"hospital_site", "hospital_number"}  # identifiers set by study team, not MDC-coded
 
 EXPECTED_HEADER = [
     "Variable / Field Name", "Form Name", "Section Header", "Field Type",

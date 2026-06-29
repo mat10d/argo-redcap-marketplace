@@ -54,6 +54,7 @@ HEADER = ["Variable / Field Name", "Form Name", "Section Header", "Field Type", 
           "Matrix Ranking?", "Field Annotation"]
 
 EXEMPT_TYPES = {"descriptive", "calc", "file"}
+EXEMPT_VARS = {"hospital_number", "hospital_site"}  # identifiers set by study team, not MDC-coded
 CHOICE_TYPES = {"radio", "dropdown", "checkbox"}
 
 
@@ -66,7 +67,7 @@ class DD:
               identifier="", branching="", required="", section="", align="",
               qnum="", matrix="", annotation="", form=None, mdc=True):
         is_first = not self.rows  # first field is the record identifier — never gets MDC
-        if mdc and not is_first and type not in EXEMPT_TYPES:
+        if mdc and not is_first and type not in EXEMPT_TYPES and var not in EXEMPT_VARS:
             if type in CHOICE_TYPES:
                 choices = (choices + " | " + MDC_CHOICES) if choices else MDC_CHOICES
             elif type in ("text", "notes") and not note:
