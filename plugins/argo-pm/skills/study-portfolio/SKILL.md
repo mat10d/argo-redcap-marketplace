@@ -31,7 +31,7 @@ Where:
 - `6/9` is per-step progress across the 9 canonical build flags
 - The short name comes from `shortened_study_name`
 
-This replaces the Active Databases Excel sheet — see [[feedback-active-dbs-deprecated]].
+This replaces the Active Databases Excel sheet.
 
 ## How to run
 

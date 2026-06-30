@@ -22,7 +22,7 @@ A `y` in column 11 means the field holds PII (and gets de-identified on export b
 - **Choice fields (radio/dropdown/checkbox):** MDCs appended to choices
 - **Text/notes/date fields:** MDCs in Field Note column as a comment
 
-That's it. **No separate project-level MDC configuration step** in REDCap. See [[feedback-mdc-in-dd-only]] / [[mdc-rules]].
+That's it. **No separate project-level MDC configuration step** in REDCap. See [[mdc-rules]].
 
 ### 5. "Other + branched free-text" is the clean DD extension pattern
 When source data has categories the DD doesn't anticipate (e.g., morbidity values like "Liver failure" not in `morbidity_major_types`):
@@ -50,13 +50,13 @@ Display form (`06-06-6666`) goes in the Field Note. Import form (`6666-06-06`) g
 ## Ingest
 
 ### 8. DD is canonical — reshape source data to fit
-See [[feedback-questionnaire-canonical]]. Source typos (`Haemagioma` → `Haemangioma`), inverted codings, missing categories — reshape source. Don't expand the DD just to absorb source quirks unless the user approves the extension.
+The DD is canonical. Source typos (`Haemagioma` → `Haemangioma`), inverted codings, missing categories — reshape source. Don't expand the DD just to absorb source quirks unless the user approves the extension.
 
 ### 9. Inverted codings need PI confirmation — but don't over-escalate when obvious
-HepB / HepC source columns labeled `1=Yes, 2=No` vs DD using `1=Negative, 2=Positive` is a real semantic question. **But** when the column header itself spells out the meaning, don't bury the user in confirmation requests — make the obvious call and flag in the mapping report. See [[feedback-walk-through-decisions]].
+HepB / HepC source columns labeled `1=Yes, 2=No` vs DD using `1=Negative, 2=Positive` is a real semantic question. **But** when the column header itself spells out the meaning, don't bury the user in confirmation requests — make the obvious call and flag in the mapping report.
 
 ### 10. "Nil" / NaN / missing-source handling depends on field type
-**Default rule:** blank source data stays blank in the import CSV. See [[feedback-blanks-stay-blank]]. MDC codes are reserved for the rare case where the source explicitly documents "patient does not know" / "missing in case notes" — almost never the case in retrospective ingests.
+**Default rule:** blank source data stays blank in the import CSV. MDC codes are reserved for the rare case where the source explicitly documents "patient does not know" / "missing in case notes" — almost never the case in retrospective ingests.
 
 - **Checkbox bit:** `Nil` / `NaN` / blank → `0` (not selected)
 - **Radio with a "No" option:** `Nil` → `0` only if column-name semantics support it (e.g., `morbidity_popf`). Otherwise **blank**, not MDC.
@@ -78,7 +78,7 @@ Per-project API tokens are admin-controlled at OAU. The marketplace defaults to 
 The Hepatectomy build had a moment where PID 242 (new study) was confused with PID 224 (SIR admin). Token confirmation always shows `project_title` — verify before any write.
 
 ### 13b. Push SIR build_tracking + study_metadata as each step lands
-Do not batch the per-step writes at the end of a build. Immediately after each canonical step completes (project creation, DD upload, user rights, data import, internal review, PI review, production), call `sir_update.py` with the right `--mark-step` / `--set` / `--status` flags. The portfolio dashboard reads these in real time. See [[feedback-push-sir-each-step]].
+Do not batch the per-step writes at the end of a build. Immediately after each canonical step completes (project creation, DD upload, user rights, data import, internal review, PI review, production), call `sir_update.py` with the right `--mark-step` / `--set` / `--status` flags. The portfolio dashboard reads these in real time.
 
 The 7 build_tracking flags: `project_created`, `dd_uploaded`, `user_rights_complete`, `data_imported` (radio: 1=Yes/2=Prospective-not-required), `review_internal`, `review_pi`, `study_production`.
 
@@ -88,7 +88,7 @@ PIs often submit before IRB approval lands ("Pending" `irb_number`, blank `irb_a
 ## Decision protocol
 
 ### 15. Walk every non-mechanical decision through the user
-Auto mode applies to file ops and validation. Decisions about data semantics, DD structure, identifier conflicts, or live-project writes always go through a user check, one at a time, sorted by stakes. See [[decision-protocol]] / [[feedback-walk-through-decisions]].
+Auto mode applies to file ops and validation. Decisions about data semantics, DD structure, identifier conflicts, or live-project writes always go through a user check, one at a time, sorted by stakes. See [[decision-protocol]].
 
 ### 16. Don't over-escalate
 The flip side of #15: when the data tells you the answer (column headers, clinical literature, distribution of values), make the call and document it. Don't bury the user in confirmations.
