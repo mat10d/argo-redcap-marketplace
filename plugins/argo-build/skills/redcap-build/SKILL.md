@@ -128,8 +128,14 @@ Retrospective data exists → map source → `import_ready.csv`, validate with `
 (branching-aware), import via `content=record`, then `--set data_imported=1`.
 
 ## Step 6 — Setup: File Repository, weekly reports, DAGs (the MANUAL_SETUP_BRIEF)
-Produce a `MANUAL_SETUP_BRIEF.md` in the build folder — the per-study UI checklist with pre-filled
-values, so the manual work is copy-paste-and-click. It covers:
+Generate the per-study UI checklist with `setup_brief.py`:
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-build/setup_brief.py <RID> --out <build_dir> --moniker <Moniker>
+```
+It derives — from the SIR record — the File Repository rename table, the Data Access Groups, the
+user→role table, the IRB-expiry flag, and the token-optional `build_tracking` commands, so the
+manual work is copy-paste-and-click. (Token-optional: add `--from-json rec.json` to run from a
+`sir_update.py --pull` dump with no token.) Review/augment the generated brief, which covers:
 - **File Repository:** the `irb_file_*` / `consent_file_*` / `sop` / `eligibility_checklist` /
   questionnaire docs, each **renamed with the study moniker**, into Study Documents vs IRB/Ethics.
 - **Data Access Groups:** one per institution (`inst_name_*`) for multi-site studies; assign users.
@@ -177,7 +183,8 @@ production + forms complete), `--reopen`. **No token → set these `build_tracki
 
 ## Scripts in this skill
 `fill_new_project.py` (Step 2 paste sheet) · `dd_builder.py` + `validate_dd.py` (Step 3 build) ·
-`validate_import.py` (Step 5) · `sir_update.py` (the tracker tool) ·
+`validate_import.py` (Step 5) · `setup_brief.py` (Step 6 MANUAL_SETUP_BRIEF generator) ·
+`sir_update.py` (the tracker tool) ·
 `backfill_sir_from_csv.py` (one-time SIR migration from a portfolio CSV — not part of the per-study loop).
 
 ## Not here
