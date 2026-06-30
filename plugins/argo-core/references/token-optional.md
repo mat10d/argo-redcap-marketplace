@@ -31,7 +31,7 @@ For any operation a skill performs:
 | **Upload a data dictionary** | API import | Save the validated DD CSV; the user uploads it via Designer ([[redcap-build]]). |
 | **Set roles / user rights** | `content=userRole` API | Generate the roles CSV; the user uploads it (User Rights → Upload). `redcap-admin` already supports this CSV path. |
 | **Write/back-fill records** | diff-only API import | Emit the update/conflict CSVs for the user to import via the UI ([[study-linkage]] diff_payload). |
-| **QA worklists** | pull via `--token-env` | Run against a local export the user downloaded (planned: local-CSV mode for `redcap-qa`). |
+| **QA worklists** | pull via `--token-env` | Run against a local record export + Data Dictionary the user downloaded: `build_worklists.py --records-csv --metadata-csv`. |
 
 ## How a skill should behave
 

@@ -356,10 +356,35 @@ def _expand_checkbox_columns(fields: list, raw_cols: list, meta_by: dict) -> lis
     return out
 
 
+# REDCap "Download Data Dictionary" CSV (human headers) -> API metadata keys, for no-token mode.
+_DD_TO_META = {
+    "Variable / Field Name": "field_name", "Form Name": "form_name", "Section Header": "section_header",
+    "Field Type": "field_type", "Field Label": "field_label",
+    "Choices, Calculations, OR Slider Labels": "select_choices_or_calculations", "Field Note": "field_note",
+    "Text Validation Type OR Show Slider Number": "text_validation_type_or_show_slider_number",
+    "Text Validation Min": "text_validation_min", "Text Validation Max": "text_validation_max",
+    "Identifier?": "identifier", "Branching Logic (Show field only if...)": "branching_logic",
+    "Required Field?": "required_field", "Custom Alignment": "custom_alignment",
+    "Question Number (surveys only)": "question_number", "Matrix Group Name": "matrix_group_name",
+    "Matrix Ranking?": "matrix_ranking", "Field Annotation": "field_annotation",
+}
+
+
+def load_metadata_csv(path):
+    """Load a local metadata CSV (no-token mode). Accepts either a REDCap API metadata export
+    (already has 'field_name') or a Designer 'Download Data Dictionary' CSV (human headers)."""
+    df = pd.read_csv(path, dtype=str, keep_default_na=False)
+    if "field_name" not in df.columns:
+        df = df.rename(columns=_DD_TO_META)
+    return df.to_dict("records")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--url", required=True, help="REDCap API URL")
-    ap.add_argument("--token-env", required=True, help="Env var holding the API token")
+    ap.add_argument("--url", help="REDCap API URL (API mode)")
+    ap.add_argument("--token-env", help="Env var holding the API token (API mode)")
+    ap.add_argument("--records-csv", help="No-token mode: local record export CSV (use instead of --url/--token-env)")
+    ap.add_argument("--metadata-csv", help="No-token mode: local Data Dictionary CSV (paired with --records-csv)")
     ap.add_argument("--fields", required=True, help="Path to fields YAML")
     ap.add_argument("--out", required=True, help="Output directory (a per-round subdir will be appended)")
     ap.add_argument("--round", dest="round_tag", default="",
@@ -377,9 +402,6 @@ def main():
         args.out = os.path.join(args.out, args.round_tag)
         print(f"Round: {args.round_tag} → writing to {args.out}/")
 
-    token = os.environ.get(args.token_env)
-    if not token:
-        sys.exit(f"Env var {args.token_env} is not set")
     cfg = yaml.safe_load(open(args.fields))
     workbooks_cfg = cfg.get("workbooks") or []
     if not workbooks_cfg:
@@ -389,9 +411,21 @@ def main():
     extra_id_cols = [c.strip() for c in args.extra_id_cols.split(",") if c.strip()]
     id_cols = [args.id_field] + extra_id_cols
 
-    print(f"Pulling records + metadata from {args.url} ...")
-    raw = pull_records(args.url, token)
-    metadata = pull_metadata(args.url, token)
+    if args.records_csv:
+        if not args.metadata_csv:
+            sys.exit("--records-csv requires --metadata-csv (no-token mode needs the data dictionary too).")
+        print(f"No-token mode: reading {args.records_csv} + {args.metadata_csv} ...")
+        raw = pd.read_csv(args.records_csv, dtype=str, keep_default_na=False)
+        metadata = load_metadata_csv(args.metadata_csv)
+    elif args.url and args.token_env:
+        token = os.environ.get(args.token_env)
+        if not token:
+            sys.exit(f"Env var {args.token_env} is not set")
+        print(f"Pulling records + metadata from {args.url} ...")
+        raw = pull_records(args.url, token)
+        metadata = pull_metadata(args.url, token)
+    else:
+        sys.exit("Provide either --records-csv + --metadata-csv (no-token), or --url + --token-env (API).")
     meta_by = {m["field_name"]: m for m in metadata}
 
     if args.id_field not in raw.columns:

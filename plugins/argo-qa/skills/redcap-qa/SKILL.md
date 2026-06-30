@@ -23,7 +23,10 @@ Pattern was developed on the R01 CRC cohort — see `REDCap/Analysis/linkages/R0
 
 ## Inputs
 
-1. **REDCap project token** — set as an env var (e.g. `CRC_TOKEN`).
+1. **Data source (token-optional, see [[token-optional]])** — *either* a **REDCap project token**
+   as an env var (e.g. `CRC_TOKEN`) to pull live via the API, *or* a **local record-export CSV +
+   Data Dictionary CSV** you downloaded from REDCap (no token needed). QA shouldn't require an API
+   token any more than analysis does.
 2. **Fields YAML** — names the workbooks and lists the fields each one covers. Order fields so gate fields come *before* their dependents.
 
    ```yaml
@@ -58,6 +61,15 @@ python3 .../argo-qa/skills/redcap-qa/build_worklists.py \
     --extra-id-cols collaboration_identifier \
     --scope-ids cohort_ids.csv         # optional
 ```
+
+**No-token mode** — when you don't have an API token, download the records (Data Export) and the
+Data Dictionary (Designer → Download Data Dictionary) and point at them instead of `--url`/`--token-env`:
+```bash
+python3 .../argo-qa/skills/redcap-qa/build_worklists.py \
+    --records-csv export.csv --metadata-csv data_dictionary.csv \
+    --fields fields.yaml --out outputs/qa_worklists --id-field research_number
+```
+(The Data Dictionary's human column headers are mapped automatically.)
 
 Outputs:
 ```
