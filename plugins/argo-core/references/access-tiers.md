@@ -122,18 +122,32 @@ What follows from that, and is already implemented:
 
 ### Credentials in Cowork
 
-`~/.argo/.env` doesn't exist there, and that's structural — not something code can fix. Two
-workable routes, in order of preference:
+`~/.argo/.env` doesn't exist there, and that's structural — `$HOME` is ephemeral per session and
+isn't the user's Mac home. So the file has to be **created**, in a folder the user connects.
+That's what `argo_setup.py` is for:
 
-1. **No token at all.** This is the default and it carries almost everything: Tier 2 and Tier 3
-   work is CSV-via-UI anyway, and `run-analysis` is Tier 0. Cowork should be assumed token-free.
-2. **A dedicated connected folder**, for the one person running the weekly portfolio. The shared
-   client looks for `argo.env` / `.env` / `.argo/.env` in the working directory, its parents, and
-   any mounted folder under `/mnt`, and `ARGO_ENV_FILE=/path/to/file` overrides all of it.
-   **Connect a folder containing only that file** — a connected folder is readable in full, so
-   don't put credentials in a folder with other work in it.
+```bash
+python3 argo_setup.py --dir /mnt/<connected-folder>/argo-work
+```
 
-Tokens exported inline for a single command always win over anything read from a file.
+**Decided layout: one working folder, with the keys inside it.** `argo-work/` holds `.env`
+alongside `exports/`, `worklists/`, `builds/` and `pm/`. One folder to connect, and the shared
+client discovers the settings on its own when run from inside it. The trade-off was considered
+deliberately: a connected folder is readable in full, so the keys are visible whenever that folder
+is connected. That's accepted because these are admin-tracker keys for ARGO's own
+project-management records rather than patient data, and nothing ever prints more than a token's
+last four characters. `--separate-credentials` splits keys into their own folder for anyone who
+wants the smaller footprint.
+
+Still true regardless of layout:
+
+- **Assume token-free by default.** Tier 2 and Tier 3 work is CSV-via-UI anyway and `run-analysis`
+  is Tier 0, so most Cowork sessions need no key at all.
+- **Never put a token in a command.** `argo_setup.py` takes no token argument and never prompts
+  for one; keys are pasted into the file in an editor. Commands end up in history and transcripts.
+- **Lookup order:** `ARGO_ENV_FILE` → working directory and its parents → `/mnt/*` →
+  `~/.argo/.env`. A token exported inline for a single command always wins over any file.
+- The settings file is written `0600` and git-ignored on creation.
 
 ## Credential storage convention
 

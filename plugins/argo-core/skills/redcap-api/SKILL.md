@@ -77,6 +77,33 @@ curl -X POST "$REDCAP_URL" \
   -d "token=$TOKEN" -d "content=project" -d "format=json"
 ```
 
+## First-time setup
+
+Before anything else on a new machine — or in a new Cowork session — create a folder to work in.
+Nothing exists by default: there is no `~/.argo/.env` until someone makes one.
+
+```bash
+python3 argo_setup.py --dir ~/argo-work          # local
+python3 argo_setup.py --dir /mnt/<folder>/argo-work   # a folder connected in Cowork
+```
+
+It creates `exports/`, `worklists/`, `builds/`, `pm/`, a `.gitignore`, and a `.env` holding the
+REDCap web address and any access keys — written `0600`, and never overwritten if it already
+exists. **The keys live in the working folder** so one connected folder is all anyone needs;
+`--separate-credentials` splits them out for anyone who wants a smaller footprint.
+
+`argo_setup.py` never asks for a token interactively and takes no token argument, deliberately:
+anything typed as a command can end up in shell history and transcripts. The user pastes keys into
+the file in an editor. Then:
+
+```bash
+python3 argo_setup.py --check --dir ~/argo-work
+```
+
+Once the file exists, scripts find it on their own — the shared client searches `ARGO_ENV_FILE`,
+the working directory and its parents, `/mnt/*`, and `~/.argo/.env`. Sourcing it by hand still
+works and still wins.
+
 ## Checking your setup works
 
 Before doing anything else on a new machine, or if a skill says it can't reach REDCap:

@@ -25,6 +25,24 @@ like `plugin_01Nb88PFMeGYARWh6p7i7MV2`, *not* `argo-core` — that's the point o
 
 ---
 
+## 0. First-time setup
+
+Cowork has no `~/.argo/.env` and no persistent home, so the working folder has to be created.
+This check confirms setup works *and* that it's safe to run.
+
+```bash
+U=$(find /mnt/.remote-plugins ~/.claude/plugins -name argo_setup.py 2>/dev/null | head -1); echo "--- with no arguments, must create nothing ---"; python3 "$U" 2>&1 | tail -4; echo "--- now actually set up a folder ---"; python3 "$U" --dir /tmp/argo-work-test 2>&1 | tail -8; ls -la /tmp/argo-work-test/.env
+```
+
+**Pass:** the first run explains itself and ends with "Nothing has been created yet"; the second
+creates `exports/ worklists/ builds/ pm/`, a `.gitignore`, and a `.env` with permissions
+`-rw-------`. **Fail:** the no-argument run creates anything, or the `.env` is group/world
+readable.
+
+For a real setup, use a folder you've connected rather than `/tmp`, and paste the REDCap address
+and any access keys into the `.env` **in an editor** — never as a command, since commands are
+saved in transcripts.
+
 ## 1. Crash site: `backfill_sir_from_csv.py`
 
 Previously raised a bare `KeyError: 'REDCAP_URL'` with nothing configured.

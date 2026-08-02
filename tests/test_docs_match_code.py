@@ -175,6 +175,54 @@ class TestHeadlessSafe(unittest.TestCase):
         )
 
 
+class TestSetupIsSafe(unittest.TestCase):
+    """argo_setup.py creates folders — so it must never do that just for being run."""
+
+    SETUP = PLUGINS / "argo-core/scripts/argo_setup.py"
+
+    def test_no_args_creates_nothing(self):
+        import tempfile
+        home = tempfile.mkdtemp()
+        env = dict(os.environ, HOME=home)
+        before = set(os.listdir(home))
+        proc = subprocess.run([sys.executable, str(self.SETUP)],
+                              capture_output=True, text=True, timeout=60, env=env)
+        after = set(os.listdir(home))
+        self.assertEqual(before, after,
+                         "running argo_setup.py with no arguments created something")
+        self.assertIn("Nothing has been created yet", proc.stdout)
+
+    def test_setup_writes_a_private_env_file(self):
+        import tempfile
+        work = Path(tempfile.mkdtemp()) / "argo-work"
+        subprocess.run([sys.executable, str(self.SETUP), "--dir", str(work)],
+                       capture_output=True, text=True, timeout=60)
+        env_file = work / ".env"
+        self.assertTrue(env_file.exists(), "no .env was created")
+        self.assertEqual(oct(env_file.stat().st_mode & 0o777)[2:], "600",
+                         "the settings file must be readable only by its owner")
+        self.assertIn(".env", (work / ".gitignore").read_text(),
+                      "the settings file must be git-ignored so keys can't be committed")
+
+    def test_setup_never_overwrites_existing_keys(self):
+        import tempfile
+        work = Path(tempfile.mkdtemp()) / "argo-work"
+        subprocess.run([sys.executable, str(self.SETUP), "--dir", str(work)],
+                       capture_output=True, timeout=60)
+        env_file = work / ".env"
+        env_file.write_text(env_file.read_text().replace("DATA_REQUEST=", "DATA_REQUEST=keepme"))
+        subprocess.run([sys.executable, str(self.SETUP), "--dir", str(work)],
+                       capture_output=True, timeout=60)
+        self.assertIn("DATA_REQUEST=keepme", env_file.read_text(),
+                      "re-running setup destroyed a key the user had filled in")
+
+    def test_template_never_asks_for_a_token_on_the_command_line(self):
+        text = self.SETUP.read_text()
+        self.assertNotIn('"--token"', text)
+        self.assertNotIn("'--token'", text)
+        self.assertIn("never pass one on the command line", text.lower().replace("**", ""))
+
+
 class TestScriptsDegradeGracefully(unittest.TestCase):
     """Finding #3's smoke test: no script may traceback when run with no arguments."""
 
