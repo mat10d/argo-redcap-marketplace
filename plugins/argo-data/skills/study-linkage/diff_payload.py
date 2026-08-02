@@ -68,7 +68,13 @@ def main():
     else:
         fields = [c for c in comp_cols if c in set(curr_cols) and c != args.id_field]
     if not fields:
-        raise SystemExit("ERROR: no shared fields to compare (check --fields / headers)")
+        raise SystemExit(
+            "The two files have no columns in common, so there's nothing to compare.\n"
+            "\n"
+            "Check that both files really are the ones you meant, and that their column headings\n"
+            "match. If the same information is under different headings in each file, say which\n"
+            "ones to compare with --fields."
+        )
 
     updates = []      # rows with >=1 safe-fill (id + filled cells only)
     overwrites = []   # rows with >=1 conflict (id + computed values for conflicting cells)

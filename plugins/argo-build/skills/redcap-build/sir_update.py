@@ -55,6 +55,25 @@ def api_post_record(token, payload):
 
 
 def confirm(prompt):
+    """Ask before writing. Works whether or not anyone is sitting at a keyboard.
+
+    When this runs somewhere with no keyboard attached — an agent session, a scheduled job, a
+    cloud runner — there is nobody to answer, so waiting would hang forever. In that case require
+    --yes up front instead, which makes the approval explicit rather than assumed.
+    """
+    if "--yes" in sys.argv or os.environ.get("ARGO_ASSUME_YES") == "1":
+        print(f"{prompt} [y/N] y   (--yes was given)")
+        return True
+    if not sys.stdin.isatty():
+        sys.exit(
+            f"{prompt}\n"
+            "\n"
+            "I need you to approve this before writing, but nothing here can accept a typed\n"
+            "answer — there's no keyboard attached to this session.\n"
+            "\n"
+            "Look at the changes listed above. If they're right, run the same command again with\n"
+            "--yes on the end, which records that you approved them."
+        )
     return input(f"{prompt} [y/N] ").strip().lower() in ("y", "yes")
 
 
@@ -78,6 +97,9 @@ def main():
     ap = argparse.ArgumentParser(description="Apply targeted updates to a SIR record.")
     ap.add_argument("rid", help="SIR record_id")
     # Read mode
+    ap.add_argument("--yes", action="store_true",
+                    help="Approve the change without being asked. Required when running where "
+                         "there's no keyboard to answer a prompt (agent sessions, scheduled jobs).")
     ap.add_argument("--pull", action="store_true", help="Print the full record (intake + build_tracking + study_metadata) as JSON to stdout. Read-only; ignores all write flags.")
     # Convenience flags (common cases)
     ap.add_argument("--irb-number", help="Set irb_number (e.g. IPH/OAU/12/3275)")
@@ -93,13 +115,28 @@ def main():
     args = ap.parse_args()
 
     if not REDCAP_URL or not SIR_TOKEN:
-        sys.exit("REDCAP_URL or STUDY_INITIATION_REQUEST not set. Source ~/.argo/.env first.")
+        sys.exit(
+        "This tool needs to know the web address of your REDCap system, and the access key for\n"
+        "the Study Tracker, before it can do anything. One or both isn't set on this computer.\n"
+        "\n"
+        "Both live in a file called ~/.argo/.env. If you have that file already, load it into\n"
+        "this terminal window and try again:\n"
+        "\n"
+        "    set -a; source ~/.argo/.env; set +a\n"
+        "\n"
+        "If you don't have it yet, ask your ARGO REDCap administrator to set you up."
+    )
 
     # Pull mode: read-only, dump JSON, exit
     if args.pull:
         rec = api_post(SIR_TOKEN, content="record", **{f"records[0]": args.rid})
         if not rec:
-            sys.exit(f"Record {args.rid} not found in SIR.")
+            sys.exit(
+            f"There's no record numbered {args.rid} in the Study Tracker.\n"
+            "\n"
+            "Check the number — you can see the full list by running the portfolio tool\n"
+            "(study-portfolio), which prints each study's record number in square brackets."
+        )
         json.dump(rec[0], sys.stdout, indent=2)
         sys.stdout.write("\n")
         return
@@ -109,7 +146,13 @@ def main():
         sys.exit("Nothing to do — pass at least one of: --pull, --irb-number, --irb-expires, --close, --reopen, --pid, --status, --mark-step, --mark-built, --set FIELD=VALUE")
 
     if args.irb_expires and not re.match(r"^\d{4}-\d{2}-\d{2}$", args.irb_expires):
-        sys.exit(f"--irb-expires must be YYYY-MM-DD (REDCap import format), got: {args.irb_expires}")
+        sys.exit(
+            f"The IRB expiry date needs to be written year-month-day, with dashes, like\n"
+            f"2027-04-16. I got: {args.irb_expires}\n"
+            "\n"
+            "REDCap only accepts that exact format on import, so 16/04/2027 or Apr 16 2027\n"
+            "won't work."
+        )
 
     # Step 1: confirm token
     info = api_post(SIR_TOKEN, content="project")
@@ -119,7 +162,16 @@ def main():
     print(f"  pid:   {info.get('project_id')}")
     print(f"  token tail: ...{SIR_TOKEN[-4:]}")
     if "Study Tracker" not in info.get("project_title", "") and "Study Initiation" not in info.get("project_title", ""):
-        sys.exit("Token does not appear to point at the SIR / Study Tracker — refusing to proceed.")
+        sys.exit(
+            "Stopping before making any changes.\n"
+            "\n"
+            "The access key set up on this computer doesn't open the Study Tracker — it opens a\n"
+            "different REDCap project. Writing build progress to the wrong project would put\n"
+            "false information in someone else's study, so nothing has been changed.\n"
+            "\n"
+            "Check the STUDY_INITIATION_REQUEST line in ~/.argo/.env, or ask your REDCap\n"
+            "administrator which key belongs to the Study Tracker."
+        )
 
     # Step 2: fetch the full record so we can diff against any field
     cur = api_post(SIR_TOKEN, content="record",

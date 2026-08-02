@@ -144,7 +144,13 @@ def forms_block(template: str, all_forms: list, clinical_forms: list) -> str:
 def build_csv(dd_path: Path, clinical_override: list = None) -> str:
     all_forms = extract_forms_from_dd(dd_path)
     if not all_forms:
-        sys.exit(f"No forms found in DD: {dd_path}")
+        sys.exit(
+            f"That file doesn't seem to contain any forms:\n"
+            f"    {dd_path}\n"
+            "\n"
+            "It should be the study's data dictionary, downloaded from REDCap's Data Dictionary\n"
+            "page. If you opened and re-saved it in Excel, try downloading a fresh copy."
+        )
 
     clinical, non_clinical = split_clinical(all_forms, clinical_override)
 
@@ -176,7 +182,13 @@ def main():
 
     dd_path = Path(args.dd_path).resolve()
     if not dd_path.exists():
-        sys.exit(f"DD not found: {dd_path}")
+        sys.exit(
+            f"I couldn't find the data dictionary file:\n"
+            f"    {dd_path}\n"
+            "\n"
+            "This is the CSV describing the study's fields — you can download it from the\n"
+            "REDCap project's Data Dictionary page. Check the file name and folder are right."
+        )
 
     clinical_override = None
     if args.clinical:

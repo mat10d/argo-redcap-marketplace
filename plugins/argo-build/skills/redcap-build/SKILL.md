@@ -11,11 +11,20 @@ skills (intake triage + DD build). The spine is a feedback loop — **every pipe
 lets you flip one `build_tracking` flag on the Study Tracker, so the portfolio gets more accurate
 in real time.** Mark as you go; never batch at the end.
 
-## Token-optional (read first)
-Per [[token-optional]]: never block on an API token. If the SIR token (`STUDY_INITIATION_REQUEST`)
-is present, mark flags via `sir_update.py`; if not, set the same `build_tracking` fields by hand in
-the Study Tracker UI. Project creation and DD upload are UI steps regardless (OAU has no Super
-Token — [[project-no-super-token]]).
+## Which access this skill needs (read first)
+
+Two different things get confused here, so be precise ([[access-tiers]]):
+
+- **Writing build progress to the Study Tracker** uses the SIR token
+  (`STUDY_INITIATION_REQUEST`), which ARGO holds permanently. This is **Tier 1** — it needs no
+  per-study permission from anyone. `sir_update.py --mark-step` is **the** way to mark progress;
+  do not offer the user a choice about it.
+- **Anything against the new study's own project** (creating it, uploading the DD) is UI-only
+  regardless, because OAU has no Super Token ([[project-no-super-token]]).
+
+If the SIR token genuinely isn't configured on this machine, fall back to setting the same
+`build_tracking` yes/no fields by hand in the Study Tracker — but say that's what you're doing and
+why. That's a fallback for a broken setup, not an equal option to present each time.
 
 ## The pipeline ↔ tracker loop
 
@@ -30,8 +39,11 @@ Token — [[project-no-super-token]]).
 | 7 | **Review** | Internal QA, then PI sign-off | — | `review_internal`, `review_pi` |
 | 8 | **Production** | Move project to Production | — | `study_production` |
 
-After each step: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-build/sir_update.py <RID> --mark-step <flag>`
-(token), **or** set that yes/no field on the record in the Study Tracker UI (no token).
+After each step, immediately:
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-build/sir_update.py <RID> --mark-step <flag>`
+
+One push per step, never batched at the end — that's what keeps the portfolio's progress column
+honest between runs.
 
 > ### Two kinds of flags — treat them differently
 > - **Mechanical** (`project_created`, `dd_uploaded`, `data_imported`): objective facts about what
@@ -177,15 +189,31 @@ python3 .../skills/redcap-build/sir_update.py <RID> --irb-number IPH/OAU/12/3275
 # close out the whole build
 python3 .../skills/redcap-build/sir_update.py <RID> --mark-built
 ```
-Flags: `--pull`, `--pid`, `--status`, `--mark-step <field>` (the 7 canonical flags), `--set F=V`,
-`--irb-number/--irb-expires`, `--close` (production + open to accrual), `--mark-built` (all 7 +
-production + forms complete), `--reopen`. **No token → set these `build_tracking` fields in the UI.**
+### Which flag to use when
+
+Three flags can move a study toward "done". They are **not** interchangeable — use them like this
+([[access-tiers]]):
+
+| Situation | Use | Why |
+|---|---|---|
+| A build step just landed | `--mark-step <field>` | One step, one push, as it happens |
+| The build is finished | `--mark-built` | **The** close-out command: sets all 7 flags + production + forms complete |
+| Fixing one wrong value after the fact | `--set F=V` | **Escape hatch only.** Never a routine close-out path — it bypasses the step-by-step record the tracker exists to keep |
+
+`--close` (production + open to accrual) is for a study going live where the build was already
+marked complete; if you're finishing a build, `--mark-built` is the command you want.
+
+Other flags: `--pull`, `--pid`, `--status`, `--irb-number/--irb-expires`, `--reopen`.
+
+If the SIR token isn't configured, set the same `build_tracking` fields by hand in the Study
+Tracker and say so — see the access note at the top of this skill.
 
 ## Scripts in this skill
 `fill_new_project.py` (Step 2 paste sheet) · `dd_builder.py` + `validate_dd.py` (Step 3 build) ·
 `validate_import.py` (Step 5) · `setup_brief.py` (Step 6 MANUAL_SETUP_BRIEF generator) ·
 `sir_update.py` (the tracker tool) ·
-`backfill_sir_from_csv.py` (one-time SIR migration from a portfolio CSV — not part of the per-study loop).
+`backfill_sir_from_csv.py` (bulk SIR loads from a spreadsheet — not part of the per-study loop;
+requires an explicit `--record-id-range` before it will write anything).
 
 ## Not here
 - **User-rights / role mechanics and SPR (personnel) requests** → [[redcap-admin]].

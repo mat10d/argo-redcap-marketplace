@@ -138,9 +138,25 @@ def render(rec):
 
 def main():
     if not REDCAP_URL or not SIR_TOKEN:
-        sys.exit("REDCAP_URL or STUDY_INITIATION_REQUEST not set. Source ~/.argo/.env first.")
+        sys.exit(
+        "This tool needs to know the web address of your REDCap system, and the access key for\n"
+        "the Study Tracker, before it can do anything. One or both isn't set on this computer.\n"
+        "\n"
+        "Both live in a file called ~/.argo/.env. If you have that file already, load it into\n"
+        "this terminal window and try again:\n"
+        "\n"
+        "    set -a; source ~/.argo/.env; set +a\n"
+        "\n"
+        "If you don't have it yet, ask your ARGO REDCap administrator to set you up."
+    )
     if len(sys.argv) < 2:
-        sys.exit("Usage: python3 fill_new_project.py <SIR_RID> [<SIR_RID> ...]")
+        sys.exit(
+        "Tell me which study or studies to prepare, using their record numbers in the Study\n"
+        "Tracker. For example:\n"
+        "\n"
+        "    python3 fill_new_project.py 109\n"
+        "    python3 fill_new_project.py 109 110 111"
+    )
 
     for rid in sys.argv[1:]:
         rec = fetch_sir(rid)

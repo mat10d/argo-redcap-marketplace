@@ -1,29 +1,56 @@
 #!/usr/bin/env python3
-"""Backfill SIR with explicit record_ids per master sort.
+"""Load Study Tracker (SIR) records in bulk from a spreadsheet, at chosen record numbers.
 
-Pushes 17 updates (in place) + 84 Excel creates at explicit record_ids 1-108
-filling gaps left after the manual rename.
+This writes to the Study Tracker (project 224) — ARGO's own project-management records, not
+patient data. It assigns each row a record number in sorted order, so it can both update records
+that already exist and create the ones that don't.
+
+Because it writes at specific record numbers, **you must say which range of record numbers it is
+allowed to touch** before it will write anything. That way a re-run against a different
+spreadsheet can't quietly overwrite records outside the range you had in mind.
+
+Usage:
+    set -a; source ~/.argo/.env; set +a
+
+    # See what it would do, without changing anything (always do this first)
+    python3 backfill_sir_from_csv.py --csv active_dbs.csv
+
+    # Actually write, allowing only record numbers 1 to 108 to be touched
+    python3 backfill_sir_from_csv.py --csv active_dbs.csv --record-id-range 1-108 --commit
 """
-import os, sys, csv, json, urllib.request, urllib.parse, difflib, re, argparse
+import os, sys, csv, json, difflib, re, argparse
 
-REDCAP_URL = os.environ['REDCAP_URL']
-SIR_TOKEN = os.environ['STUDY_INITIATION_REQUEST']
+def _add_argo_core_to_path():
+    """Find argo-core's scripts folder and make it importable.
 
-def api_post(token, **params):
-    data = urllib.parse.urlencode({'token': token, 'format':'json', **params}).encode()
-    req = urllib.request.Request(REDCAP_URL, data=data, method='POST')
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.loads(r.read())
+    Searches for the FILE argo_redcap_client.py, never for a directory named "argo-core":
+    plugin directories are named differently per environment (Claude Code uses
+    <marketplace>/<plugin>/<version>/; Cowork uses opaque plugin_<id>/ names with the plugin
+    name only inside its manifest), so a name-based search finds nothing in some of them.
+    """
+    from pathlib import Path as _P
+    marker = "argo_redcap_client.py"
+    override = os.environ.get("ARGO_CORE_SCRIPTS")
+    if override and (_P(override).expanduser() / marker).exists():
+        sys.path.insert(0, str(_P(override).expanduser())); return
+    for root in ("/mnt/.remote-plugins", "~/.claude/plugins", "~/.claude/plugins/cache"):
+        base = _P(root).expanduser()
+        if base.is_dir():
+            hits = sorted(base.glob(f"**/{marker}"))
+            if hits:
+                sys.path.insert(0, str(hits[-1].parent)); return
+    for parent in _P(__file__).resolve().parents:
+        for cand in (parent / "plugins" / "argo-core" / "scripts",
+                     parent / "argo-core" / "scripts"):
+            if (cand / marker).exists():
+                sys.path.insert(0, str(cand)); return
 
-def api_post_record(token, payload, mode='normal'):
-    data = urllib.parse.urlencode({
-        'token': token, 'format':'json',
-        'content':'record', 'overwriteBehavior': mode,
-        'data': json.dumps(payload),
-    }).encode()
-    req = urllib.request.Request(REDCAP_URL, data=data, method='POST')
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.loads(r.read())
+
+_add_argo_core_to_path()
+from argo_redcap_client import RedcapClient, RedcapError  # noqa: E402
+
+SIR_TITLE = "Study Tracker"
+SIR_PID = "224"
 
 def fuzz_norm(t):
     t = (t or '').lower(); t = re.sub(r'[^a-z0-9 ]', ' ', t)
@@ -105,10 +132,24 @@ def find_pid(excel, pid):
         if r.get('new_project_pid') == str(pid): return i
     return None
 
-def build_master(csv_path):
-    existing = api_post(SIR_TOKEN, content='record', **{'fields[0]':'record_id', 'fields[1]':'project_title'})
-    with open(os.path.expanduser(csv_path)) as f:
+def build_master(client, csv_path):
+    existing = client.export_records(**{'fields[0]': 'record_id', 'fields[1]': 'project_title'})
+    csv_path = os.path.expanduser(csv_path)
+    if not os.path.exists(csv_path):
+        raise SystemExit(
+            f"I couldn't find the spreadsheet you asked me to read:\n"
+            f"    {csv_path}\n"
+            "\n"
+            "Check the file name and folder are right. If the path has spaces in it, put quotes\n"
+            'around it, like --csv "My Folder/active dbs.csv".'
+        )
+    with open(csv_path) as f:
         excel = list(csv.DictReader(f))
+    if not excel:
+        raise SystemExit(
+            f"The spreadsheet {csv_path} has no rows in it (only a header, or nothing at all).\n"
+            "Nothing to load, so I've stopped without changing anything."
+        )
     MANUAL = {'24':find_pid(excel,7390), '79':None, '80':find_pid(excel,182),
               '85':None, '86':find_pid(excel,192), '100':None, '101':find_pid(excel,237),
               '102':find_pid(excel,238)}
@@ -169,16 +210,80 @@ def build_master(csv_path):
         r['target_rid'] = i
     return records
 
+def parse_record_id_range(text):
+    """Turn '1-108' into (1, 108). Anything else gets a message explaining the format."""
+    match = re.fullmatch(r'\s*(\d+)\s*-\s*(\d+)\s*', text or '')
+    if not match:
+        raise SystemExit(
+            f"I didn't understand the record number range {text!r}.\n"
+            "\n"
+            "Write it as two numbers with a dash between them — the first record number and the\n"
+            "last one this run is allowed to touch. For example:\n"
+            "\n"
+            "    --record-id-range 1-108"
+        )
+    low, high = int(match.group(1)), int(match.group(2))
+    if low > high:
+        raise SystemExit(
+            f"The record number range {text!r} runs backwards — {low} is higher than {high}.\n"
+            "Put the smaller number first, like --record-id-range 1-108."
+        )
+    return low, high
+
+
 def main():
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        description="Load Study Tracker records in bulk from a spreadsheet.")
     ap.add_argument('--csv', required=True,
                     help='Path to the active-databases CSV to backfill from '
                          '(e.g. "$ARGO_PM_ROOT/active_dbs_normalized_with_pid.csv")')
-    ap.add_argument('--commit', action='store_true')
-    ap.add_argument('--limit', type=int, default=0)
+    ap.add_argument('--record-id-range', metavar='LOW-HIGH',
+                    help='Which record numbers this run may touch, e.g. 1-108. '
+                         'Required with --commit. Anything outside the range is skipped.')
+    ap.add_argument('--commit', action='store_true',
+                    help='Actually write to the Study Tracker. Without this, nothing is changed.')
+    ap.add_argument('--limit', type=int, default=0,
+                    help='Only process the first N rows (useful for a cautious first run).')
     args = ap.parse_args()
 
-    records = build_master(args.csv)
+    # No token? Say so plainly and stop — but never pretend this is the user's fault.
+    client = RedcapClient.from_env('STUDY_INITIATION_REQUEST', label=SIR_TITLE)
+    if client is None:
+        raise SystemExit(RedcapClient.explain_missing_token(
+            'STUDY_INITIATION_REQUEST',
+            'load records into the Study Tracker',
+            fallback=(
+                "This particular task needs the access key — there's no file-upload alternative\n"
+                "for it. Ask your ARGO REDCap administrator for the Study Tracker key, add it to\n"
+                "~/.argo/.env, and run this again. Everything else in the build skill works\n"
+                "without one."
+            ),
+        ))
+
+    allowed = None
+    if args.commit:
+        if not args.record_id_range:
+            raise SystemExit(
+                "Before writing anything, I need to know which record numbers I'm allowed to\n"
+                "touch in the Study Tracker.\n"
+                "\n"
+                "This is a safety check: this tool writes to specific record numbers, and without\n"
+                "a stated range a re-run against a different spreadsheet could overwrite records\n"
+                "you didn't mean to change.\n"
+                "\n"
+                "Run it again with the range added, for example:\n"
+                "\n"
+                f"    python3 {os.path.basename(__file__)} --csv {args.csv} "
+                "--record-id-range 1-108 --commit"
+            )
+        allowed = parse_record_id_range(args.record_id_range)
+    elif args.record_id_range:
+        allowed = parse_record_id_range(args.record_id_range)
+
+    try:
+        records = build_master(client, args.csv)
+    except RedcapError as e:
+        raise SystemExit(str(e))
     creates = [r for r in records if r['kind']=='create']
     updates = [r for r in records if r['kind']=='update']
     print(f"Master: {len(records)} | creates: {len(creates)} | updates: {len(updates)} | sir-only: {sum(1 for r in records if r['kind']=='sir-only')}")
@@ -192,23 +297,60 @@ def main():
 
     if args.limit:
         work = work[:args.limit]
+
+    # Enforce the stated record number range: anything outside it is dropped, and said out loud.
+    if allowed:
+        low, high = allowed
+        in_range = [w for w in work if low <= w[0] <= high]
+        skipped = [w for w in work if not (low <= w[0] <= high)]
+        if skipped:
+            numbers = ", ".join(str(w[0]) for w in skipped[:10])
+            more = f" (and {len(skipped) - 10} more)" if len(skipped) > 10 else ""
+            print(f"Skipping {len(skipped)} rows outside the range {low}-{high} you allowed: "
+                  f"{numbers}{more}")
+        work = in_range
+
     print(f"\nQueued: {len(work)} write operations\n")
+    if not work:
+        print("Nothing to do — no rows fell inside the allowed record number range.")
+        return
 
     if not args.commit:
         for tr, p, kind in work[:5]:
             print(f"\n[{kind}] target_rid={tr}")
             for k, v in sorted(p.items()):
                 print(f"  {k}: {str(v)[:80]}")
-        print(f"\n[dry-run] No writes. Re-run with --commit.")
+        if len(work) > 5:
+            print(f"\n… and {len(work) - 5} more, not shown.")
+        print(
+            "\nNothing has been changed — this was a preview.\n"
+            "If the above looks right, run it again with the range you want to allow and --commit:\n"
+            f"\n    python3 {os.path.basename(__file__)} --csv {args.csv} "
+            f"--record-id-range {work[0][0]}-{work[-1][0]} --commit"
+        )
         return
 
+    # Confirm once, up front, that this key really opens the Study Tracker — before any write.
+    try:
+        client.confirm_project(expect_title=SIR_TITLE, expect_pid=SIR_PID)
+    except RedcapError as e:
+        raise SystemExit(str(e))
+
+    failures = 0
     for i, (tr, p, kind) in enumerate(work, 1):
         try:
             mode = 'overwrite' if kind == 'CREATE' else 'normal'
-            resp = api_post_record(SIR_TOKEN, [p], mode=mode)
+            resp = client.import_records([p], overwrite=mode)
             print(f"  [{i}/{len(work)}] {kind} record_id={tr}: {resp}")
-        except Exception as e:
-            print(f"  [{i}/{len(work)}] {kind} record_id={tr} FAILED: {e}")
+        except RedcapError as e:
+            failures += 1
+            print(f"  [{i}/{len(work)}] {kind} record_id={tr} FAILED: "
+                  f"{str(e).strip().splitlines()[0]}")
+
+    print(f"\nDone. {len(work) - failures} of {len(work)} records written.")
+    if failures:
+        print(f"{failures} did not go through — the FAILED lines above say why for each one.")
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()

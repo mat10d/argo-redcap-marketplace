@@ -10,12 +10,57 @@ Read/write to REDCap projects via the REST API. Export records, metadata, files,
 
 For base API conventions (URL form, token handling) see [[redcap-api]] (argo-core).
 For project-identification safety see [[token-confirmation]] and [[record-id-safety]].
+For whether this study should have a token at all, see [[access-tiers]] — data-export is **Tier 2**:
+occasional, one task at a time, no standing credential.
 
-## Prerequisites
+## Start here: `export.py`
 
-- A REDCap API token with the needed permissions for the target project
-- The REDCap API URL (e.g., `https://redcap.oauife.edu.ng/api/`)
-- Ask the user for both if not already known
+**Use the script, not the `curl` recipes below.** `export.py` handles token lookup, checks the key
+opens the project you meant, retries when REDCap is briefly unreachable, and names the output
+files consistently. The `curl` snippets further down are kept for debugging by hand and for
+operations the script doesn't cover yet — they are not the normal path ([[access-tiers]]).
+
+```bash
+set -a; source ~/.argo/.env; set +a
+
+# What does this key open? (reads nothing else)
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-export/export.py --token-env CRC_TOKEN --info
+
+# The usual thing: records + data dictionary into a dated folder
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-export/export.py --token-env CRC_TOKEN \
+    --out ~/Desktop/crc-export
+
+# Refuse to download unless the key opens the project you expect
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-export/export.py --token-env CRC_TOKEN \
+    --expect-project 77 --out ./crc
+```
+
+Useful flags: `--what records|metadata|both`, `--forms a,b,c`, `--raw` (codes instead of labels),
+`--expect-project NAME_OR_PID`.
+
+## The default path is the REDCap website, not the API
+
+Most ARGO studies have **no API token** — one has to be issued by a REDCap administrator, per
+person, per project, and that rarely happens ([[project-no-super-token]]). So the normal way to
+get data out is:
+
+1. Open the study in REDCap in a browser.
+2. **Data Exports, Reports, and Stats** → "All data" → export as CSV.
+3. **Data Dictionary** page → download as CSV.
+
+Those two files are exactly what [[run-analysis]] and the QA tools expect. Treat `export.py` as
+the shortcut for the studies where a key happens to exist — never as a prerequisite, and never
+ask the user to go and get a token before helping them.
+
+**Identifiable data:** REDCap decides what an export contains from the permissions of the account
+the key belongs to. Nothing in `export.py` can strip identifiers. For a de-identified extract, the
+key must belong to an account whose export rights are set to "De-Identified" — ask the REDCap
+administrator, and check the file before sharing it.
+
+## Prerequisites (API path only)
+
+- A REDCap API token with the needed permissions for the target project — optional, see above
+- The REDCap API URL (e.g., `https://redcap.oauife.edu.ng/api/`), set once as `REDCAP_URL`
 
 ## Exporting records (study data)
 
@@ -268,6 +313,27 @@ curl -s -X POST API_URL \
 curl -s -X POST API_URL \
   -d token=TOKEN -d content=metadata -d format=csv \
   -d data="$(cat data_dictionary.csv)" -d returnFormat=json
+```
+
+### Legacy free-text → structured multistep migration
+
+When a dictionary redesign replaces one legacy free-text field (e.g. a hidden `address`) with several new structured fields (e.g. `house_number`/`street`/`town`/`state`), migrate the old values with this safety choreography. It follows the [[redcap-api-gotchas]] §0 rule (no programmatic writes to cohort patient data): the API is used only to *read*; the fill is handed off as a CSV for a **manual** import.
+
+1. **Candidate set = source filled AND every target field blank.** Records that already have any new-field data are *excluded entirely* — they are never in the CSV, so a re-run can't disturb prior migration or hand-entry.
+   ```python
+   NEW = ['house_number','street','town','state']
+   cands = [r for r in rows
+            if r.get('address','').strip()
+            and not any(r.get(f,'').strip() for f in NEW)]
+   ```
+2. **Deterministic, literal-only split — no inference.** Take what is written; do not "correct" values (e.g. never rewrite a typed state to match geography, and never infer a state that wasn't typed — leave it blank). Slightly-rough splits (a locality landing in `street` vs `town`) are acceptable; silent fabrication is not. An LLM pass tends to over-correct here, which is usually *not* what's wanted for a faithful migration.
+3. **Emit only rows with ≥1 non-empty target field.** Drop pure missing-codes (`-777`/`-999` …) — there's nothing to fill.
+4. **Second safety net: import with `overwriteBehavior=normal`,** which only writes into blank cells and can never replace an existing value — belt-and-suspenders on top of step 1.
+5. **Hand off the CSV for manual import** (REDCap Data Import Tool). Keep a companion audit CSV (`record_id, source_raw, <new fields>`) so every split is traceable to its source string.
+
+```
+# upload CSV columns: <record_id_field>, house_number, street, town, state
+# import via the Data Import Tool with "overwrite = normal" (leave existing data)
 ```
 
 ## Common workflows

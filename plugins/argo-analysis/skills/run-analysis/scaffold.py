@@ -141,7 +141,13 @@ def main():
     dictionary = Path(args.dictionary).expanduser()
     for label, p in (("export", export), ("dictionary", dictionary)):
         if not p.is_file():
-            sys.exit(f"ERROR: --{label} not found: {p}")
+            sys.exit(
+                f"I couldn't find the {label} file:\n"
+                f"    {p}\n"
+                "\n"
+                "Check the name and folder are right. If the path has spaces in it, put quotation\n"
+                "marks around it."
+            )
 
     root = Path(args.analysis_dir).expanduser()
     data = root / "data"

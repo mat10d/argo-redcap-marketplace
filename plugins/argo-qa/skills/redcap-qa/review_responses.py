@@ -13,10 +13,63 @@ Usage:
 from __future__ import annotations
 
 import sys
+import zipfile
+from pathlib import Path
+
 from openpyxl import load_workbook
 
 
 YELLOW_HEX = "FFC7CE"   # matches build_worklists.py
+
+
+def open_worklist(path: str, role: str, **kwargs):
+    """Open an Excel worklist, explaining clearly what to do when it can't be opened.
+
+    `role` is how to refer to the file in a message, e.g. "original worklist".
+    """
+    p = Path(path).expanduser()
+    if not p.exists():
+        raise SystemExit(
+            f"I couldn't find the {role}:\n"
+            f"    {p}\n"
+            "\n"
+            "Check the file name and the folder are right. If the name has spaces in it, put\n"
+            'quotation marks around it, like "Ife site worklist.xlsx".'
+        )
+    if p.is_dir():
+        raise SystemExit(
+            f"The {role} path points at a folder, not a file:\n"
+            f"    {p}\n"
+            "\n"
+            "Give me the .xlsx file inside that folder instead."
+        )
+    if p.suffix.lower() != ".xlsx":
+        raise SystemExit(
+            f"The {role} needs to be an Excel .xlsx file, but this one is {p.suffix or 'not'}:\n"
+            f"    {p}\n"
+            "\n"
+            "If an RA sent it back in a different format, open it in Excel and use\n"
+            'File → Save As → Excel Workbook (.xlsx), then try again.'
+        )
+    try:
+        return load_workbook(p, **kwargs)
+    except zipfile.BadZipFile:
+        raise SystemExit(
+            f"The {role} can't be opened — the file looks damaged or incomplete:\n"
+            f"    {p}\n"
+            "\n"
+            "This usually means it didn't download or copy fully, or it was renamed to .xlsx\n"
+            "without actually being an Excel file. Try opening it in Excel: if Excel can't open\n"
+            "it either, ask whoever sent it for a fresh copy."
+        )
+    except Exception as e:
+        raise SystemExit(
+            f"Something went wrong opening the {role}:\n"
+            f"    {p}\n"
+            f"\n{type(e).__name__}: {e}\n"
+            "\n"
+            "Try opening the file in Excel to check it's intact."
+        )
 
 
 def _row_to_dict(ws, header_row=1, prereq_row=2):
@@ -55,8 +108,8 @@ RESPONSE_HEADER_TOKENS = ("response", "comment", "note")
 
 
 def diff(orig_path: str, resp_path: str):
-    orig_wb = load_workbook(orig_path)
-    resp_wb = load_workbook(resp_path, data_only=True)
+    orig_wb = open_worklist(orig_path, "original worklist")
+    resp_wb = open_worklist(resp_path, "worklist the RA sent back", data_only=True)
     orig_ws = orig_wb.active
     resp_ws = resp_wb.active
 
@@ -101,6 +154,14 @@ def diff(orig_path: str, resp_path: str):
 def main():
     if len(sys.argv) != 3:
         print(__doc__)
+        print(
+            "This compares two Excel worklists: the one you originally sent to a site, and the\n"
+            "one the RA filled in and sent back. It shows you every cell they changed.\n"
+            "\n"
+            "Give it both file names, original first:\n"
+            "\n"
+            "    python3 review_responses.py original.xlsx returned.xlsx"
+        )
         sys.exit(2)
     orig, resp = sys.argv[1], sys.argv[2]
     by_record, notes, id_field, had_response_col = diff(orig, resp)

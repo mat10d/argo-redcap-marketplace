@@ -100,6 +100,25 @@ def api_post_data(token, content, payload):
 
 
 def confirm(prompt):
+    """Ask before writing. Works whether or not anyone is sitting at a keyboard.
+
+    With no keyboard attached (agent session, scheduled job, cloud runner) there is nobody to
+    answer, so waiting would hang forever. Require --yes up front instead.
+    """
+    if "--yes" in sys.argv or os.environ.get("ARGO_ASSUME_YES") == "1":
+        print(f"{prompt} [y/N] y   (--yes was given)")
+        return True
+    if not sys.stdin.isatty():
+        sys.exit(
+            f"{prompt}\n"
+            "\n"
+            "I need you to approve this before writing, but nothing here can accept a typed\n"
+            "answer — there's no keyboard attached to this session.\n"
+            "\n"
+            "Check what's listed above. If it's right, run the same command again with --yes on\n"
+            "the end. If you want a different clinical/non-clinical split, pass it explicitly\n"
+            "with --clinical form1,form2,... instead of being asked."
+        )
     ans = input(f"{prompt} [y/N] ").strip().lower()
     return ans in ("y", "yes")
 
@@ -150,14 +169,72 @@ def materialize_roles(all_forms, clinical_forms):
 
 def main():
     if not REDCAP_URL:
-        sys.exit("REDCAP_URL not set. Did you source ~/.argo/.env?")
-    if len(sys.argv) != 2:
-        sys.exit("Usage: python3 set_roles.py <TOKEN_ENV_VAR>")
+        sys.exit(
+        "This tool needs to know the web address of your REDCap system before it can do\n"
+        "anything, and that address isn't set on this computer yet.\n"
+        "\n"
+        "It's a single line of text ending in /api/ — ask your ARGO REDCap administrator for it\n"
+        "if you don't have it. Add it to the file ~/.argo/.env like this:\n"
+        "\n"
+        "    REDCAP_URL=https://your-redcap-site.org/api/\n"
+        "\n"
+        "then load it into this terminal window and try again:\n"
+        "\n"
+        "    set -a; source ~/.argo/.env; set +a"
+    )
+    # Flags are handled by hand here (this script predates argparse use in the suite).
+    # --clinical lets a caller state the split up front, so nothing has to be typed mid-run.
+    argv = sys.argv[1:]
+    clinical_override = None
+    positional = []
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg == "--yes":
+            pass  # read directly by confirm()
+        elif arg == "--clinical" and i + 1 < len(argv):
+            i += 1
+            clinical_override = [f.strip() for f in argv[i].split(",") if f.strip()]
+        elif arg.startswith("--clinical="):
+            clinical_override = [f.strip() for f in arg.split("=", 1)[1].split(",") if f.strip()]
+        elif arg.startswith("-"):
+            sys.exit(
+                f"I don't recognise the option {arg!r}.\n"
+                "\n"
+                "The options are:\n"
+                "    --yes                    approve the changes without being asked\n"
+                "    --clinical form1,form2   say which forms are clinical, instead of being asked"
+            )
+        else:
+            positional.append(arg)
+        i += 1
 
-    env_var = sys.argv[1]
+    if len(positional) != 1:
+        sys.exit(
+        "Tell me which study to set the roles up on, by naming the setting that holds its\n"
+        "access key. For example:\n"
+        "\n"
+        "    python3 set_roles.py CRC_TOKEN\n"
+        "\n"
+        "If you don't have an access key for the study, you don't need one — run\n"
+        "make_roles_csv.py instead and upload the file it makes through the REDCap website."
+    )
+
+    env_var = positional[0]
     token = os.environ.get(env_var)
     if not token:
-        sys.exit(f"{env_var} is empty. Add it to ~/.argo/.env and source again.")
+        sys.exit(
+        f"No access key for {env_var} is set up on this computer, so I can't reach REDCap.\n"
+        "\n"
+        "An access key (REDCap calls it an API token) is a long password that lets a tool read\n"
+        "or update one specific REDCap project on your behalf. Your REDCap administrator\n"
+        "creates it for you — it isn't something you can generate yourself.\n"
+        "\n"
+        "If you already have one, add it to the file ~/.argo/.env, then load it into this\n"
+        "terminal window and try again:\n"
+        "\n"
+        "    set -a; source ~/.argo/.env; set +a"
+    )
 
     # --- Step 1: confirm project ---
     info = api_post(token, content="project")
@@ -180,16 +257,33 @@ def main():
         print(f"    - {f}")
 
     # --- Step 3: clinical vs non-clinical split ---
-    clinical, non_clinical = split_forms(all_forms)
-    print(f"\n  Proposed clinical/non-clinical split (Data Entry role gets View+Edit on clinical, Read Only on qa):")
-    print(f"    clinical:     {clinical}")
-    print(f"    non-clinical: {non_clinical}  (Data Entry → No Access, except qa → Read Only)")
-    if not confirm("\nUse this split?"):
-        manual = input("Comma-separated list of CLINICAL form names (others will be non-clinical): ").strip()
-        clinical = [f.strip() for f in manual.split(",") if f.strip()]
+    if clinical_override is not None:
+        clinical = clinical_override
         non_clinical = [f for f in all_forms if f not in clinical]
-        print(f"\n  Updated clinical:     {clinical}")
-        print(f"  Updated non-clinical: {non_clinical}")
+        unknown = [f for f in clinical if f not in all_forms]
+        if unknown:
+            sys.exit(
+                f"These form names aren't in this study: {', '.join(unknown)}\n"
+                "\n"
+                f"The study's forms are: {', '.join(all_forms)}\n"
+                "\n"
+                "Check the spelling and try again — form names are the short internal ones, not\n"
+                "the titles shown to data entry staff."
+            )
+        print(f"\n  Using the clinical/non-clinical split you supplied:")
+        print(f"    clinical:     {clinical}")
+        print(f"    non-clinical: {non_clinical}")
+    else:
+        clinical, non_clinical = split_forms(all_forms)
+        print(f"\n  Proposed clinical/non-clinical split (Data Entry role gets View+Edit on clinical, Read Only on qa):")
+        print(f"    clinical:     {clinical}")
+        print(f"    non-clinical: {non_clinical}  (Data Entry → No Access, except qa → Read Only)")
+        if not confirm("\nUse this split?"):
+            manual = input("Comma-separated list of CLINICAL form names (others will be non-clinical): ").strip()
+            clinical = [f.strip() for f in manual.split(",") if f.strip()]
+            non_clinical = [f for f in all_forms if f not in clinical]
+            print(f"\n  Updated clinical:     {clinical}")
+            print(f"  Updated non-clinical: {non_clinical}")
 
     # --- Step 4: show what will be posted ---
     roles = materialize_roles(all_forms, clinical)

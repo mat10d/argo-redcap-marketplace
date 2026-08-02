@@ -67,7 +67,18 @@ def main():
 
     tok = os.environ.get(args.token_env)
     if not tok:
-        sys.exit(f"Env var {args.token_env} is not set")
+        sys.exit(
+        f"No access key for {args.token_env} is set up on this computer, so I can't reach REDCap.\n"
+        "\n"
+        "An access key (REDCap calls it an API token) is a long password that lets a tool read\n"
+        "or update one specific REDCap project on your behalf. Your REDCap administrator\n"
+        "creates it for you — it isn't something you can generate yourself.\n"
+        "\n"
+        "If you already have one, add it to the file ~/.argo/.env, then load it into this\n"
+        "terminal window and try again:\n"
+        "\n"
+        "    set -a; source ~/.argo/.env; set +a"
+    )
 
     # Gather all (id, field) targets across every push CSV
     all_ids: set[str] = set()
@@ -87,7 +98,12 @@ def main():
             all_fields.update(c for c in rows[0] if c != args.id_field)
 
     if not all_ids:
-        sys.exit("No records found in push_drafts/")
+        sys.exit(
+            "There are no records to check — the push_drafts folder is empty.\n"
+            "\n"
+            "That folder is filled in by the review step. If you haven't run that yet, do it\n"
+            "first; if you have, it may simply have found nothing needing changes, which is fine."
+        )
 
     print(f"Re-pulling {len(all_ids)} records × {len(all_fields)} fields...")
     current = pull_records(args.url, tok, sorted(all_ids), sorted(all_fields), args.id_field)

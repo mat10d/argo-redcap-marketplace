@@ -31,7 +31,18 @@ def main():
 
     tok = os.environ.get(args.token_env)
     if not tok:
-        sys.exit(f"Env var {args.token_env} is not set")
+        sys.exit(
+        f"No access key for {args.token_env} is set up on this computer, so I can't reach REDCap.\n"
+        "\n"
+        "An access key (REDCap calls it an API token) is a long password that lets a tool read\n"
+        "or update one specific REDCap project on your behalf. Your REDCap administrator\n"
+        "creates it for you — it isn't something you can generate yourself.\n"
+        "\n"
+        "If you already have one, add it to the file ~/.argo/.env, then load it into this\n"
+        "terminal window and try again:\n"
+        "\n"
+        "    set -a; source ~/.argo/.env; set +a"
+    )
 
     os.makedirs(args.out, exist_ok=True)
     stamp = dt.datetime.now().strftime("%Y%m%dT%H%M%S")

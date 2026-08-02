@@ -26,18 +26,30 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REDCAP_URL = os.environ.get("REDCAP_URL")
-# Operational state (portfolio snapshots) lives outside the repo, in your local
-# REDCap project folder. This is machine-specific, so it must be set explicitly.
-_pm_root = os.environ.get("ARGO_PM_ROOT")
-if not _pm_root:
-    raise SystemExit(
-        "ARGO_PM_ROOT is not set. Add it to ~/.argo/.env "
-        "(e.g. ARGO_PM_ROOT=/path/to/ARGO/REDCap/PM), then re-source:\n"
-        "    set -a; source ~/.argo/.env; set +a"
-    )
-PM_ROOT = Path(_pm_root).expanduser()
-STATE_DIR = PM_ROOT / "portfolio-snapshots"
-STATE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def state_dir() -> Path:
+    """Where snapshots are saved. Resolved when needed, not at import.
+
+    Nothing is required just to *import* this file or to run --check — that way a broken or
+    unconfigured setup can still be diagnosed. Falls back to a sensible location so the tool
+    works out of the box in any environment, and says where it put things.
+    """
+    pm_root = os.environ.get("ARGO_PM_ROOT")
+    if pm_root:
+        root = Path(pm_root).expanduser()
+    else:
+        root = Path.home() / ".argo" / "pm"
+        print(
+            f"Note: saving snapshots to {root} because ARGO_PM_ROOT isn't set.\n"
+            "If you keep your ARGO project folder somewhere specific, add a line like\n"
+            "    ARGO_PM_ROOT=/path/to/ARGO/REDCap/PM\n"
+            "to ~/.argo/.env so snapshots land next to the rest of your work.",
+            file=sys.stderr,
+        )
+    directory = root / "portfolio-snapshots"
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
 
 # Each admin REDCap: (env var name, project label, source form, status field, status "done" value).
 # SIR's done-marker is `study_production` (yesno on build_tracking — final canonical step).
@@ -207,10 +219,21 @@ def compute_diff(curr: dict, prev: dict) -> dict:
     return out
 
 
-def load_previous() -> "dict | None":
-    # New layout: snapshot-<stamp>/summary.json
-    snapshots = sorted(STATE_DIR.glob("snapshot-*/summary.json"))
+def load_previous(state: Path) -> "dict | None":
+    # Current layout: snapshot-<stamp>/summary.json
+    snapshots = sorted(state.glob("snapshot-*/summary.json"))
     if not snapshots:
+        # Older runs saved a single flat file, snapshot-<stamp>.json. Those can't be compared
+        # against, but say so rather than silently reporting "nothing changed".
+        legacy = sorted(state.glob("snapshot-*.json"))
+        if legacy:
+            print(
+                f"Note: found {len(legacy)} snapshot(s) saved in the older format, which this\n"
+                f"version can't compare against (for example {legacy[-1].name}).\n"
+                "There's nothing to compare this week's numbers to yet — from the next run\n"
+                "onwards, comparisons will work normally.",
+                file=sys.stderr,
+            )
         return None
     return json.loads(snapshots[-1].read_text())
 
@@ -221,24 +244,117 @@ def save(snapshot: dict, snap_dir: Path) -> Path:
     return path
 
 
+def find_argo_core() -> "str | None":
+    """Find the folder holding argo-core's shared REDCap code.
+
+    Searches for the FILE argo_redcap_client.py, never for a directory named "argo-core".
+    Plugin directories are named differently per environment — Claude Code uses
+    <marketplace>/<plugin>/<version>/, Cowork uses opaque plugin_<id>/ names with the plugin
+    name recorded only inside its manifest — so a name-based search finds nothing in some.
+    A relative '../argo-core' path never works either: plugins are siblings only in some layouts.
+    """
+    marker = "argo_redcap_client.py"
+    override = os.environ.get("ARGO_CORE_SCRIPTS")
+    if override and (Path(override).expanduser() / marker).exists():
+        return str(Path(override).expanduser())
+
+    for root in ("/mnt/.remote-plugins", "~/.claude/plugins", "~/.claude/plugins/cache"):
+        base = Path(root).expanduser()
+        if base.is_dir():
+            hits = sorted(base.glob(f"**/{marker}"))
+            if hits:
+                return str(hits[-1].parent)
+
+    for parent in Path(__file__).resolve().parents:
+        for candidate in (parent / "plugins" / "argo-core" / "scripts",
+                          parent / "argo-core" / "scripts"):
+            if (candidate / marker).exists():
+                return str(candidate)
+    return None
+
+
+def run_setup_check() -> int:
+    """Check every tracker key without pulling any data. Delegates to argo-core's shared client."""
+    core = find_argo_core()
+    if core is None:
+        print(
+            "I couldn't find the shared ARGO REDCap code, which this check needs.\n"
+            "\n"
+            "It lives in the argo-core plugin. This usually means argo-core isn't installed\n"
+            "alongside argo-pm. Ask whoever set up your ARGO tools to reinstall the plugins, or\n"
+            "set ARGO_CORE_SCRIPTS to the folder containing argo_redcap_client.py."
+        )
+        return 1
+    sys.path.insert(0, core)
+    from argo_redcap_client import run_check
+    return run_check()
+
+
 def main():
+    if "--check" in sys.argv:
+        sys.exit(run_setup_check())
+
     if not REDCAP_URL:
-        sys.exit("REDCAP_URL not set. Did you source ~/.argo/.env?")
+        sys.exit(
+            "This tool needs to know the web address of your REDCap system before it can check\n"
+            "anything, and that address isn't set on this computer yet.\n"
+            "\n"
+            "It's a single line of text ending in /api/ — ask your ARGO REDCap administrator for\n"
+            "it if you don't have it. Add it to the file ~/.argo/.env like this:\n"
+            "\n"
+            "    REDCAP_URL=https://your-redcap-site.org/api/\n"
+            "\n"
+            "then load it into this terminal window and try again:\n"
+            "\n"
+            "    set -a; source ~/.argo/.env; set +a"
+        )
 
     want_diff = "--diff" in sys.argv
 
     stamp = datetime.now(timezone.utc).isoformat().replace(":", "-").split(".")[0]
-    snap_dir = STATE_DIR / f"snapshot-{stamp}"
+    snap_dir = state_dir() / f"snapshot-{stamp}"
     snap_dir.mkdir(parents=True, exist_ok=True)
 
-    prev = load_previous() if want_diff else None
+    prev = load_previous(snap_dir.parent) if want_diff else None
     curr = collect(snap_dir)
     diff = compute_diff(curr, prev) if prev else None
 
+    # If every single tracker failed, this is an outage — not a quiet week. Say so at the top,
+    # and exit non-zero so an automated weekly run can tell the difference.
+    projects = curr.get("projects", {})
+    failed = [k for k, v in projects.items() if "error" in v]
+    total_failed = len(failed) == len(projects) and projects
+
+    if total_failed:
+        print("!" * 72)
+        print("COULD NOT READ ANY OF THE ARGO TRACKERS — this report is empty because something")
+        print("is wrong, NOT because there was no activity this week.")
+        print("")
+        print("Each tracker below says what went wrong. The most common causes are: the access")
+        print("keys in ~/.argo/.env were never loaded into this terminal window (run")
+        print("'set -a; source ~/.argo/.env; set +a' and try again), the REDCap address changed,")
+        print("or REDCap is temporarily down.")
+        print("!" * 72)
+        print("")
+
     print(render(curr, diff))
-    path = save(curr, snap_dir)
+    save(curr, snap_dir)
     print(f"# Snapshot dir: {snap_dir}", file=sys.stderr)
     print(f"# Per-project CSVs + summary.json", file=sys.stderr)
+
+    if total_failed:
+        print(
+            "\nStopping with an error because none of the trackers could be read. "
+            "Nothing above should be treated as a real portfolio update.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if failed:
+        print(
+            f"\nNote: {len(failed)} of {len(projects)} trackers could not be read "
+            f"({', '.join(failed)}). Everything else in this report is accurate.",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":

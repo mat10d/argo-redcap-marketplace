@@ -86,7 +86,12 @@ class DD:
 
 def main():
     if len(sys.argv) != 3:
-        sys.exit("usage: python3 dd_builder.py fields.json out.csv")
+        sys.exit(
+        "Give me two file names: the field definitions to read, and where to save the data\n"
+        "dictionary I build from them. For example:\n"
+        "\n"
+        "    python3 dd_builder.py fields.json my_study_datadictionary.csv"
+    )
     spec = json.load(open(sys.argv[1]))
     dd = DD(form=spec[0].get("form", "data") if spec else "data")
     for fld in spec:

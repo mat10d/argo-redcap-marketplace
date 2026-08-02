@@ -413,19 +413,47 @@ def main():
 
     if args.records_csv:
         if not args.metadata_csv:
-            sys.exit("--records-csv requires --metadata-csv (no-token mode needs the data dictionary too).")
+            sys.exit(
+                "To build worklists from files on your computer, I need two of them: the records\n"
+                "export and the data dictionary. You've given me only the records.\n"
+                "\n"
+                "Download the data dictionary from the REDCap project's Data Dictionary page and\n"
+                "pass it as well:\n"
+                "\n"
+                "    --records-csv records.csv --metadata-csv datadictionary.csv"
+            )
         print(f"No-token mode: reading {args.records_csv} + {args.metadata_csv} ...")
         raw = pd.read_csv(args.records_csv, dtype=str, keep_default_na=False)
         metadata = load_metadata_csv(args.metadata_csv)
     elif args.url and args.token_env:
         token = os.environ.get(args.token_env)
         if not token:
-            sys.exit(f"Env var {args.token_env} is not set")
+            sys.exit(
+        f"No access key for {args.token_env} is set up on this computer, so I can't reach REDCap.\n"
+        "\n"
+        "An access key (REDCap calls it an API token) is a long password that lets a tool read\n"
+        "or update one specific REDCap project on your behalf. Your REDCap administrator\n"
+        "creates it for you — it isn't something you can generate yourself.\n"
+        "\n"
+        "If you already have one, add it to the file ~/.argo/.env, then load it into this\n"
+        "terminal window and try again:\n"
+        "\n"
+        "    set -a; source ~/.argo/.env; set +a"
+    )
         print(f"Pulling records + metadata from {args.url} ...")
         raw = pull_records(args.url, token)
         metadata = pull_metadata(args.url, token)
     else:
-        sys.exit("Provide either --records-csv + --metadata-csv (no-token), or --url + --token-env (API).")
+        sys.exit(
+            "I need to know where to get the study's data from, and you haven't told me yet.\n"
+            "There are two ways, and you only need one:\n"
+            "\n"
+            "  Working from files you downloaded from the REDCap website (the usual way):\n"
+            "      --records-csv records.csv --metadata-csv datadictionary.csv\n"
+            "\n"
+            "  Or, if you have an access key for this study set up:\n"
+            "      --url $REDCAP_URL --token-env YOUR_STUDY_TOKEN"
+        )
     meta_by = {m["field_name"]: m for m in metadata}
 
     if args.id_field not in raw.columns:

@@ -99,9 +99,20 @@ curl -s -X POST $REDCAP_URL \
 5. Export new roles from target to capture generated IDs
 6. Import role mappings (`content=userRoleMapping`) to assign users
 
-## Two paths: CSV upload (default) or API
+## Setting up roles — how to pick, without asking the user
 
-This skill supports two operational paths for the same outcome. **The default at ARGO is CSV-upload-via-UI** because per-project API tokens are admin-controlled at OAU and not immediately available (see [[project-no-super-token]]). The API path is an enhancement when a token is in hand.
+Roles are **Tier 2** ([[access-tiers]]): a study's own project rarely has an API token, because
+each one has to be issued by an admin per person per project ([[project-no-super-token]]).
+
+**Decide it from what's available, then say what you did:**
+
+- **No token for this study** (the common case) → make the roles CSV (Path A) and tell the user
+  the exact REDCap page to upload it on.
+- **Token is in `~/.argo/.env`** → use `set_roles.py` (Path B), and report which roles were created.
+
+Prefer Path A whenever the user has said they want to eyeball the role grid before it goes live,
+or when they're handing the file to a teammate who has no API access. Don't put the choice to them
+as a question.
 
 ### Path A (DEFAULT): CSV upload via REDCap UI (make_roles_csv.py)
 
@@ -135,11 +146,6 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/redcap-admin/set_roles.py ARGO_TOKEN_<STUDY
 
 Walks token confirmation → form discovery → clinical/non-clinical split → role preview → POST → re-export to capture `unique_role_name` values. Use this when the project's API token is already in `~/.argo/.env`.
 
-Path A is appropriate when:
-- You don't have an API token for the project yet (the common ARGO case)
-- You prefer to review the role grid visually in REDCap before activation
-- You're handing off to a teammate without API credentials
-
 ## Push to SIR after roles + users land
 
 Once both the roles CSV is uploaded AND users are assigned to roles in the new REDCap project, **immediately mark the SIR** so the portfolio dashboard reflects the build state:
@@ -164,8 +170,15 @@ New users for a study are recorded in the **Study Personnel Request** admin REDC
 one record per user. Don't just send a loose account-request message — create the SPR record(s) so
 the request is tracked and resolvable.
 
-**Token-optional** ([[token-optional]]): with the SPR token (`STUDY_PERSONELL_REQUEST`), create
-records via API import; without it, submit the SPR survey in the UI for each user.
+**Decide this yourself — don't ask the user which way to do it.** Check whether
+`STUDY_PERSONELL_REQUEST` is set, then:
+
+- **It is set** (the normal case — this is a Tier 1 admin tracker, [[access-tiers]]) → create the
+  records by API import, and tell the user afterwards which records you created.
+- **It isn't set** → fill in the SPR survey in the REDCap UI, one submission per user, and tell
+  the user that's what needs doing and why.
+
+Either way, report what happened. Never present this as a choice for the user to make.
 
 **One record per user. Key fields + dropdown codes:**
 - `redcap_instance` — REDCap to add the user to: `1` OAUTHC, `2` MSKCC (OAU studies → `1`).
