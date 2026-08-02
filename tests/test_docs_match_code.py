@@ -175,6 +175,50 @@ class TestHeadlessSafe(unittest.TestCase):
         )
 
 
+class TestVersionsAreInStep(unittest.TestCase):
+    """All six plugins and the marketplace share one version — they release as one unit.
+
+    argo-core ships the shared REDCap client that build/data/pm/qa import, so a mix of old and
+    new plugins isn't a supported combination. Separate numbers would imply an independence that
+    doesn't exist. Bumping everything each release also guarantees update-detection fires, which
+    keys off the version field.
+    """
+
+    SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
+
+    def versions(self):
+        import json
+        found = {}
+        for manifest in sorted(REPO.glob("plugins/*/.claude-plugin/plugin.json")):
+            found[manifest.parents[1].name] = json.loads(manifest.read_text()).get("version")
+        found["(marketplace)"] = json.loads(
+            (REPO / ".claude-plugin" / "marketplace.json").read_text())["metadata"].get("version")
+        return found
+
+    def test_every_version_matches(self):
+        found = self.versions()
+        distinct = set(found.values())
+        self.assertEqual(
+            len(distinct), 1,
+            "Plugin versions have drifted apart. They ship as one unit — run "
+            f"`python3 release.py --set <version>`. Found: {found}",
+        )
+
+    def test_versions_are_plain_semver(self):
+        for name, version in self.versions().items():
+            self.assertIsNotNone(version, f"{name} has no version")
+            self.assertRegex(str(version), self.SEMVER,
+                             f"{name}'s version {version!r} isn't a plain X.Y.Z number")
+
+    def test_every_plugin_is_listed_in_the_marketplace(self):
+        import json
+        listed = {p["name"] for p in json.loads(
+            (REPO / ".claude-plugin" / "marketplace.json").read_text())["plugins"]}
+        on_disk = {p.parents[1].name for p in REPO.glob("plugins/*/.claude-plugin/plugin.json")}
+        self.assertEqual(listed, on_disk,
+                         "the marketplace listing and the plugins on disk disagree")
+
+
 class TestSetupIsSafe(unittest.TestCase):
     """argo_setup.py creates folders — so it must never do that just for being run."""
 

@@ -87,6 +87,38 @@ A GitHub repo is the keystone for both routes below — it's the portable source
 3. **Shared rules live once.** Anything used by more than one plugin lives in `argo-core/references/`.
 4. **Portable by default.** No machine-specific paths; operational folders come from `~/.argo/.env`.
 
+## Versioning
+
+**All six plugins and the marketplace carry the same version, always.** They are released as one
+unit and there is no supported mix of old and new.
+
+Two reasons, both concrete:
+
+1. **They're genuinely coupled.** `argo-core` ships `argo_redcap_client.py`, which `argo-build`,
+   `argo-data`, `argo-pm` and `argo-qa` all import. An old argo-core beside a new argo-build is a
+   broken install, not a supported combination. Independent version numbers would advertise an
+   independence that doesn't exist.
+2. **It's the only way updates reliably land.** Marketplace update-detection keys off the version
+   field, and a session's plugin copies are an immutable snapshot taken when the conversation
+   starts. A plugin whose version didn't move may never register as changed. Bumping everything
+   every time removes that failure mode entirely.
+
+Never edit a version by hand — the numbers live in seven files and drift silently. Use:
+
+```bash
+python3 release.py                 # show current versions, and flag any drift
+python3 release.py --bump patch    # fixes only
+python3 release.py --bump minor    # new behaviour or new scripts
+python3 release.py --bump major    # something that changes how existing things work
+python3 release.py --set 1.0.0     # an exact version
+```
+
+`tests/run_all.py` fails if the versions ever disagree, so this can't quietly rot.
+
+**After releasing, refresh the installed copies.** A running session keeps whatever it snapshotted
+at the start, so a new session is needed to pick up changes — see
+[[verify-install]] for the checklist to run there.
+
 ## Roadmap (not yet built)
 
 These are intended additions, deliberately not shipped as empty skills:

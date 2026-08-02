@@ -1,6 +1,8 @@
 {
   "name": "argo-analysis",
-  "version": "0.1.1",
-  "description": "Analysis on a local REDCap export — no API token required. Interview-driven analysis plan, saved well-commented scripts (Python/R/Stata), and organized, auditable outputs (run-analysis). For API export/import and cross-study linkage, see argo-data.",
-  "author": { "name": "ARGO" }
+  "version": "0.8.0",
+  "description": "Analysis on a local REDCap export \u2014 no API token required. Interview-driven analysis plan, saved well-commented scripts (Python/R/Stata), and organized, auditable outputs (run-analysis). For API export/import and cross-study linkage, see argo-data.",
+  "author": {
+    "name": "ARGO"
+  }
 }
