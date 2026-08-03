@@ -92,7 +92,6 @@ def _load_trackers():
         ("DATA_LINKING_REQUEST",     "Data Linking Request",     "data_linking_request",     "completed", "Yes"),
         ("DATA_REQUEST",             "Data Request",             "data_request",             "completed", "Yes"),
         ("SUPPORT_TICKET_REQUEST",   "Support Ticket Request",   "support_ticket",           "completed", "Yes"),
-        ("PATHPRESENTER_INITIATION", "PathPresenter Initiation", "pathpresenter_initiation", "completed", "Yes"),
     ], ["project_created", "dd_uploaded", "user_rights_complete", "data_imported",
         "review_internal", "review_pi", "study_production"])
 

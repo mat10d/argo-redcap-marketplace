@@ -40,7 +40,7 @@ The variable names in `.env.example` are the exact names the skills read — don
 | Role | Plugin | Tokens needed in `~/.argo/.env` |
 |---|---|---|
 | Everyone | `argo-core` | `REDCAP_URL` (no tokens — it's reference material) |
-| Admins | `argo-pm` | `REDCAP_URL`, `ARGO_PM_ROOT`, and the admin tokens: `STUDY_INITIATION_REQUEST`, `STUDY_PERSONELL_REQUEST`, `DATA_LINKING_REQUEST`, `DATA_REQUEST`, `SUPPORT_TICKET_REQUEST`, `PATHPRESENTER_INITIATION` |
+| Admins | `argo-pm` | `REDCAP_URL`, `ARGO_PM_ROOT`, and the admin tokens: `STUDY_INITIATION_REQUEST`, `STUDY_PERSONELL_REQUEST`, `DATA_LINKING_REQUEST`, `DATA_REQUEST`, `SUPPORT_TICKET_REQUEST` |
 | Builder | `argo-build` | `REDCAP_URL` + the token for the project you're building/administering (e.g. `CRC_TOKEN`). Study intake also uses `STUDY_INITIATION_REQUEST`. |
 | QA | `argo-qa` | `REDCAP_URL` + one `<NAME>_TOKEN` per cohort you QA (e.g. `CRC_TOKEN`); pass it with `--token-env CRC_TOKEN` |
 | Data management | `argo-data` | `REDCAP_URL` + one `<NAME>_TOKEN` per project you export/import/link (e.g. `CRC_TOKEN`) |

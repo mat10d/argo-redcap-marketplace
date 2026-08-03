@@ -16,7 +16,7 @@ Before reading the tiers, note the distinction that matters most in practice:
 
 | | **Admin tracker REDCaps** | **A study's own REDCap project** |
 |---|---|---|
-| Which projects | The 6 trackers: Study Tracker (SIR), SPR, Data Linking, Data Request, Support Ticket, PathPresenter | Every individual cohort/study project |
+| Which projects | The 5 trackers: Study Tracker (SIR), SPR, Data Linking, Data Request, Support Ticket | Every individual cohort/study project |
 | Token situation | ARGO holds these already, permanently | Must be issued by a REDCap admin, per user, per project — **rarely happens in practice** |
 | Example scripts | `sir_update.py`, `portfolio.py`, `backfill_sir_from_csv.py` | `fill_new_project.py`, DD upload, `data-export`, `push_updates.py` |
 
@@ -25,11 +25,11 @@ that writes to the SIR needs no per-study access at all — it uses a tracker to
 Do not "simplify" tracker-facing scripts away on the grounds that tokens are hard to get; that
 removes automation without removing any admin dependency.
 
-## Tier 1 — standing access: the 6 admin trackers
+## Tier 1 — standing access: the 5 admin trackers
 
 Configured permanently in `~/.argo/.env`. This is the only place a token lives between uses.
 
-- `study-portfolio/portfolio.py` — read-only weekly pull across all 6 trackers. Writes nothing back
+- `study-portfolio/portfolio.py` — read-only weekly pull across all 5 trackers. Writes nothing back
   except a local snapshot file.
 - `redcap-build/sir_update.py` — writes build progress to the **SIR record** (Study Tracker, PID 224).
   One push per build step, no batching. This is what keeps the portfolio's progress column current.
@@ -156,7 +156,7 @@ One file: **`~/.argo/.env`**, loaded with `set -a; source ~/.argo/.env; set +a`.
 - `REDCAP_URL` — the API endpoint, shared by every project on that REDCap instance
 - One variable per project, named for the project (`STUDY_INITIATION_REQUEST`,
   `STUDY_PERSONELL_REQUEST`, `DATA_LINKING_REQUEST`, `DATA_REQUEST`,
-  `SUPPORT_TICKET_REQUEST`, `PATHPRESENTER_INITIATION`, …)
+  `SUPPORT_TICKET_REQUEST`)
 - Tier 2/3 study tokens are **not** stored here. They are supplied for the one task that needs them.
 - Never commit this file. Never log a full token — truncate to the last 4 characters.
 

@@ -20,17 +20,12 @@ buckets a record as "done" purely on the done-marker field equalling `Yes`.
 | `DATA_LINKING_REQUEST` | Data Linking Request | 222 | `completed` |
 | `DATA_REQUEST` | Data Request | 223 | `completed` |
 | `SUPPORT_TICKET_REQUEST` | Support Ticket Request | 225 | `completed` |
-| `PATHPRESENTER_INITIATION` | PathPresenter Initiation | *(not yet issued)* | `completed` |
 
-Notes on the two rows that trip people up:
+One note, on the row that trips people up:
 
 - **The SIR's done-marker is `study_production`, not `study_built` or `study_status`.**
   `study_production` is the final canonical build step, so it is the single done-marker. Older
   docs referred to `study_built`/`study_status >= 2`; those are not what the code reads.
-- **PathPresenter has no token issued yet.** The code has always listed six projects, but no
-  `PATHPRESENTER_INITIATION` key exists in `~/.argo/.env`, so it reports "token not set" on every
-  run and its PID has never been observed. It is included so it starts working the moment a key
-  is issued — nothing needs to change in the code.
 
 The other four trackers share the `tracking` form's `completed` yes/no field. These fields don't
 exist until the relevant instrument ZIP has been uploaded to that project — until then every

@@ -2,7 +2,7 @@
 """The one list of ARGO's admin tracker REDCaps.
 
 This list used to be written out separately in four places — the shared client, argo_setup.py,
-portfolio.py, and access-tiers.md — each with its own comment explaining the PathPresenter stub.
+portfolio.py, and access-tiers.md, and they had already drifted apart.
 Four copies means four things to remember to update the day a token is finally issued, and
 nothing checked that they agreed. They live here now; everything else imports this.
 
@@ -10,8 +10,8 @@ Each entry is (env_var, project_title, pid, done_marker_field).
 
   env_var        the name of the setting holding that project's access key
   project_title  the project's title in REDCap, used to confirm a key opens what we expect
-  pid            REDCap's project number. None means we've never held a key for it, so the
-                 number has never been observed — not that the project doesn't exist.
+  pid            REDCap's project number, verified live. Used to spot a key that has been
+                 repointed at a different project.
   done_marker    the field the portfolio uses to bucket a record as finished
 """
 from __future__ import annotations
@@ -22,9 +22,6 @@ ADMIN_TRACKERS = [
     ("DATA_LINKING_REQUEST",     "Data Linking Request",      "222", "completed"),
     ("DATA_REQUEST",             "Data Request",              "223", "completed"),
     ("SUPPORT_TICKET_REQUEST",   "Support Ticket Request",    "225", "completed"),
-    # No key has ever been issued for this one, so its PID is unknown. It stays listed so it
-    # starts working the moment a key appears, with no code change anywhere.
-    ("PATHPRESENTER_INITIATION", "PathPresenter Initiation",  None,  "completed"),
 ]
 
 # The form each tracker's records live on, used by the portfolio when summarising a record.
@@ -34,7 +31,6 @@ SOURCE_FORMS = {
     "DATA_LINKING_REQUEST": "data_linking_request",
     "DATA_REQUEST": "data_request",
     "SUPPORT_TICKET_REQUEST": "support_ticket",
-    "PATHPRESENTER_INITIATION": "pathpresenter_initiation",
 }
 
 # The 7 canonical build steps tracked on a SIR record's build_tracking form.
