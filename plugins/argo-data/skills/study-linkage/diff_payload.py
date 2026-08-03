@@ -40,7 +40,8 @@ def _add_argo_core_to_path():
             if hits:
                 sys.path.insert(0, str(hits[-1].parent)); return
     for parent in Path(__file__).resolve().parents:
-        for cand in (parent / "plugins" / "argo-core" / "scripts",
+        for cand in (parent / "plugins" / "argo-core" / "skills" / "redcap-api" / "scripts",
+                     parent / "plugins" / "argo-core" / "scripts",
                      parent / "argo-core" / "scripts"):
             if (cand / marker).exists():
                 sys.path.insert(0, str(cand)); return

@@ -26,7 +26,7 @@ def load(rel, name):
     return module
 
 
-D = load("plugins/argo-core/scripts/argo_diff.py", "argo_diff")
+D = load("plugins/argo-core/skills/redcap-api/scripts/argo_diff.py", "argo_diff")
 
 
 class TestNormalisation(unittest.TestCase):

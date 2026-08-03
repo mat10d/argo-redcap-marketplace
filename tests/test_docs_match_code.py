@@ -219,10 +219,40 @@ class TestVersionsAreInStep(unittest.TestCase):
                          "the marketplace listing and the plugins on disk disagree")
 
 
+class TestEverythingShipsInsideASkill(unittest.TestCase):
+    """No plugin asset may live outside a skills/<name>/ folder.
+
+    Chat-surface distribution mounts each SKILL folder, not the plugin root. scripts/ and
+    references/ used to sit at argo-core's root — so a chat session received bare SKILL.mds
+    with no executable layer and no reference docs, while everything worked locally. Anything
+    a skill needs must live inside the skill folder to travel.
+    """
+
+    ALLOWED_AT_ROOT = {"plugin.json"}  # .claude-plugin/plugin.json is plugin metadata
+
+    def test_no_scripts_or_references_outside_skills(self):
+        offenders = []
+        for plugin in sorted(PLUGINS.iterdir()):
+            if not plugin.is_dir():
+                continue
+            for path in plugin.rglob("*"):
+                if not path.is_file():
+                    continue
+                rel = path.relative_to(plugin)
+                if rel.parts[0] in ("skills", ".claude-plugin"):
+                    continue
+                offenders.append(str(path.relative_to(REPO)))
+        self.assertFalse(
+            offenders,
+            "These files sit outside every skills/<name>/ folder, so chat-surface installs "
+            f"will not include them: {offenders}",
+        )
+
+
 class TestSetupIsSafe(unittest.TestCase):
     """argo_setup.py creates folders — so it must never do that just for being run."""
 
-    SETUP = PLUGINS / "argo-core/scripts/argo_setup.py"
+    SETUP = PLUGINS / "argo-core/skills/redcap-api/scripts/argo_setup.py"
 
     def test_no_args_creates_nothing(self):
         import tempfile

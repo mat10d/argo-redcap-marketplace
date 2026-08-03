@@ -21,9 +21,9 @@ Tokens are secrets — never paste them into chats, scripts, or git.
 ## 3. Create your working folder and settings file
 
 ```bash
-python3 plugins/argo-core/scripts/argo_setup.py --dir ~/argo-work
+python3 plugins/argo-core/skills/redcap-api/scripts/argo_setup.py --dir ~/argo-work
 $EDITOR ~/argo-work/.env      # paste your tokens after each =
-python3 plugins/argo-core/scripts/argo_setup.py --check --dir ~/argo-work
+python3 plugins/argo-core/skills/redcap-api/scripts/argo_setup.py --check --dir ~/argo-work
 ```
 
 The setup script writes the file readable only by you (0600) and never overwrites keys you've

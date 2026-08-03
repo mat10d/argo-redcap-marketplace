@@ -22,7 +22,7 @@ before adding a flag, a mode, or a "would you like to…" prompt to any skill.
 
 ## Use the shared client — do not write your own HTTP call
 
-`argo_redcap_client.py` (in `argo-core/scripts/`) is the one way ARGO code talks to REDCap. It
+`argo_redcap_client.py` (in `argo-core/skills/redcap-api/scripts/`) is the one way ARGO code talks to REDCap. It
 handles token lookup, `REDCAP_URL` validation, automatic project confirmation before writes,
 retry/backoff, and plain-language errors. **No script should write its own `urlopen` or `curl`
 call.** The raw `curl` snippets further down this page are for a human debugging by hand, not a
@@ -112,7 +112,7 @@ Before doing anything else on a new machine, or if a skill says it can't reach R
 
 ```bash
 set -a; source ~/.argo/.env; set +a
-python3 argo-core/scripts/argo_redcap_client.py --check
+python3 plugins/argo-core/skills/redcap-api/scripts/argo_redcap_client.py --check
 ```
 
 This prints one line per configured project — its title, its record-ID field name, and whether the

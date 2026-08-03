@@ -35,7 +35,7 @@ def load(path: Path, name: str, env: dict | None = None):
                 os.environ[k] = v
 
 
-CLIENT = load(PLUGINS / "argo-core/scripts/argo_redcap_client.py", "argo_redcap_client")
+CLIENT = load(PLUGINS / "argo-core/skills/redcap-api/scripts/argo_redcap_client.py", "argo_redcap_client")
 PORTFOLIO = load(
     PLUGINS / "argo-pm/skills/study-portfolio/portfolio.py",
     "portfolio",

@@ -296,7 +296,8 @@ def find_argo_core() -> "str | None":
                 return str(hits[-1].parent)
 
     for parent in Path(__file__).resolve().parents:
-        for candidate in (parent / "plugins" / "argo-core" / "scripts",
+        for candidate in (parent / "plugins" / "argo-core" / "skills" / "redcap-api" / "scripts",
+                          parent / "plugins" / "argo-core" / "scripts",
                           parent / "argo-core" / "scripts"):
             if (candidate / marker).exists():
                 return str(candidate)

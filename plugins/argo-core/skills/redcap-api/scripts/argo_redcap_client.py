@@ -96,7 +96,8 @@ def find_argo_core() -> str:
             return str(hits[-1].parent)
 
     for parent in here.parents:
-        for candidate in (parent / "plugins" / "argo-core" / "scripts",
+        for candidate in (parent / "plugins" / "argo-core" / "skills" / "redcap-api" / "scripts",
+                          parent / "plugins" / "argo-core" / "scripts",
                           parent / "argo-core" / "scripts"):
             if (candidate / MARKER).exists():
                 return str(candidate)

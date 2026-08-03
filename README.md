@@ -46,11 +46,11 @@ argo-analysis/run-analysis    ← analysis on the local export (no token needed)
 
 ```bash
 # 1. Create a working folder + settings file (never overwrites existing keys)
-python3 plugins/argo-core/scripts/argo_setup.py --dir ~/argo-work
+python3 plugins/argo-core/skills/redcap-api/scripts/argo_setup.py --dir ~/argo-work
 $EDITOR ~/argo-work/.env        # paste in your REDCap address and tracker keys
 
 # 2. Check it works
-python3 plugins/argo-core/scripts/argo_setup.py --check --dir ~/argo-work
+python3 plugins/argo-core/skills/redcap-api/scripts/argo_setup.py --check --dir ~/argo-work
 
 # 3. Register the marketplace and install the plugins for your role
 #    From a local clone of this repo:
@@ -84,7 +84,7 @@ A GitHub repo is the keystone for both routes below — it's the portable source
 
 1. **One entry point per role.** The QA teammate shouldn't need to learn the build skill.
 2. **Build and verify are unified.** `redcap-build` Path A (construct) and Path B (audit) are one skill.
-3. **Shared rules live once.** Anything used by more than one plugin lives in `argo-core/references/`.
+3. **Shared rules live once.** Anything used by more than one plugin lives in `argo-core/skills/redcap-api/references/`.
 4. **Portable by default.** No machine-specific paths; operational folders come from the settings file `argo_setup.py` creates.
 
 ## Versioning
