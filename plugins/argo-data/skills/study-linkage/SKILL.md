@@ -116,7 +116,11 @@ The team's real linkage pipelines are the canonical patterns; read and adapt the
 - `Analysis/linkages/R01_linkages/linkage.py` — multi-way resolution + gap taxonomy.
 - `Analysis/linkages/R01_linkages/pipeline.py` (`build_*_payload`) — the diff-only payload in situ.
 - `Analysis/linkages/R01_linkages/audit.py` — integrity checks + fuzzy name/hospital scoring.
-- `Analysis/linkages/R01_linkages/redcap_client.py` — pull/push/metadata wrapper.
+- `Analysis/linkages/R01_linkages/redcap_client.py` — **superseded; do not copy this one.**
+  It predates the shared client and has no automatic project confirmation, no retry/backoff
+  and no token masking. Lift the *matching and scoring* logic from these pipelines if it's
+  useful, but do all REDCap I/O through `argo_redcap_client.py` from argo-core
+  ([[redcap-api]], [[access-tiers]]). One HTTP path, no exceptions.
 
 ## See also
 

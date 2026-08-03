@@ -22,19 +22,34 @@ Usage:
 """
 import argparse
 import csv
+import os
+import sys
 from pathlib import Path
 
 
-def norm(v):
-    """Normalize a value for comparison: trim, blank-out nan, drop numeric .0 tails."""
-    s = ("" if v is None else str(v)).strip()
-    if s.lower() == "nan":
-        return ""
-    try:
-        f = float(s)
-        return str(int(f)) if f == int(f) else repr(f)
-    except (ValueError, TypeError):
-        return s
+def _add_argo_core_to_path():
+    """Locate argo-core by marker file — never by directory name (see access-tiers.md)."""
+    marker = "argo_redcap_client.py"
+    override = os.environ.get("ARGO_CORE_SCRIPTS")
+    if override and (Path(override).expanduser() / marker).exists():
+        sys.path.insert(0, str(Path(override).expanduser())); return
+    for root in ("/mnt/.remote-plugins", "~/.claude/plugins", "~/.claude/plugins/cache"):
+        base = Path(root).expanduser()
+        if base.is_dir():
+            hits = sorted(base.glob(f"**/{marker}"))
+            if hits:
+                sys.path.insert(0, str(hits[-1].parent)); return
+    for parent in Path(__file__).resolve().parents:
+        for cand in (parent / "plugins" / "argo-core" / "scripts",
+                     parent / "argo-core" / "scripts"):
+            if (cand / marker).exists():
+                sys.path.insert(0, str(cand)); return
+
+
+_add_argo_core_to_path()
+# The fill-vs-conflict rule lives in argo-core so redcap-qa and study-linkage share one
+# implementation of the same guarantee, rather than each owning a slightly different copy.
+from argo_diff import norm, diff_records, FILL, CONFLICT, NOOP  # noqa: E402
 
 
 def load(path, id_field):
@@ -76,34 +91,11 @@ def main():
             "ones to compare with --fields."
         )
 
-    updates = []      # rows with >=1 safe-fill (id + filled cells only)
-    overwrites = []   # rows with >=1 conflict (id + computed values for conflicting cells)
-    conflicts = []    # long format: id, field, existing, computed
-    n_fill = n_conflict = n_noop = 0
-
-    for rid, comp in computed.items():
-        curr = current.get(rid, {})
-        fill_row = {args.id_field: rid}
-        over_row = {args.id_field: rid}
-        for field in fields:
-            new_v = norm(comp.get(field, ""))
-            cur_v = norm(curr.get(field, ""))
-            if new_v == cur_v:
-                n_noop += 1
-            elif cur_v == "":          # blank -> value : safe fill
-                fill_row[field] = new_v
-                n_fill += 1
-            elif new_v == "":          # nothing to add
-                n_noop += 1
-            else:                       # both non-blank, differ : conflict
-                conflicts.append({args.id_field: rid, "field": field,
-                                  "existing": cur_v, "computed": new_v})
-                over_row[field] = new_v
-                n_conflict += 1
-        if len(fill_row) > 1:
-            updates.append(fill_row)
-        if len(over_row) > 1:
-            overwrites.append(over_row)
+    result = diff_records(computed, current, fields, args.id_field)
+    updates, conflicts, overwrites = result["updates"], result["conflicts"], result["overwrites"]
+    n_fill = result["counts"][FILL]
+    n_conflict = result["counts"][CONFLICT]
+    n_noop = result["counts"][NOOP]
 
     out = Path(args.out_dir).expanduser()
     out.mkdir(parents=True, exist_ok=True)

@@ -60,6 +60,7 @@ These live in `references/` and are linked from skills in `argo-build`, `argo-pm
 - [[token-optional]] — **cross-cutting:** use the API only when a token is present; else fall back to files + UI
 - [[access-tiers]] — **decision record:** which skills hold tokens, and which pathway wins at each fork
 - [[verify-install]] — checklist for confirming an install works, to run in a **fresh** session
+- [[getting-files-from-redcap]] — click-by-click download instructions for the no-token path
 - [[mdc-rules]] — Missing Data Codes by field type
 - [[standard-roles]] — ARGO's four standard REDCap roles
 - [[dd-column-spec]] — Data dictionary CSV column reference

@@ -1,6 +1,6 @@
 {
   "name": "argo-qa",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Continuous quality assurance on active REDCap studies \u2014 branching-logic-aware, per-site completeness worklists for RAs to resolve.",
   "author": {
     "name": "ARGO"

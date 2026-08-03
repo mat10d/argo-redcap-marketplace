@@ -94,7 +94,7 @@ Override `ARGO_PM_ROOT` to point to a different operational root if needed.
 When the user picks a record to act on:
 - **SIR record (study to build)** → [[redcap-build]] (argo-build) to triage, build the DD, and mark build progress
 - **SPR record (personnel request)** → [[redcap-admin]] (in argo-build) to assign roles
-- **DATA_LINKING** → linkage workflow (TBD, may live under `argo-analysis/linkages`)
+- **DATA_LINKING** → [[study-linkage]] (argo-data). Builds the master linkage table, separates safe-fills from conflicts, and reports gaps/orphans before any write-back.
 - **DATA_REQUEST** → extraction via [[data-export]]
 - **SUPPORT_TICKET** → triage manually; if technical, route to [[redcap-admin]]
 

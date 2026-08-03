@@ -5,6 +5,7 @@ Generalized from REDCap/Analysis/linkages/R01_linkages/build_ra_worklists.py.
 For each configured workbook (a named bundle of fields), this:
   1. Pulls raw records + metadata via the REDCap API.
   2. Evaluates each field's branching logic per record to decide applicability.
+     Conditions it cannot read are surfaced and marked uncertain, never dropped.
   3. Flags applicable-but-blank cells (and optionally MDC sentinels
      -666/-777/-888/-999, plus 666 = N/A).
   4. Splits output by DAG (`redcap_data_access_group`) and writes one .xlsx
@@ -76,12 +77,35 @@ def pull_metadata(url: str, token: str) -> list[dict]:
 # Metadata-driven branching + labels (vendored from R01_linkages/pipeline.py)
 # -----------------------------------------------------------------------------
 
+# One clause pattern, used everywhere. It must accept everything REDCap's Designer actually
+# emits, which is broader than it first appears:
+#   [field] = 'value'     quoted, the form most docs show
+#   [field] = 1           UNQUOTED — what REDCap writes for numeric codes, and by far the most
+#                         common form in practice. A stricter pattern that required quotes was
+#                         silently dropping 28% of branching fields on one live cohort and 70%
+#                         on another, because an unparseable clause was treated as "not applicable".
+#   [field(2)] = 1        a single checkbox option
+#   [age] >= 18           numeric comparison (documented in dd-column-spec.md)
 _CLAUSE_RE = re.compile(
-    r"""\s*\[([a-zA-Z0-9_]+)(?:\((-?\w+)\))?\]\s*(=|<>|!=)\s*['"]([^'"]*)['"]\s*"""
+    r"""\s*\[([a-zA-Z0-9_]+)(?:\((-?\w+)\))?\]\s*"""
+    r"""(<=|>=|<>|!=|=|<|>)\s*"""
+    r"""(?:'([^']*)'|"([^"]*)"|([^\s'"]+))\s*"""
 )
-_CLAUSE_RE_LOOSE = re.compile(
-    r"\s*\[(\w+)(?:\((-?\w+)\))?\]\s*(=|<>|!=|>=|<=|>|<)\s*['\"]?([^'\"\s]+)['\"]?\s*"
-)
+
+# Logic strings we couldn't understand this run. Reported once at the end rather than per row,
+# so the operator finds out the parser needs extending instead of silently losing coverage.
+UNPARSEABLE_LOGIC: set = set()
+
+
+def _clause_parts(clause: str):
+    """(field, choice_code, operator, value) for a clause, or None if it can't be parsed."""
+    m = _CLAUSE_RE.fullmatch(clause)
+    if not m:
+        return None
+    field, choice, op = m.group(1), m.group(2), m.group(3)
+    # Exactly one of the three value groups matches, depending on the quoting style.
+    value = next(g for g in (m.group(4), m.group(5), m.group(6)) if g is not None)
+    return field, choice, op, value
 
 
 def parse_choices(raw: str) -> dict:
@@ -99,33 +123,89 @@ def clean_label(label: str) -> str:
     return re.sub(r"\s+", " ", label).strip().rstrip(" ?.:;")
 
 
-def _eval_clause(clause: str, row: dict) -> bool:
-    m = _CLAUSE_RE.fullmatch(clause)
-    if not m:
-        return False
-    field, choice, op, val = m.group(1), m.group(2), m.group(3), m.group(4)
+def _eval_clause(clause: str, row: dict) -> "bool | None":
+    """True/False if the clause could be evaluated; None if it couldn't be parsed."""
+    parts = _clause_parts(clause)
+    if parts is None:
+        return None
+    field, choice, op, val = parts
     if choice:
         suf = f"____{choice[1:]}" if choice.startswith("-") else f"___{choice}"
         col = f"{field}{suf}"
     else:
         col = field
-    actual = str(row.get(col, ""))
-    return actual == val if op == "=" else actual != val
+    actual = str(row.get(col, "")).strip()
+
+    if op in ("=", "<>", "!="):
+        equal = actual == str(val).strip()
+        return equal if op == "=" else not equal
+
+    # Numeric comparison.
+    # A BLANK value fails the comparison, and that's a definite answer, not an unknown one:
+    # REDCap evaluates `[x] >= 1` with x empty as false and hides the field, so we match it.
+    # Treating blanks as "uncertain" instead would flood a worklist — on the Study Tracker it
+    # would have marked a quarter of all cells "please check" for no reason.
+    if actual == "":
+        return False
+    try:
+        left, right = float(actual), float(val)
+    except (TypeError, ValueError):
+        return None      # a genuinely non-numeric value on either side — we can't say
+    return {"<": left < right, ">": left > right,
+            "<=": left <= right, ">=": left >= right}[op]
+
+
+def evaluate_branching(logic: str, row: dict) -> "tuple[bool, bool]":
+    """Decide whether a field applies to this record.
+
+    Returns (applies, certain).
+
+    `certain` is False when some part of the logic couldn't be understood. In that case we say the
+    field DOES apply — never silently drop a field just because we couldn't read its condition,
+    which is precisely the failure this replaced — but the caller marks it as uncertain rather
+    than asserting it as a confirmed gap, and the logic string is reported at the end of the run.
+    """
+    if not logic or not logic.strip():
+        return True, True
+
+    any_unparseable = False
+    for or_part in re.split(r"\s+OR\s+", logic, flags=re.IGNORECASE):
+        branch = True
+        branch_unparseable = False
+        for clause in re.split(r"\s+AND\s+", or_part, flags=re.IGNORECASE):
+            result = _eval_clause(clause, row)
+            if result is None:
+                branch_unparseable = any_unparseable = True
+                continue          # unknown — don't let it decide the branch either way
+            if not result:
+                branch = False
+                break
+        if branch and not branch_unparseable:
+            return True, True     # this branch is satisfied outright
+    if any_unparseable:
+        UNPARSEABLE_LOGIC.add(logic.strip())
+        return True, False        # surfaced, but flagged as uncertain
+    return False, True
 
 
 def eval_branching(logic: str, row: dict) -> bool:
-    """Evaluate REDCap branching logic. Fail-open on unparseable clauses."""
-    if not logic or not logic.strip():
-        return True
-    for or_part in re.split(r"\s+OR\s+", logic, flags=re.IGNORECASE):
-        ok = True
-        for clause in re.split(r"\s+AND\s+", or_part, flags=re.IGNORECASE):
-            if not _CLAUSE_RE.fullmatch(clause) or not _eval_clause(clause, row):
-                ok = False
-                break
-        if ok:
-            return True
-    return False
+    """Whether a field applies. Kept for callers that don't need the certainty flag."""
+    return evaluate_branching(logic, row)[0]
+
+
+def report_unparseable_logic(stream=sys.stderr) -> None:
+    """Say once, at the end of a run, which branching logic couldn't be understood."""
+    if not UNPARSEABLE_LOGIC:
+        return
+    print(
+        f"\nNote: {len(UNPARSEABLE_LOGIC)} branching condition(s) couldn't be fully understood.\n"
+        "Fields controlled by them were included in the worklist and marked as 'check whether\n"
+        "this applies' rather than left out — but do check them, and pass this list on so the\n"
+        "tool can be taught to read them:",
+        file=stream,
+    )
+    for logic in sorted(UNPARSEABLE_LOGIC):
+        print(f"    {logic}", file=stream)
 
 
 def extract_branching_triggers(logic: str) -> list:
@@ -133,9 +213,9 @@ def extract_branching_triggers(logic: str) -> list:
         return []
     out, seen = [], set()
     for clause in re.split(r"\s+(?:AND|OR)\s+", logic, flags=re.IGNORECASE):
-        m = _CLAUSE_RE.fullmatch(clause)
-        if m and m.group(1) not in seen:
-            seen.add(m.group(1)); out.append(m.group(1))
+        parts = _clause_parts(clause)
+        if parts and parts[0] not in seen:
+            seen.add(parts[0]); out.append(parts[0])
     return out
 
 
@@ -166,10 +246,10 @@ def format_branching_logic(logic: str, meta_by: dict) -> str:
     for tok in parts:
         if re.fullmatch(r"\s+(?:AND|OR)\s+", tok, flags=re.IGNORECASE):
             out.append(tok.strip().upper()); continue
-        m = _CLAUSE_RE_LOOSE.fullmatch(tok)
-        if not m:
+        parts = _clause_parts(tok)
+        if not parts:
             out.append(tok.strip()); continue
-        field, choice_code, op, val = m.group(1), m.group(2), m.group(3), m.group(4)
+        field, choice_code, op, val = parts
         choices = parse_choices(meta_by.get(field, {}).get("select_choices_or_calculations", "") or "")
         if choice_code is not None:
             label = choices.get(choice_code, choice_code)
@@ -228,6 +308,10 @@ def labelize(df: pd.DataFrame, metadata: list, fields: list) -> tuple[pd.DataFra
 SENTINEL_CODES = {"666", "-666", "-777", "-888", "-999"}
 
 YELLOW          = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+# A distinct fill for cells whose branching condition we could not read. These are shown so
+# nothing is ever silently dropped, but they are NOT an assertion that the RA missed something —
+# they mean "we couldn't tell whether this applies; please check".
+UNCERTAIN       = PatternFill(start_color="FFE9B8", end_color="FFE9B8", fill_type="solid")
 HEADER_FILL     = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
 RESPONSE_HEADER = PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid")
 HEADER_FONT     = Font(bold=True, color="FFFFFF")
@@ -243,11 +327,19 @@ def _option_code(col: str, base: str) -> str:
 
 def missing_mask_for(field: str, raw_row: pd.Series, meta_by: dict,
                       flag_sentinels: bool = True) -> bool:
+    """Whether this cell should be flagged. See missing_and_certainty_for for the certainty flag."""
+    return missing_and_certainty_for(field, raw_row, meta_by, flag_sentinels)[0]
+
+
+def missing_and_certainty_for(field: str, raw_row: pd.Series, meta_by: dict,
+                              flag_sentinels: bool = True) -> "tuple[bool, bool]":
+    """(should_flag, certain). certain=False means we could not read the field's condition."""
     m = meta_by.get(field)
     if not m:
-        return False
-    if not eval_branching(m.get("branching_logic") or "", raw_row.to_dict()):
-        return False
+        return False, True
+    applies, certain = evaluate_branching(m.get("branching_logic") or "", raw_row.to_dict())
+    if not applies:
+        return False, certain
     ftype = m.get("field_type", "")
     if ftype == "checkbox":
         ticked = [
@@ -275,9 +367,15 @@ def build_workbook(labeled: pd.DataFrame, raw_by_id: dict, meta_by: dict,
         rrow = raw_by_id.get(rid)
         if rrow is None:
             continue
-        missing = [f for f in fields if missing_mask_for(f, rrow, meta_by, flag_sentinels)]
+        missing, uncertain = [], set()
+        for f in fields:
+            flag, certain = missing_and_certainty_for(f, rrow, meta_by, flag_sentinels)
+            if flag:
+                missing.append(f)
+                if not certain:
+                    uncertain.add(f)
         if missing:
-            rows_with_work.append((lrow, rrow, set(missing)))
+            rows_with_work.append((lrow, rrow, set(missing), uncertain))
             fields_with_work.update(missing)
 
     if not rows_with_work:
@@ -318,7 +416,7 @@ def build_workbook(labeled: pd.DataFrame, raw_by_id: dict, meta_by: dict,
         cell.alignment = Alignment(vertical="center", wrap_text=True)
     ws.freeze_panes = f"{get_column_letter(len(id_cols) + 1)}3"
 
-    for lrow, rrow, missing in rows_with_work:
+    for lrow, rrow, missing, uncertain in rows_with_work:
         out = [lrow.get(c, "") for c in id_cols]
         for f in display_fields:
             out.append(lrow.get(label_map.get(f, f), ""))
@@ -327,7 +425,8 @@ def build_workbook(labeled: pd.DataFrame, raw_by_id: dict, meta_by: dict,
         row_idx = ws.max_row
         for i, f in enumerate(display_fields):
             if f in missing:
-                ws.cell(row=row_idx, column=len(id_cols) + 1 + i).fill = YELLOW
+                ws.cell(row=row_idx, column=len(id_cols) + 1 + i).fill = (
+                    UNCERTAIN if f in uncertain else YELLOW)
 
     for i in range(1, len(header) + 1):
         ws.column_dimensions[get_column_letter(i)].width = max(14, min(32, len(str(header[i-1])) + 4))
@@ -506,6 +605,7 @@ def main():
                 print(f"  wrote {path}  ({ws.max_row - 2} patients × {ws.max_column - len(id_cols)} fields)")
 
     print("Done.")
+    report_unparseable_logic()
 
 
 if __name__ == "__main__":

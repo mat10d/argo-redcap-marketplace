@@ -260,6 +260,9 @@ def main():
             expect_pid=expect if by_pid else None,
         )
         print(f"  Confirmed: {info.get('project_title')!r} (project {info.get('project_id')})")
+        # Tier 3: the rule that this must run under a permission-restricted account is otherwise
+        # only a sentence in a document. Check it and say so out loud.
+        client.warn_if_over_permissioned("changing patient data in this study")
         print(f"Writing {rows} record(s). Blank cells will leave existing values alone.")
         response = client.import_records_csv(merged, overwrite="normal")
     except RedcapError as e:

@@ -48,7 +48,7 @@ get data out is:
 2. **Data Exports, Reports, and Stats** → "All data" → export as CSV.
 3. **Data Dictionary** page → download as CSV.
 
-Those two files are exactly what [[run-analysis]] and the QA tools expect. Treat `export.py` as
+Those two files are exactly what [[run-analysis]] and the QA tools expect. Click-by-click instructions, written for someone who doesn't know REDCap's menus: [[getting-files-from-redcap]]. Treat `export.py` as
 the shortcut for the studies where a key happens to exist — never as a prerequisite, and never
 ask the user to go and get a token before helping them.
 

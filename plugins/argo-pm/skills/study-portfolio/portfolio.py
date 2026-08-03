@@ -51,18 +51,53 @@ def state_dir() -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     return directory
 
-# Each admin REDCap: (env var name, project label, source form, status field, status "done" value).
-# SIR's done-marker is `study_production` (yesno on build_tracking — final canonical step).
-# The 4 other admin REDCaps share the `tracking` form's `completed` yesno field.
-# Fields don't exist until the user uploads the relevant instrument ZIP — until then, every record stays bucketed as "open".
-ADMIN_REDCAPS = [
-    ("STUDY_INITIATION_REQUEST", "Study Tracker", "study_initiation_request", "study_production", "Yes"),
-    ("STUDY_PERSONELL_REQUEST",  "Study Personnel Request",  "study_personnel_request",  "completed", "Yes"),
-    ("DATA_LINKING_REQUEST",     "Data Linking Request",     "data_linking_request",     "completed", "Yes"),
-    ("DATA_REQUEST",             "Data Request",             "data_request",             "completed", "Yes"),
-    ("SUPPORT_TICKET_REQUEST",   "Support Ticket Request",   "support_ticket",           "completed", "Yes"),
-    ("PATHPRESENTER_INITIATION", "PathPresenter Initiation", "pathpresenter_initiation", "completed", "Yes"),
-]
+# The admin trackers and the canonical build steps come from argo-core's argo_trackers.py, so
+# this list exists in exactly one place. If argo-core isn't reachable we fall back to a local
+# copy rather than failing outright — but the shared file is the source of truth.
+def _load_trackers():
+    # Self-contained locator: find_argo_core() is defined further down this file, and this runs
+    # at import time. Searches by marker file, never by directory name (see access-tiers.md).
+    core = None
+    marker = "argo_redcap_client.py"
+    override = os.environ.get("ARGO_CORE_SCRIPTS")
+    if override and (Path(override).expanduser() / marker).exists():
+        core = str(Path(override).expanduser())
+    if core is None:
+        for root in ("/mnt/.remote-plugins", "~/.claude/plugins", "~/.claude/plugins/cache"):
+            base = Path(root).expanduser()
+            if base.is_dir():
+                hits = sorted(base.glob(f"**/{marker}"))
+                if hits:
+                    core = str(hits[-1].parent); break
+    if core is None:
+        for parent in Path(__file__).resolve().parents:
+            for cand in (parent / "plugins" / "argo-core" / "scripts",
+                         parent / "argo-core" / "scripts"):
+                if (cand / marker).exists():
+                    core = str(cand); break
+            if core:
+                break
+    if core:
+        sys.path.insert(0, core)
+        try:
+            from argo_trackers import as_portfolio_rows, SIR_BUILD_STEPS as steps
+            return as_portfolio_rows(), steps
+        except ImportError:
+            pass
+    print("Note: couldn't load the shared tracker list from argo-core; using a local copy. "
+          "Re-install the ARGO plugins together if this persists.", file=sys.stderr)
+    return ([
+        ("STUDY_INITIATION_REQUEST", "Study Tracker", "study_initiation_request", "study_production", "Yes"),
+        ("STUDY_PERSONELL_REQUEST",  "Study Personnel Request",  "study_personnel_request",  "completed", "Yes"),
+        ("DATA_LINKING_REQUEST",     "Data Linking Request",     "data_linking_request",     "completed", "Yes"),
+        ("DATA_REQUEST",             "Data Request",             "data_request",             "completed", "Yes"),
+        ("SUPPORT_TICKET_REQUEST",   "Support Ticket Request",   "support_ticket",           "completed", "Yes"),
+        ("PATHPRESENTER_INITIATION", "PathPresenter Initiation", "pathpresenter_initiation", "completed", "Yes"),
+    ], ["project_created", "dd_uploaded", "user_rights_complete", "data_imported",
+        "review_internal", "review_pi", "study_production"])
+
+
+ADMIN_REDCAPS, SIR_BUILD_STEPS = _load_trackers()
 
 
 def api_post(token: str, **params) -> "list | dict":
@@ -134,10 +169,6 @@ def collect(csv_dir: Path) -> dict:
     return snapshot
 
 
-SIR_BUILD_STEPS = [
-    "project_created", "dd_uploaded", "user_rights_complete", "data_imported",
-    "review_internal", "review_pi", "study_production",
-]
 # Build-side technical detail (hospital_number, file import fields, separate roles vs users granularity)
 # is enforced by the DD validator + collapsed into user_rights_complete. Document checklist + weekly
 # reports tracked granularly in study_metadata.

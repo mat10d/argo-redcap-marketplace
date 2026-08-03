@@ -26,14 +26,13 @@ import sys
 from pathlib import Path
 
 # The admin trackers ARGO holds keys for permanently (Tier 1 in access-tiers.md).
-TIER1 = [
-    ("STUDY_INITIATION_REQUEST", "Study Tracker (the main study list)"),
-    ("STUDY_PERSONELL_REQUEST", "Study Personnel Request"),
-    ("DATA_LINKING_REQUEST", "Data Linking Request"),
-    ("DATA_REQUEST", "Data Request"),
-    ("SUPPORT_TICKET_REQUEST", "Support Ticket Request"),
-    ("PATHPRESENTER_INITIATION", "PathPresenter Initiation"),
-]
+# Single source of truth: argo_trackers.py, next to this file.
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from argo_trackers import ADMIN_TRACKERS  # noqa: E402
+
+TIER1 = [(env, f"{title}{'' if pid else ' (no key issued yet)'}")
+         for env, title, pid, _marker in ADMIN_TRACKERS]
 
 ENV_TEMPLATE = """\
 # ARGO REDCap settings
@@ -61,9 +60,21 @@ ARGO_PM_ROOT={pm_root}
 {tracker_lines}
 
 # ---------------------------------------------------------------------------
-# Access keys for individual studies (only if you've been given one).
-# Name each one after the study, for example:
-#     CRC_TOKEN=
+# Access keys for individual studies — THINK BEFORE ADDING ONE HERE.
+#
+# The keys above open ARGO's own project-management records. A study key is
+# different: it opens patient data. Anything in a folder you share with Claude
+# can be read in full, so a study key kept here is more exposed than a tracker
+# key, for a much more sensitive project.
+#
+# Prefer either of these instead:
+#   - supply it just for the one command that needs it, e.g.
+#         CRC_TOKEN=... python3 export.py --token-env CRC_TOKEN --info
+#   - or keep study keys in their own folder:
+#         python3 argo_setup.py --separate-credentials
+#
+# If you do add one anyway, name it after the study (CRC_TOKEN=). The setup
+# check will remind you it's here.
 # ---------------------------------------------------------------------------
 """
 
@@ -146,6 +157,21 @@ def run_check(work_dir: Path) -> int:
 
     print(f"\nFilled in ({len(filled)}): {', '.join(filled) if filled else 'nothing yet'}")
     print(f"Still blank ({len(blank)}): {', '.join(blank) if blank else 'none'}")
+
+    tracker_vars = {env for env, _desc in TIER1}
+    study_keys = [k for k in filled
+                  if k not in tracker_vars and k not in ("REDCAP_URL", "ARGO_PM_ROOT")]
+    if study_keys:
+        print(
+            f"\n⚠ This file also holds {len(study_keys)} access key(s) for individual studies:\n"
+            f"    {', '.join(study_keys)}\n"
+            "\n"
+            "Those open patient data, unlike the tracker keys. If this folder is one you share\n"
+            "with Claude, everything in it can be read — so consider supplying a study key only\n"
+            "for the command that needs it, or moving study keys to their own folder:\n"
+            "\n"
+            f"    python3 {Path(__file__).name} --separate-credentials"
+        )
 
     if "REDCAP_URL" in blank or "REDCAP_URL" not in filled:
         print(

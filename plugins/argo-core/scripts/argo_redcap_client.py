@@ -354,6 +354,71 @@ class RedcapClient:
 
     # ---------------------------------------------------------------- confirmation
 
+    # Rights that a QA write-back account has no business holding. A REDCap token carries exactly
+    # the permissions of the account that made it — there's no way to scope a token down — so the
+    # only place this can be checked is the account itself (see [[access-tiers]] Tier 3).
+    EXCESSIVE_RIGHTS = {
+        "user_rights": "add and remove other users",
+        "design": "redesign forms and fields",
+        "record_delete": "delete records outright",
+        "data_export": "export the full dataset",
+    }
+
+    def account_rights(self) -> "dict | None":
+        """This token's own user record, or None if REDCap won't tell us (older versions)."""
+        try:
+            users = self._post(content="user")
+        except RedcapError:
+            return None
+        if not isinstance(users, list) or not users:
+            return None
+        # The API returns the calling account first when it can identify it.
+        return users[0]
+
+    def warn_if_over_permissioned(self, purpose: str = "writing data") -> list:
+        """Warn plainly if this token's account can do far more than the task needs.
+
+        Returns the list of concerning rights. This warns rather than blocks: a legitimate
+        one-off migration shouldn't be stranded by it. But the Tier 3 rule stops being purely a
+        sentence in a document that somebody has to remember.
+        """
+        rights = self.account_rights()
+        if not rights:
+            print(
+                "  (Couldn't check what this access key is allowed to do — REDCap didn't say. "
+                "Carrying on.)",
+                file=sys.stderr,
+            )
+            return []
+
+        # A right counts as held only when REDCap returns a truthy value for it. Absent or null
+        # means "not reported", which must not be read as "granted".
+        found = []
+        for field, desc in self.EXCESSIVE_RIGHTS.items():
+            value = rights.get(field)
+            if value is None:
+                continue
+            if str(value).strip() not in ("", "0", "false", "False"):
+                found.append((field, desc))
+        if not found:
+            return []
+
+        username = rights.get("username", "(unknown)")
+        print("", file=sys.stderr)
+        print("  ⚠ This access key belongs to an account with broad powers.", file=sys.stderr)
+        print(f"    Account: {username}", file=sys.stderr)
+        print(f"    As well as {purpose}, this key can:", file=sys.stderr)
+        for _field, desc in found:
+            print(f"      - {desc}", file=sys.stderr)
+        print(
+            "\n    A key can only ever do what its owner's account can do — there's no way to\n"
+            "    limit a key by itself. For routine work, ask your REDCap administrator for a key\n"
+            "    tied to an account that can only edit the forms you actually need.\n"
+            "    Carrying on, because this may be deliberate.",
+            file=sys.stderr,
+        )
+        return [f for f, _ in found]
+
     def confirm_project(self, expect_title: str | None = None, expect_pid: str | None = None) -> dict:
         """Check this token points where the caller intended, before writing anything.
 
@@ -461,17 +526,13 @@ class RedcapClient:
 
 # -------------------------------------------------------------------- setup check
 
-# The admin tracker projects that should always be configured (Tier 1 in [[access-tiers]]).
-# PIDs verified live against redcap.oauife.edu.ng. PathPresenter has no PID recorded because no
-# token for it has ever been configured — see the note in study-portfolio's SKILL.md.
-TIER1_PROJECTS = [
-    ("STUDY_INITIATION_REQUEST", "Study Tracker", "224"),
-    ("STUDY_PERSONELL_REQUEST", "Study Personnel Request", "221"),
-    ("DATA_LINKING_REQUEST", "Data Linking Request", "222"),
-    ("DATA_REQUEST", "Data Request", "223"),
-    ("SUPPORT_TICKET_REQUEST", "Support Ticket Request", "225"),
-    ("PATHPRESENTER_INITIATION", "PathPresenter Initiation", None),
-]
+# The admin trackers. Single source of truth lives in argo_trackers.py, next to this file.
+# The path insert matters: this module is often loaded by file path rather than imported by
+# name, and without it the sibling import fails.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from argo_trackers import ADMIN_TRACKERS  # noqa: E402
+
+TIER1_PROJECTS = [(env, title, pid) for env, title, pid, _marker in ADMIN_TRACKERS]
 
 
 def run_check() -> int:
@@ -518,6 +579,26 @@ def run_check() -> int:
             first_line = str(e).strip().splitlines()[0]
             print(f"  ✗ {env_var}: {first_line}")
             broken += 1
+
+    # Study tokens don't belong in the same file as the admin-tracker keys. The justification for
+    # keeping keys in the shared working folder — "these are only ARGO's own PM records" — stops
+    # being true the moment a cohort project's key is pasted in beside them.
+    tier1 = {env for env, *_ in TIER1_PROJECTS}
+    strays = sorted(k for k in os.environ
+                    if k.endswith("_TOKEN") and k not in tier1 and os.environ.get(k))
+    if strays:
+        print("\n" + "-" * 60)
+        print("Note: these look like access keys for individual studies, not the admin trackers:")
+        for name in strays:
+            print(f"    {name}")
+        print(
+            "\nIf they're in the same settings file as your tracker keys, be aware that anything\n"
+            "in a folder you share with Claude can be read in full — and a study key opens\n"
+            "patient data, which the tracker keys don't. Supply a study key just for the task\n"
+            "that needs it, or keep it in a separate folder:\n"
+            "\n"
+            "    python3 argo_setup.py --separate-credentials"
+        )
 
     print("\n" + "-" * 60)
     print(f"{working} working, {missing} not set up, {broken} not working")

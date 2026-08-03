@@ -85,7 +85,13 @@ outputs/qa_worklists/
 ## Workbook conventions (what the RA sees)
 
 - One row per patient, one column per field.
-- Cells that are **applicable per branching logic AND blank** (or sentinel, in `with_MDC`) are highlighted yellow.
+- Cells that are **applicable per branching logic AND blank** (or sentinel, in `with_MDC`) are
+  highlighted **yellow** — these are confirmed gaps: the field applies and has no value.
+- Cells in **amber** mean *"we couldn't read this field's condition — please check whether it
+  applies"*. They are not an accusation that something was missed; the tool is telling you it
+  doesn't know. Every condition that caused one is listed at the end of the run so the parser
+  can be extended. In practice this is rare — across two live projects and ~11,000 evaluations
+  there were none — but it exists so a field is never silently omitted.
 - A second header row (`only if ...`) shows each field's prerequisite in plain English ("only if treatment_received includes Surgery").
 - "Gate context" columns are surfaced automatically: if `surgery_intent` is flagged because `treatment_received` includes Surgery, the workbook also shows `treatment_received` so the RA can see *why*.
 - Workbook is filtered — only patients and fields that have at least one yellow cell appear.
@@ -97,7 +103,46 @@ outputs/qa_worklists/
 3. In the spreadsheet, type either the actual value, `filled`, or an MDC code into the yellow cell to mark it resolved. RAs often add a `RESPONSE` column with per-row context (why they couldn't fill, "RESOLVED" marker, patient died, etc.) — `review_responses.py` picks this up.
 4. Re-run this skill to confirm — resolved cells drop out of the next worklist.
 
-## Review → snapshot → push workflow (round-trip)
+## LASUTH
+### 40-65 — could you clarify your "RESOLVED" note?
+...
+## OAUTHC
+### 46-608, 46-613 — what does "patient was disqualified" mean?
+...
+```
+
+The `## <SITE>` headers are matched (case-insensitive) against push_drafts filenames so the right questions show up in the right summary.
+
+## What gates a field
+
+`build_worklists.py` evaluates the branching logic literally. It supports `[field]='val'` and `[field]=val` (**unquoted — what REDCap's Designer actually emits for numeric codes**), `[field(N)]` for checkbox option N, `AND`, `OR`, `=`, `!=`, `<>`, and the numeric comparisons `<`, `>`, `<=`, `>=`.
+
+A condition it cannot read does **not** cause the field to be dropped. The cell is surfaced in a distinct amber fill meaning *"we couldn't tell whether this applies — please check"*, as opposed to the normal yellow *"this applies and is blank"*. Every unreadable condition is listed once at the end of the run so the parser can be extended.
+
+> This previously worked the other way round: the docstring and this file both claimed fail-open, but the code treated an unparseable clause as *not applicable* and dropped the field. Because REDCap writes numeric conditions unquoted, that silently hid 28% of branching-gated fields on one live cohort and 70% on another. Fixed in 0.9.0.
+
+## Limits / known gaps
+
+- **Single form / single arm only for now** — multi-event REDCap projects need a per-event split; not yet wired.
+- **No cross-form logic checks** (e.g. surgery_date ≥ diagnosis_date). Planned.
+- **No outlier / impossible-value detection** — planned.
+- **No write-back (by design, enforced by policy)** — the RA enters changes in REDCap directly so REDCap's branching, validation, and audit trail apply. We do not round-trip dirty Excel into REDCap. See [[redcap-api-gotchas]] §0; the push scripts are deprecated/migration-only.
+
+## See also
+
+- `REDCap/Analysis/linkages/R01_linkages/build_ra_worklists.py` — the study-specific original this was generalized from
+
+Roadmap (not yet built): source-document audit verification, and a PM-side blocker view that QA flags should eventually feed into.
+
+---
+
+## [DEPRECATED] Migration-only push workflow
+
+**Do not use this to close a QA round.** RAs edit REDCap directly; you re-run the
+worklist build to confirm. This section is kept only because a genuine one-off legacy
+migration may need it, and `push_updates.py` refuses to run without
+`--force-migration` plus a shown dry-run ([[access-tiers]] Tier 3).
+
 
 > ⚠️ **DEPRECATED — read [[redcap-api-gotchas]] §0 (no programmatic writes to cohort patient data).**
 > This skill is **read-only by default**: produce worklists, RAs fill REDCap directly, re-pull to confirm. The push steps below (`verify_push.py`, `push_updates.py`) are retained only as a **migration-only escape hatch** for one-off bulk loads of legacy data, and require an explicit acknowledgment flag to run. Do **not** use them in the routine QA cycle. `snapshot_project.py` (read-only export) is fine to use anytime.
@@ -217,29 +262,3 @@ Outputs `RA_summaries/<site>.md` per site, each with:
 
 Section structure expected in `RA_questions.md`:
 ```markdown
-## LASUTH
-### 40-65 — could you clarify your "RESOLVED" note?
-...
-## OAUTHC
-### 46-608, 46-613 — what does "patient was disqualified" mean?
-...
-```
-
-The `## <SITE>` headers are matched (case-insensitive) against push_drafts filenames so the right questions show up in the right summary.
-
-## What gates a field
-
-`build_worklists.py` evaluates the branching logic literally — supports `[field]='val'`, `[field(N)]='val'` (checkbox option N), `AND`, `OR`, and `=/!=/<>`. Unparseable clauses are treated as True (fail-open) so the field is still surfaced — better than silently dropping it.
-
-## Limits / known gaps
-
-- **Single form / single arm only for now** — multi-event REDCap projects need a per-event split; not yet wired.
-- **No cross-form logic checks** (e.g. surgery_date ≥ diagnosis_date). Planned.
-- **No outlier / impossible-value detection** — planned.
-- **No write-back (by design, enforced by policy)** — the RA enters changes in REDCap directly so REDCap's branching, validation, and audit trail apply. We do not round-trip dirty Excel into REDCap. See [[redcap-api-gotchas]] §0; the push scripts are deprecated/migration-only.
-
-## See also
-
-- `REDCap/Analysis/linkages/R01_linkages/build_ra_worklists.py` — the study-specific original this was generalized from
-
-Roadmap (not yet built): source-document audit verification, and a PM-side blocker view that QA flags should eventually feed into.
