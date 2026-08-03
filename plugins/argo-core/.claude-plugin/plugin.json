@@ -1,6 +1,6 @@
 {
   "name": "argo-core",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "Shared REDCap API conventions, safety rules, and reference tables (MDC, standard roles, DD column spec). Required by other ARGO plugins.",
   "author": {
     "name": "ARGO"

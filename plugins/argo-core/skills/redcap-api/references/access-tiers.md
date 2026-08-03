@@ -95,6 +95,13 @@ the below was verified empirically, not assumed.
 | | **Claude Code** (local) | **Cowork** (sandboxed VM) |
 |---|---|---|
 | Where plugins live | `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/` | `/mnt/.remote-plugins/plugin_<opaque-id>/` — the plugin **name appears only inside `.claude-plugin/plugin.json`**, never in the directory name |
+
+A **third layout** exists: plain chat containers mount skills at `/mnt/skills/plugins/<name>/`,
+with real names and a *writable* tree, and `CLAUDE_PLUGIN_ROOT` unset like Cowork. Found
+empirically when a chat-container test broke discovery. The lesson generalises: **never assume
+the set of layouts is closed.** Locators search a roots list plus a marker-file glob precisely so
+a new environment is a one-line addition — and a test forces that line into every locator copy
+at once.
 | `${CLAUDE_PLUGIN_ROOT}` | set | **not set** |
 | Plugin files | writable | **read-only (mode 400)** |
 | `~/.argo/.env` | the user's real file | **does not exist** — `$HOME` is ephemeral per session and is not the user's Mac home |

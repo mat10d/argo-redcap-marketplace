@@ -33,7 +33,7 @@ def _add_argo_core_to_path():
     override = os.environ.get("ARGO_CORE_SCRIPTS")
     if override and (Path(override).expanduser() / marker).exists():
         sys.path.insert(0, str(Path(override).expanduser())); return
-    for root in ("/mnt/.remote-plugins", "~/.claude/plugins", "~/.claude/plugins/cache"):
+    for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/.claude/plugins", "~/.claude/plugins/cache"):
         base = Path(root).expanduser()
         if base.is_dir():
             hits = sorted(base.glob(f"**/{marker}"))

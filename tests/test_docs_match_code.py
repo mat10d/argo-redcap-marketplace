@@ -154,10 +154,15 @@ class TestHeadlessSafe(unittest.TestCase):
         locators = [p for p in PLUGINS.rglob("*.py")
                     if "_add_argo_core_to_path" in p.read_text() or "def find_argo_core" in p.read_text()]
         self.assertTrue(locators, "expected at least one argo-core locator")
+        # Every root any environment has ever needed. When a new layout appears, add it here
+        # and the test forces it into every locator copy at once.
+        REQUIRED_ROOTS = ("/mnt/.remote-plugins", "/mnt/skills", "~/.claude/plugins")
         for py in locators:
             text = py.read_text()
-            self.assertIn("/mnt/.remote-plugins", text,
-                          f"{py.relative_to(REPO)} doesn't look in the sandboxed plugin root")
+            for root in REQUIRED_ROOTS:
+                self.assertIn(root, text,
+                              f"{py.relative_to(REPO)} doesn't search {root} — locator copies "
+                              "must stay identical across scripts")
             self.assertIn("argo_redcap_client.py", text,
                           f"{py.relative_to(REPO)} doesn't search by marker file")
 

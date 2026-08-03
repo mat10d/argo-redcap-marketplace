@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "AI-augmented research workflow plugins for the African Research Group for Oncology. Built around REDCap as the system of record for multi-site oncology cohorts.",
-    "version": "0.9.3"
+    "version": "0.9.4"
   },
   "plugins": [
     {

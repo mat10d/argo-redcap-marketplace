@@ -63,8 +63,9 @@ class ProjectMismatch(RedcapError):
 # .claude-plugin/plugin.json, never in the directory name. So never glob for a directory called
 # "argo-core"; always search for the file itself.
 PLUGIN_ROOTS = (
-    "/mnt/.remote-plugins",
-    "~/.claude/plugins",
+    "/mnt/.remote-plugins",   # Cowork: opaque plugin_<id> dirs, read-only
+    "/mnt/skills",            # chat containers: /mnt/skills/plugins/<name>/, writable
+    "~/.claude/plugins",      # Claude Code
     "~/.claude/plugins/cache",
 )
 MARKER = "argo_redcap_client.py"

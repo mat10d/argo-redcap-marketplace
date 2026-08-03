@@ -63,7 +63,7 @@ def _load_trackers():
     if override and (Path(override).expanduser() / marker).exists():
         core = str(Path(override).expanduser())
     if core is None:
-        for root in ("/mnt/.remote-plugins", "~/.claude/plugins", "~/.claude/plugins/cache"):
+        for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/.claude/plugins", "~/.claude/plugins/cache"):
             base = Path(root).expanduser()
             if base.is_dir():
                 hits = sorted(base.glob(f"**/{marker}"))
@@ -288,7 +288,7 @@ def find_argo_core() -> "str | None":
     if override and (Path(override).expanduser() / marker).exists():
         return str(Path(override).expanduser())
 
-    for root in ("/mnt/.remote-plugins", "~/.claude/plugins", "~/.claude/plugins/cache"):
+    for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/.claude/plugins", "~/.claude/plugins/cache"):
         base = Path(root).expanduser()
         if base.is_dir():
             hits = sorted(base.glob(f"**/{marker}"))

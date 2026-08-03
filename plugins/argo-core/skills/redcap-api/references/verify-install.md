@@ -19,7 +19,7 @@ Shell state does not carry between commands in Cowork or Claude Code, and `CLAUD
 **not set** in Cowork. So locate the files by search, and combine everything into single commands.
 
 ```bash
-CORE=$(find /mnt/.remote-plugins ~/.claude/plugins -name argo_redcap_client.py 2>/dev/null | head -1)
+CORE=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name argo_redcap_client.py 2>/dev/null | head -1)
 echo "argo-core scripts: $(dirname "$CORE")"
 ```
 
@@ -36,7 +36,7 @@ Cowork has no `~/.argo/.env` and no persistent home, so the working folder has t
 This check confirms setup works *and* that it's safe to run.
 
 ```bash
-U=$(find /mnt/.remote-plugins ~/.claude/plugins -name argo_setup.py 2>/dev/null | head -1); echo "--- with no arguments, must create nothing ---"; python3 "$U" 2>&1 | tail -4; echo "--- now actually set up a folder ---"; python3 "$U" --dir /tmp/argo-work-test 2>&1 | tail -8; ls -la /tmp/argo-work-test/.env
+U=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name argo_setup.py 2>/dev/null | head -1); echo "--- with no arguments, must create nothing ---"; python3 "$U" 2>&1 | tail -4; echo "--- now actually set up a folder ---"; python3 "$U" --dir /tmp/argo-work-test 2>&1 | tail -8; ls -la /tmp/argo-work-test/.env
 ```
 
 **Pass:** the first run explains itself and ends with "Nothing has been created yet"; the second
@@ -53,7 +53,7 @@ saved in transcripts.
 Previously raised a bare `KeyError: 'REDCAP_URL'` with nothing configured.
 
 ```bash
-B=$(find /mnt/.remote-plugins ~/.claude/plugins -name backfill_sir_from_csv.py 2>/dev/null | head -1); python3 "$B" --csv /nonexistent.csv 2>&1 | tail -12
+B=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name backfill_sir_from_csv.py 2>/dev/null | head -1); python3 "$B" --csv /nonexistent.csv 2>&1 | tail -12
 ```
 
 **Pass — either of these, depending on whether any credentials file is reachable:**
@@ -72,7 +72,7 @@ especially `KeyError: 'REDCAP_URL'`, which is the exact bug this replaced.
 Previously raised a raw `openpyxl`/`zipfile` traceback on a missing or corrupt file.
 
 ```bash
-R=$(find /mnt/.remote-plugins ~/.claude/plugins -name review_responses.py 2>/dev/null | head -1); printf 'not a real xlsx' > /tmp/corrupt.xlsx; python3 "$R" /tmp/missing.xlsx /tmp/other.xlsx 2>&1 | tail -6; echo "--- corrupt file ---"; python3 "$R" /tmp/corrupt.xlsx /tmp/corrupt.xlsx 2>&1 | tail -7
+R=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name review_responses.py 2>/dev/null | head -1); printf 'not a real xlsx' > /tmp/corrupt.xlsx; python3 "$R" /tmp/missing.xlsx /tmp/other.xlsx 2>&1 | tail -6; echo "--- corrupt file ---"; python3 "$R" /tmp/corrupt.xlsx /tmp/corrupt.xlsx 2>&1 | tail -7
 ```
 
 **Pass:** "I couldn't find the original worklist:" for the first, and "looks damaged or
@@ -84,7 +84,7 @@ The setup check must work — and be *useful* — on a machine with nothing conf
 normal Cowork state, so this is the most representative check of the three.
 
 ```bash
-P=$(find /mnt/.remote-plugins ~/.claude/plugins -name portfolio.py 2>/dev/null | head -1); python3 "$P" --check 2>&1 | tail -15
+P=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name portfolio.py 2>/dev/null | head -1); python3 "$P" --check 2>&1 | tail -15
 ```
 
 **Pass:** it finds argo-core across the plugin boundary, then explains that the REDCap web address
@@ -98,7 +98,7 @@ Every prompt must detect that no keyboard is attached. A regression here **hangs
 so the check is wrapped in a hard timeout.
 
 ```bash
-S=$(find /mnt/.remote-plugins ~/.claude/plugins -name sir_update.py 2>/dev/null | head -1); python3 -c "
+S=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name sir_update.py 2>/dev/null | head -1); python3 -c "
 import subprocess,sys
 try:
     p=subprocess.run([sys.executable,'$S','109','--irb-number','TEST'],stdin=subprocess.DEVNULL,
@@ -118,7 +118,7 @@ what matters is that it **terminates** and writes nothing. **Fail:** `RESULT: FA
 Same guard, second script:
 
 ```bash
-SR=$(find /mnt/.remote-plugins ~/.claude/plugins -name set_roles.py 2>/dev/null | head -1); python3 -c "
+SR=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name set_roles.py 2>/dev/null | head -1); python3 -c "
 import subprocess,sys
 try:
     p=subprocess.run([sys.executable,'$SR','SOME_TOKEN'],stdin=subprocess.DEVNULL,
@@ -134,7 +134,7 @@ The locator must find argo-core by **file**, since Cowork's plugin directories a
 the plugin name only inside `.claude-plugin/plugin.json`.
 
 ```bash
-CORE=$(find /mnt/.remote-plugins ~/.claude/plugins -name argo_redcap_client.py 2>/dev/null | head -1); D=$(dirname "$CORE"); echo "found at: $D"; case "$D" in *argo-core*) echo "NOTE: this layout happens to contain the name — the name-independent path is untested here";; *) echo "RESULT: PASS — resolved from a directory name that does NOT contain 'argo-core'";; esac; python3 -c "
+CORE=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name argo_redcap_client.py 2>/dev/null | head -1); D=$(dirname "$CORE"); echo "found at: $D"; case "$D" in *argo-core*) echo "NOTE: this layout happens to contain the name — the name-independent path is untested here";; *) echo "RESULT: PASS — resolved from a directory name that does NOT contain 'argo-core'";; esac; python3 -c "
 import importlib.util,sys
 s=importlib.util.spec_from_file_location('c','$CORE'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m)
 print('find_argo_core() ->', m.find_argo_core())
@@ -149,7 +149,7 @@ print('RESULT: PASS — module imports and locates itself')"
 Nothing may write next to a script.
 
 ```bash
-CORE=$(find /mnt/.remote-plugins ~/.claude/plugins -name argo_redcap_client.py 2>/dev/null | head -1); ls -l "$CORE"; python3 -c "
+CORE=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name argo_redcap_client.py 2>/dev/null | head -1); ls -l "$CORE"; python3 -c "
 import subprocess,sys,os
 # Running --check must not attempt to create anything inside the plugin directory.
 before=set(os.listdir(os.path.dirname('$CORE')))
