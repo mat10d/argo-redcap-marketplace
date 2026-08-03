@@ -37,6 +37,22 @@ Configured permanently in `~/.argo/.env`. This is the only place a token lives b
 
 Low risk: these touch ARGO's own project-management records, never cohort/patient data.
 
+### Minimum rights per Tier 1 key — ask the administrator for exactly this, no more
+
+"Read-only tokens for all five" sounds safest but breaks two workflows. What each account
+actually needs (a key always carries its account's full rights — [[access-tiers]] Tier 3 note):
+
+| Key | PID | API Export | API Import | Why |
+|---|---|---|---|---|
+| `STUDY_INITIATION_REQUEST` | 224 | yes | **yes** | `sir_update.py` writes build progress after every step; `backfill_sir_from_csv.py` bulk-loads records |
+| `STUDY_PERSONELL_REQUEST` | 221 | yes | **yes** (+ create records) | redcap-admin creates SPR records by API import |
+| `DATA_LINKING_REQUEST` | 222 | yes | no | portfolio reads only |
+| `DATA_REQUEST` | 223 | yes | no | portfolio reads only |
+| `SUPPORT_TICKET_REQUEST` | 225 | yes | no | portfolio reads only; triage is done in the UI |
+
+No Tier 1 account should hold **user rights**, **project design**, or **delete records** — nothing
+in the suite uses them, and `--check` warns when a key's account has them.
+
 ## Tier 2 — occasional, one task at a time: a study's own project
 
 No standing config. A person supplies a token because they specifically want to do one thing today,
