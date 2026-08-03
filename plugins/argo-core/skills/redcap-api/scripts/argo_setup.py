@@ -188,6 +188,93 @@ def run_check(work_dir: Path) -> int:
     return 0
 
 
+def scaffold(work_dir: Path, creds_dir: "Path | None" = None, say=print) -> "Path | None":
+    """Create the working folder and settings file. Never overwrites existing keys.
+
+    Returns the settings file's path, or None if the folder couldn't be created.
+    Safe to call repeatedly — everything that already exists is left alone.
+    """
+    creds_dir = creds_dir or work_dir
+    env_path = creds_dir / ".env"
+    try:
+        for sub in ("exports", "worklists", "builds", "pm"):
+            (work_dir / sub).mkdir(parents=True, exist_ok=True)
+        creds_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        say(f"I couldn't create the folder {work_dir}:\n    {e}\n\n"
+            "Pick somewhere you can write to with --dir, for example a folder you've connected.")
+        return None
+
+    if not env_path.exists():
+        tracker_lines = "\n".join(f"# {desc}\n{var}=" for var, desc in TIER1)
+        write_private(env_path, ENV_TEMPLATE.format(
+            env_path=env_path, pm_root=work_dir / "pm", tracker_lines=tracker_lines))
+
+    readme = work_dir / "README.md"
+    if not readme.exists():
+        readme.write_text(README)
+    gitignore = work_dir / ".gitignore"
+    if not gitignore.exists():
+        gitignore.write_text(".env\n*.env\nexports/\nworklists/\n")
+    return env_path
+
+
+def find_existing_settings() -> "Path | None":
+    """Whether a settings file already exists anywhere the tools look. Loads nothing."""
+    candidates = [Path(os.environ.get("ARGO_ENV_FILE", "")).expanduser()
+                  if os.environ.get("ARGO_ENV_FILE") else None,
+                  Path.home() / ".argo" / ".env",
+                  Path.home() / "argo-work" / ".env"]
+    for base in [Path.cwd()] + list(Path.cwd().parents)[:2]:
+        candidates += [base / ".argo" / ".env", base / "argo.env", base / ".env"]
+    mnt = Path("/mnt")
+    if mnt.is_dir():
+        for entry in sorted(mnt.iterdir()):
+            if entry.is_dir() and not entry.name.startswith("."):
+                candidates += [entry / ".argo" / ".env", entry / "argo.env", entry / ".env",
+                               entry / "argo-work" / ".env"]
+    for path in candidates:
+        if path and path.is_file():
+            return path
+    return None
+
+
+def ensure(work_dir: "Path | None" = None) -> int:
+    """The default first step of any ARGO task: make sure a settings file exists.
+
+    Already set up → one quiet line, nothing touched. Not set up → create the scaffold and say
+    so LOUDLY, because the very next thing the user must do is paste their keys in.
+    """
+    existing = find_existing_settings()
+    if existing:
+        print(f"Settings found at {existing} — setup skipped.")
+        return 0
+
+    work_dir = work_dir or Path(os.environ.get("ARGO_WORK_DIR", "~/argo-work")).expanduser()
+    env_path = scaffold(work_dir)
+    if env_path is None:
+        return 1
+    print("=" * 64)
+    print(" FIRST-TIME SETUP — one thing to do before ARGO tools can")
+    print(" talk to REDCap.")
+    print()
+    print(" I created your settings file:")
+    print()
+    print(f"     {env_path}")
+    print()
+    print(" Open it in a text editor and paste in your REDCap web address")
+    print(" (REDCAP_URL) and any access keys you have, each after its = sign.")
+    print(" Don't type keys as commands — commands get saved in transcripts.")
+    print()
+    print(" Most ARGO work needs NO keys at all (files downloaded from the")
+    print(" REDCap website are enough), so you can also just carry on.")
+    print()
+    print(" If this is a temporary session, this file disappears when the")
+    print(" session ends — keep your keys somewhere safe of your own.")
+    print("=" * 64)
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="Set up a folder for ARGO work, including your REDCap settings file.",
@@ -203,7 +290,14 @@ def main() -> int:
                     help="Where the settings file goes when --separate-credentials is used")
     ap.add_argument("--check", action="store_true",
                     help="Report on an existing setup instead of creating one")
+    ap.add_argument("--ensure", action="store_true",
+                    help="The default first step of any ARGO task: if a settings file exists "
+                         "anywhere the tools look, do nothing; otherwise create one and say so "
+                         "loudly. Safe to run every time.")
     args = ap.parse_args()
+
+    if args.ensure:
+        return ensure(Path(args.dir).expanduser() if args.dir else None)
 
     # With no folder named, explain and create nothing. A setup tool should never make
     # directories on someone's computer just because it was run without arguments.
@@ -235,40 +329,19 @@ def main() -> int:
         return run_check(work_dir)
 
     creds_dir = Path(args.credentials_dir).expanduser() if args.separate_credentials else work_dir
-    env_path = creds_dir / ".env"
-
-    try:
-        for sub in ("exports", "worklists", "builds", "pm"):
-            (work_dir / sub).mkdir(parents=True, exist_ok=True)
-        creds_dir.mkdir(parents=True, exist_ok=True)
-    except OSError as e:
-        return int(bool(print(
-            f"I couldn't create the folder {work_dir}:\n    {e}\n\n"
-            "Pick somewhere you can write to with --dir, for example a folder you've connected."
-        ))) or 1
+    env_existed = (creds_dir / ".env").exists()
+    env_path = scaffold(work_dir, creds_dir)
+    if env_path is None:
+        return 1
 
     print(f"Working folder: {work_dir}")
     for sub in ("exports", "worklists", "builds", "pm"):
         print(f"  created {sub}/")
-
-    if env_path.exists():
+    if env_existed:
         print(f"\nSettings file already exists, leaving it alone: {env_path}")
         print("(Nothing was overwritten — your existing keys are untouched.)")
     else:
-        tracker_lines = "\n".join(f"# {desc}\n{var}=" for var, desc in TIER1)
-        write_private(env_path, ENV_TEMPLATE.format(
-            env_path=env_path, pm_root=work_dir / "pm", tracker_lines=tracker_lines))
         print(f"\nSettings file: {env_path}  (only you can read it)")
-
-    readme = work_dir / "README.md"
-    if not readme.exists():
-        readme.write_text(README)
-        print(f"  created README.md")
-
-    gitignore = work_dir / ".gitignore"
-    if not gitignore.exists():
-        gitignore.write_text(".env\n*.env\nexports/\nworklists/\n")
-        print(f"  created .gitignore (so keys and patient data can't be committed by accident)")
 
     print("\n" + "=" * 60)
     print("Next step — put your REDCap details in, using a text editor:\n")

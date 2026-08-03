@@ -295,6 +295,42 @@ class TestSetupIsSafe(unittest.TestCase):
         self.assertIn("DATA_REQUEST=keepme", env_file.read_text(),
                       "re-running setup destroyed a key the user had filled in")
 
+    def test_ensure_skips_when_settings_exist(self):
+        import tempfile
+        home = Path(tempfile.mkdtemp())
+        (home / ".argo").mkdir()
+        (home / ".argo" / ".env").write_text("REDCAP_URL=https://x.org/api/\n")
+        proc = subprocess.run([sys.executable, str(self.SETUP), "--ensure"],
+                              capture_output=True, text=True, timeout=60,
+                              env=dict(os.environ, HOME=str(home)), cwd=str(home))
+        self.assertIn("setup skipped", proc.stdout)
+        self.assertFalse((home / "argo-work").exists(),
+                         "--ensure must not scaffold when settings already exist")
+
+    def test_ensure_scaffolds_loudly_when_nothing_exists(self):
+        import tempfile
+        home = Path(tempfile.mkdtemp())
+        env = dict(os.environ, HOME=str(home))
+        env.pop("ARGO_ENV_FILE", None)
+        proc = subprocess.run([sys.executable, str(self.SETUP), "--ensure"],
+                              capture_output=True, text=True, timeout=60,
+                              env=env, cwd=str(home))
+        self.assertIn("FIRST-TIME SETUP", proc.stdout, "the scaffold must announce itself loudly")
+        env_file = home / "argo-work" / ".env"
+        self.assertTrue(env_file.exists(), "--ensure must create the settings file")
+        self.assertEqual(oct(env_file.stat().st_mode & 0o777)[2:], "600")
+        # And running it again must now skip.
+        proc2 = subprocess.run([sys.executable, str(self.SETUP), "--ensure"],
+                               capture_output=True, text=True, timeout=60,
+                               env=env, cwd=str(home))
+        self.assertIn("setup skipped", proc2.stdout)
+
+    def test_ensure_survives_an_unwritable_home(self):
+        proc = subprocess.run([sys.executable, str(self.SETUP), "--ensure"],
+                              capture_output=True, text=True, timeout=60,
+                              env=dict(os.environ, HOME="/nonexistent-home"), cwd="/tmp")
+        self.assertNotIn("Traceback", proc.stdout + proc.stderr)
+
     def test_template_never_asks_for_a_token_on_the_command_line(self):
         text = self.SETUP.read_text()
         self.assertNotIn('"--token"', text)

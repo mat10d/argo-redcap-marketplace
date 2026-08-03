@@ -81,8 +81,25 @@ curl -X POST "$REDCAP_URL" \
 
 ## First-time setup
 
-Before anything else on a new machine — or in a new Cowork session — create a folder to work in.
-Nothing exists by default: there is no `~/.argo/.env` until someone makes one.
+**The default first step of any ARGO task is `--ensure`** — run it before anything else, every
+time. It costs one line when set up, and does the whole first-time setup when not:
+
+```bash
+SETUP=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name argo_setup.py 2>/dev/null | head -1)
+python3 "$SETUP" --ensure
+```
+
+- **Settings file exists anywhere the tools look** → `Settings found at <path> — setup skipped.`
+  Nothing touched.
+- **Nothing exists** → it creates the working folder and settings file and says so LOUDLY, ending
+  with exactly where the user should paste their REDCap address and keys.
+
+Scripts that need a key also do this on their own: the shared client scaffolds the settings file
+automatically the first time a token lookup finds no settings file at all. So even a task started
+without `--ensure` ends with a file to fill in, never a dead end.
+
+To set up a specific folder instead (e.g. a connected folder), the explicit form still exists.
+Nothing exists by default: there is no settings file until someone (or `--ensure`) makes one.
 
 ```bash
 python3 argo_setup.py --dir ~/argo-work          # local

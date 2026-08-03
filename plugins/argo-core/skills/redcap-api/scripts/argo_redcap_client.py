@@ -162,6 +162,28 @@ def load_env_file(explicit: str | None = None) -> "Path | None":
     return None
 
 
+_SCAFFOLD_ATTEMPTED = False
+
+
+def ensure_settings_exist() -> None:
+    """If no settings file exists anywhere, create the scaffold and announce it loudly.
+
+    Delegates to argo_setup.ensure(), which skips (quietly, via its find check) when a file
+    already exists. Failure to scaffold — read-only home, no home at all — is never fatal:
+    the caller falls through to its normal no-token path and message.
+    """
+    global _SCAFFOLD_ATTEMPTED
+    if _SCAFFOLD_ATTEMPTED:
+        return
+    _SCAFFOLD_ATTEMPTED = True
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import argo_setup
+        argo_setup.ensure()
+    except Exception:
+        pass  # a broken scaffold attempt must never mask the real "no token" explanation
+
+
 def _normalise_title(title: str) -> str:
     """Lowercase, drop punctuation, collapse spaces — so 'Study Tracker' == 'study  tracker'."""
     cleaned = re.sub(r"[^a-z0-9 ]+", " ", (title or "").lower())
@@ -233,7 +255,12 @@ class RedcapClient:
             # The settings may be in a file that hasn't been loaded into this session yet —
             # common where each command runs independently, or where there's no home directory
             # to keep them in. Try to find one before giving up.
-            load_env_file()
+            if load_env_file() is None:
+                # No settings file exists ANYWHERE. Scaffold one now, loudly, so the user's very
+                # next step — paste the keys in — has somewhere to happen. Runs at most once per
+                # process, and an existing file always short-circuits this entirely.
+                ensure_settings_exist()
+                load_env_file()
             token = os.environ.get(env_var)
         if not token:
             return None
@@ -544,6 +571,11 @@ def run_check() -> int:
     found = load_env_file()
     if found:
         print(f"Read settings from: {found}")
+    else:
+        # Nothing configured anywhere — scaffold the settings file right now, loudly, so this
+        # check ends with "here's the file to fill in" rather than a dead end.
+        ensure_settings_exist()
+        found = load_env_file()
 
     url = os.environ.get("REDCAP_URL")
     try:

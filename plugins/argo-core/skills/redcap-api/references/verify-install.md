@@ -36,7 +36,7 @@ Cowork has no `~/.argo/.env` and no persistent home, so the working folder has t
 This check confirms setup works *and* that it's safe to run.
 
 ```bash
-U=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name argo_setup.py 2>/dev/null | head -1); echo "--- with no arguments, must create nothing ---"; python3 "$U" 2>&1 | tail -4; echo "--- now actually set up a folder ---"; python3 "$U" --dir /tmp/argo-work-test 2>&1 | tail -8; ls -la /tmp/argo-work-test/.env
+U=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name argo_setup.py 2>/dev/null | head -1); echo "--- with no arguments, must create nothing ---"; python3 "$U" 2>&1 | tail -4; echo "--- the default first step: --ensure (scaffolds loudly on a fresh machine, skips if set up) ---"; python3 "$U" --ensure 2>&1 | tail -6; echo "--- explicit folder form ---"; python3 "$U" --dir /tmp/argo-work-test 2>&1 | tail -8; ls -la /tmp/argo-work-test/.env
 ```
 
 **Pass:** the first run explains itself and ends with "Nothing has been created yet"; the second
