@@ -16,6 +16,8 @@ fixtures and from the code itself, so they can be run on any machine, including 
 |---|---|
 | `test_pure_logic.py` | The logic that decides what the dashboards say and what the safety gates allow: URL validation, token masking, project-title matching, SIR build progress (`N/7`), week-over-week diffing, record-ID range parsing, and the QA dry-run receipt system. |
 | `test_docs_match_code.py` | Documentation drifting away from code, and scripts crashing instead of explaining themselves. |
+| `test_branching_logic.py` | The QA worklist branching evaluator — known logic strings against known records. Exists because a silent inversion here dropped 28–70% of gated fields with no crash, so no infrastructure test could see it. |
+| `test_write_back_safety.py` | The fill-vs-conflict rule in `argo_diff.py`: computed values only ever fill blanks, a blank never erases, conflicts are quarantined. |
 
 ### The drift checks are the interesting ones
 

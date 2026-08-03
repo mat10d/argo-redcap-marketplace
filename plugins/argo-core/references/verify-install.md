@@ -171,7 +171,7 @@ file is a real failure.
 T=$(find /mnt -name run_all.py -path '*tests*' 2>/dev/null | head -1); [ -n "$T" ] && python3 "$T" 2>&1 | tail -4 || echo "repo folder not connected — skip"
 ```
 
-**Pass:** `All 44 checks passed.`
+**Pass:** the run ends `All N checks passed.` for some N, with no FAILED line. (Don't pin N — the suite grows.)
 
 ---
 

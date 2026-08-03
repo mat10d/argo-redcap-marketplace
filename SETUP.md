@@ -18,22 +18,28 @@ A token is a per-user, per-project password for the REDCap API. In REDCap, open 
 **API** (left menu) → request/copy your token. You need a token for each project you work on.
 Tokens are secrets — never paste them into chats, scripts, or git.
 
-## 3. Create your `.env`
+## 3. Create your working folder and settings file
 
 ```bash
-mkdir -p ~/.argo
-cp .env.example ~/.argo/.env
-chmod 600 ~/.argo/.env        # readable only by you
-$EDITOR ~/.argo/.env          # paste your tokens after each =
+python3 plugins/argo-core/scripts/argo_setup.py --dir ~/argo-work
+$EDITOR ~/argo-work/.env      # paste your tokens after each =
+python3 plugins/argo-core/scripts/argo_setup.py --check --dir ~/argo-work
 ```
 
-Then load it (do this once per terminal session, before running ARGO skills):
+The setup script writes the file readable only by you (0600) and never overwrites keys you've
+already filled in. Tools find the settings on their own when run from inside the folder; to load
+them into a terminal by hand instead:
 
 ```bash
-set -a; source ~/.argo/.env; set +a
+set -a; source ~/argo-work/.env; set +a
 ```
 
-The variable names in `.env.example` are the exact names the skills read — don't rename them.
+(An existing `~/.argo/.env` from an older setup keeps working — the tools check there too.)
+
+The variable names the setup script writes are the exact names the skills read — don't rename them.
+Study-project keys follow the `<NAME>_TOKEN` convention (e.g. `CRC_TOKEN`) and are passed to
+tools via `--token-env CRC_TOKEN`; per [[access-tiers]], supply them per task rather than
+keeping them beside the tracker keys.
 
 ## 4. Which tokens does each role need?
 
