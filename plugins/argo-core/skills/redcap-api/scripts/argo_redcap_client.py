@@ -227,6 +227,27 @@ def check_url(url: str | None) -> str:
     return url
 
 
+def _looks_sandboxed() -> bool:
+    """Whether this is a sandboxed session (Cowork / chat container) rather than a real machine."""
+    return Path("/mnt/.remote-plugins").is_dir() or Path("/mnt/skills").is_dir()
+
+
+def _egress_blocked_message(url: str) -> str:
+    host = urllib.parse.urlparse(url).netloc or url
+    return (
+        "This session's internet access is restricted by your organisation, so REDCap can't be\n"
+        "reached from here — this is NOT a problem with your access key or the address.\n"
+        "\n"
+        "To use REDCap directly from sessions like this one, an organisation admin needs to:\n"
+        f"  1. enable network access and allow the domain: {host}\n"
+        "     (claude.ai -> Admin settings -> Capabilities)\n"
+        "  2. then start a NEW session — the change doesn't apply to sessions already running.\n"
+        "\n"
+        "Meanwhile everything file-based still works: download exports and the data dictionary\n"
+        "from the REDCap website on your own computer and bring the files into the session."
+    )
+
+
 def mask(token: str | None) -> str:
     """Show only the last 4 characters of a token. Never print the whole thing."""
     if not token:
@@ -311,6 +332,9 @@ class RedcapClient:
                 return body if raw else (json.loads(body) if body.strip() else {})
             except urllib.error.HTTPError as e:
                 detail = e.read().decode("utf-8", errors="replace")[:500]
+                # A sandbox proxy block is NOT a credentials problem — don't blame the key.
+                if (e.headers or {}).get("X-Proxy-Error") == "blocked-by-allowlist":
+                    raise RedcapError(_egress_blocked_message(self.url)) from e
                 if e.code in (400, 401, 403):
                     # A permissions/credentials problem. Retrying won't help — explain it instead.
                     raise RedcapError(
@@ -334,8 +358,10 @@ class RedcapClient:
             f"(while working on {self.label}).\n"
             f"Last problem: {last_error}\n"
             "\n"
-            "Check that you're connected to the internet, and that the address in ~/.argo/.env is\n"
-            "correct. If both look fine, REDCap itself may be down — try again in a few minutes."
+            + (_egress_blocked_message(self.url) if _looks_sandboxed() else
+               "Check that you're connected to the internet, and that the address in\n"
+               "~/.argo/.env is correct. If both look fine, REDCap itself may be down —\n"
+               "try again in a few minutes.")
         ) from last_error
 
     # ---------------------------------------------------------------- reads

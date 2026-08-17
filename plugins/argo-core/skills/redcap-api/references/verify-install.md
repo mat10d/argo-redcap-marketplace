@@ -188,6 +188,32 @@ These are Tier 1/2/3 paths ([[access-tiers]]). In Cowork they only run if a fold
 | `push_updates.py --force-migration` without a preview | refuses: "I can't find a record that you previewed this exact data" |
 | same, after `--dry-run`, but with `--expect-project` naming the wrong project | refuses: "Stopping before making any changes", nothing written |
 
+## 8. Network egress (sandboxed sessions)
+
+Tells you which of three states this session is in — the interpretation matters more than the
+result:
+
+```bash
+python3 - <<'EOF'
+import urllib.request, urllib.error
+for host in ("https://redcap.oauife.edu.ng/api/", "https://example.com"):
+    try:
+        urllib.request.urlopen(urllib.request.Request(host, method="HEAD"), timeout=10)
+        print(f"  reachable   {host}")
+    except urllib.error.HTTPError as e:
+        blocked = (e.headers or {}).get("X-Proxy-Error") == "blocked-by-allowlist"
+        print(f"  {'BLOCKED-BY-POLICY' if blocked else f'http {e.code}'}   {host}")
+    except Exception as e:
+        print(f"  unreachable {host}  ({str(e)[:60]})")
+EOF
+```
+
+- **Both reachable** → API paths work here.
+- **REDCap blocked, example.com reachable** → the allowlist is on but missing the domain: an org
+  admin adds `redcap.oauife.edu.ng`, and it applies to NEW sessions only.
+- **Both blocked** → network access is off org-wide. File-based paths still work; API paths
+  don't, and no domain entry will help until an admin enables network access.
+
 ## Reporting back
 
 For each numbered check, record PASS/FAIL and paste the last few lines. A FAIL on 1–4 is a

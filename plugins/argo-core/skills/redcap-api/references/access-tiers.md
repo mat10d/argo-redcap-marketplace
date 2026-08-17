@@ -143,6 +143,25 @@ What follows from that, and is already implemented:
 - **Always combine sourcing and running into one command.** Shell state doesn't survive between
   commands in either environment, so `source ...` on its own line is always lost.
 
+### Network access in Cowork — may be OFF entirely
+
+Verified empirically: a Cowork sandbox can have **no outbound network at all** — every domain
+answers `X-Proxy-Error: blocked-by-allowlist`, including github and pypi, not just REDCap. In
+that state, every API path (portfolio, `--check` against live REDCap, template fetching) is dead,
+and no per-domain allowlist entry helps until the org posture changes.
+
+What to know:
+
+- **Enabling it is an org-admin action**: claude.ai → Admin settings → Capabilities → enable
+  network access and allow `redcap.oauife.edu.ng`. Individual users can't do this.
+- **Changes apply to NEW sessions only** — the allowlist is read when the sandbox boots. Adding
+  a domain mid-session looks like it "didn't work"; it did, for the next session.
+- **The shared client now says this itself**: a proxy block is reported as an org restriction
+  with the admin steps, never misattributed to a bad access key or a wrong address.
+- **The token-free paths don't care** — downloads from the REDCap website on the user's own
+  computer, brought into the session via the connected workspace folder, work regardless. This
+  is another reason CSV-via-files is the mainline design, not the fallback.
+
 ### The workspace rule in Cowork
 
 **Standing instruction to the team: create a dedicated folder on your own computer for ARGO work
