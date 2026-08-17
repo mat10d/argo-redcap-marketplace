@@ -63,12 +63,20 @@ def _load_trackers():
     if override and (Path(override).expanduser() / marker).exists():
         core = str(Path(override).expanduser())
     if core is None:
+        for parent in Path(__file__).resolve().parents:
+            for cand in (parent / "plugins" / "argo-core" / "skills" / "redcap-api" / "scripts",
+                         parent / "plugins" / "argo-core" / "scripts"):
+                if (cand / marker).exists():
+                    core = str(cand); break
+            if core:
+                break
+    if core is None:
         for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/.claude/plugins", "~/.claude/plugins/cache"):
             base = Path(root).expanduser()
             if base.is_dir():
-                hits = sorted(base.glob(f"**/{marker}"))
-                if hits:
-                    core = str(hits[-1].parent); break
+                hits = list(base.glob(f"**/{marker}"))
+                if hits:  # newest file, never name order
+                    core = str(max(hits, key=lambda h: h.stat().st_mtime).parent); break
     if core is None:
         for parent in Path(__file__).resolve().parents:
             for cand in (parent / "plugins" / "argo-core" / "scripts",
@@ -288,19 +296,19 @@ def find_argo_core() -> "str | None":
     if override and (Path(override).expanduser() / marker).exists():
         return str(Path(override).expanduser())
 
-    for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/.claude/plugins", "~/.claude/plugins/cache"):
-        base = Path(root).expanduser()
-        if base.is_dir():
-            hits = sorted(base.glob(f"**/{marker}"))
-            if hits:
-                return str(hits[-1].parent)
-
     for parent in Path(__file__).resolve().parents:
         for candidate in (parent / "plugins" / "argo-core" / "skills" / "redcap-api" / "scripts",
                           parent / "plugins" / "argo-core" / "scripts",
                           parent / "argo-core" / "scripts"):
             if (candidate / marker).exists():
                 return str(candidate)
+
+    for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/.claude/plugins", "~/.claude/plugins/cache"):
+        base = Path(root).expanduser()
+        if base.is_dir():
+            hits = list(base.glob(f"**/{marker}"))
+            if hits:  # newest file, never name order — version dirs sort lexically ("0.9" > "0.12")
+                return str(max(hits, key=lambda h: h.stat().st_mtime).parent)
     return None
 
 

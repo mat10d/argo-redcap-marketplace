@@ -51,18 +51,18 @@ def _add_argo_core_to_path():
     override = os.environ.get("ARGO_CORE_SCRIPTS")
     if override and (_P(override).expanduser() / marker).exists():
         sys.path.insert(0, str(_P(override).expanduser())); return
-    for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/.claude/plugins", "~/.claude/plugins/cache"):
-        base = _P(root).expanduser()
-        if base.is_dir():
-            hits = sorted(base.glob(f"**/{marker}"))
-            if hits:
-                sys.path.insert(0, str(hits[-1].parent)); return
     for parent in _P(__file__).resolve().parents:
         for cand in (parent / "plugins" / "argo-core" / "skills" / "redcap-api" / "scripts",
                      parent / "plugins" / "argo-core" / "scripts",
                      parent / "argo-core" / "scripts"):
             if (cand / marker).exists():
                 sys.path.insert(0, str(cand)); return
+    for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/.claude/plugins", "~/.claude/plugins/cache"):
+        base = _P(root).expanduser()
+        if base.is_dir():
+            hits = list(base.glob(f"**/{marker}"))
+            if hits:  # newest file, never name order — version dirs sort lexically ("0.9" > "0.12")
+                sys.path.insert(0, str(max(hits, key=lambda h: h.stat().st_mtime).parent)); return
 
 
 _add_argo_core_to_path()

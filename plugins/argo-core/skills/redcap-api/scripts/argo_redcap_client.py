@@ -87,21 +87,24 @@ def find_argo_core() -> str:
     if (here.parent / MARKER).exists():
         return str(here.parent)
 
-    for root in PLUGIN_ROOTS:
-        base = Path(root).expanduser()
-        if not base.is_dir():
-            continue
-        hits = sorted(base.glob(f"**/{MARKER}"))
-        if hits:
-            # Prefer the highest-sorting path — for versioned layouts that's the newest version.
-            return str(hits[-1].parent)
-
+    # A repo/tree-relative copy wins over globally installed ones: when running from a source
+    # tree, its own argo-core is by definition the right version.
     for parent in here.parents:
         for candidate in (parent / "plugins" / "argo-core" / "skills" / "redcap-api" / "scripts",
                           parent / "plugins" / "argo-core" / "scripts",
                           parent / "argo-core" / "scripts"):
             if (candidate / MARKER).exists():
                 return str(candidate)
+
+    for root in PLUGIN_ROOTS:
+        base = Path(root).expanduser()
+        if not base.is_dir():
+            continue
+        hits = list(base.glob(f"**/{MARKER}"))
+        if hits:
+            # Newest file wins. NEVER pick by name order: version-named directories sort
+            # lexically, so "0.9.3" lands after "0.12.2" and a stale cache wins forever.
+            return str(max(hits, key=lambda h: h.stat().st_mtime).parent)
 
     raise RedcapError(
         "I couldn't find the shared ARGO REDCap code that this tool needs.\n"
@@ -382,6 +385,34 @@ class RedcapClient:
         params.setdefault("exportCheckboxLabel", "true")
         result = self._post(raw=True, content="record", format="csv", **params)
         return result if isinstance(result, str) else ""
+
+    def list_file_repository(self, folder_id=None) -> list:
+        """Folders and files in the project's File Repository (read-only)."""
+        params = {"content": "fileRepository", "action": "list"}
+        if folder_id:
+            params["folder_id"] = str(folder_id)
+        result = self._post(**params)
+        return result if isinstance(result, list) else []
+
+    def export_file_repository(self, doc_id) -> bytes:
+        """One file's raw bytes from the File Repository. Binary-safe (no text decoding)."""
+        payload = urllib.parse.urlencode({
+            "token": self.token, "content": "fileRepository", "action": "export",
+            "doc_id": str(doc_id), "returnFormat": "json",
+        }).encode()
+        last_error = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                req = urllib.request.Request(self.url, data=payload, method="POST")
+                with urllib.request.urlopen(req, timeout=TIMEOUT_SECONDS) as resp:
+                    return resp.read()
+            except (urllib.error.URLError, TimeoutError) as e:
+                last_error = e
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(BACKOFF_SECONDS * (2**attempt))
+        raise RedcapError(
+            f"Couldn't download file {doc_id} from {self.label}'s File Repository after "
+            f"{MAX_RETRIES} tries.\nLast problem: {last_error}")
 
     # ---------------------------------------------------------------- confirmation
 

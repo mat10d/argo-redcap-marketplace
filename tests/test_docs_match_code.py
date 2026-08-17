@@ -165,6 +165,10 @@ class TestHeadlessSafe(unittest.TestCase):
                               "must stay identical across scripts")
             self.assertIn("argo_redcap_client.py", text,
                           f"{py.relative_to(REPO)} doesn't search by marker file")
+            self.assertNotIn("hits[-1]", text,
+                             f"{py.relative_to(REPO)} picks glob hits by name order — version "
+                             "directories sort lexically ('0.9' > '0.12'), so a stale cache wins "
+                             "forever. Pick by newest mtime instead.")
 
     def test_no_relative_cross_plugin_paths_in_docs(self):
         """Plugins install into separate versioned dirs — '../other-plugin' never resolves."""
