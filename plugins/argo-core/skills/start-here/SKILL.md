@@ -24,8 +24,8 @@ python3 "$SETUP" --ensure
 
 - `Settings found at <path> — setup skipped.` → carry on, nothing to explain.
 - The FIRST-TIME SETUP banner → relay its instructions in your own words: a settings file was
-  created, here is where it is, they can paste their REDCap address and keys into it **in a text
-  editor** when they have them — and they can also just carry on, because most ARGO work needs no
+  created, here is where it is, the ARGO REDCap address is already filled in, and they paste
+  their access keys into it **in a text editor** when they have them — and they can also just carry on, because most ARGO work needs no
   keys at all.
 
 **Never ask them to paste an access key into the chat.** Keys typed into a conversation are saved

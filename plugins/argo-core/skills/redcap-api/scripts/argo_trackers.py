@@ -16,6 +16,10 @@ Each entry is (env_var, project_title, pid, done_marker_field).
 """
 from __future__ import annotations
 
+# ARGO's REDCap instance. One org, one instance — so the settings template pre-fills it
+# rather than asking every new person to find and type it correctly.
+ARGO_REDCAP_URL = "https://redcap.oauife.edu.ng/api/"
+
 ADMIN_TRACKERS = [
     ("STUDY_INITIATION_REQUEST", "Study Tracker",             "224", "study_production"),
     ("STUDY_PERSONELL_REQUEST",  "Study Personnel Request",   "221", "completed"),

@@ -29,53 +29,27 @@ from pathlib import Path
 # Single source of truth: argo_trackers.py, next to this file.
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
-from argo_trackers import ADMIN_TRACKERS  # noqa: E402
+from argo_trackers import ADMIN_TRACKERS, ARGO_REDCAP_URL  # noqa: E402
 
 TIER1 = [(env, f"{title}{'' if pid else ' (no key issued yet)'}")
          for env, title, pid, _marker in ADMIN_TRACKERS]
 
 ENV_TEMPLATE = """\
-# ARGO REDCap settings
+# ARGO REDCap settings — private. Never share, email, or commit this file.
 #
-# This file holds your REDCap access keys. Treat it like a password file:
-# don't email it, don't put it in a shared folder, don't commit it to git.
-#
-# Fill in the values after each "=" sign. Leave any you don't have as they are —
-# the ARGO tools work without them and will tell you when something needs one.
-#
-# After editing this file, load it into your terminal with:
+# Paste each access key after its = sign, in a text editor. Leave blank any
+# you don't have — the tools say when one is needed. To load into a terminal:
 #     set -a; source {env_path}; set +a
 
-# The web address of your REDCap system. Ask your ARGO REDCap administrator.
-# It usually ends in /api/ — for example: https://redcap.oauife.edu.ng/api/
-REDCAP_URL=
-
-# Where ARGO project-management files are kept on this computer.
+REDCAP_URL={redcap_url}
 ARGO_PM_ROOT={pm_root}
 
-# ---------------------------------------------------------------------------
-# Access keys for the ARGO admin trackers.
-# Your REDCap administrator creates these — you can't generate them yourself.
-# ---------------------------------------------------------------------------
+# --- ARGO admin tracker keys (ask the ARGO REDCap administrator) ---
 {tracker_lines}
 
-# ---------------------------------------------------------------------------
-# Access keys for individual studies — THINK BEFORE ADDING ONE HERE.
-#
-# The keys above open ARGO's own project-management records. A study key is
-# different: it opens patient data. Anything in a folder you share with Claude
-# can be read in full, so a study key kept here is more exposed than a tracker
-# key, for a much more sensitive project.
-#
-# Prefer either of these instead:
-#   - supply it just for the one command that needs it, e.g.
-#         CRC_TOKEN=... python3 export.py --token-env CRC_TOKEN --info
-#   - or keep study keys in their own folder:
-#         python3 argo_setup.py --separate-credentials
-#
-# If you do add one anyway, name it after the study (CRC_TOKEN=). The setup
-# check will remind you it's here.
-# ---------------------------------------------------------------------------
+# --- Individual-study keys (e.g. CRC_TOKEN=) ---
+# These open patient data. Prefer supplying one per task instead of storing it here:
+#     CRC_TOKEN=... python3 export.py --token-env CRC_TOKEN ...
 """
 
 README = """\
@@ -206,9 +180,10 @@ def scaffold(work_dir: Path, creds_dir: "Path | None" = None, say=print) -> "Pat
         return None
 
     if not env_path.exists():
-        tracker_lines = "\n".join(f"# {desc}\n{var}=" for var, desc in TIER1)
+        tracker_lines = "\n".join(f"{var}=" for var, _desc in TIER1)
         write_private(env_path, ENV_TEMPLATE.format(
-            env_path=env_path, pm_root=work_dir / "pm", tracker_lines=tracker_lines))
+            env_path=env_path, pm_root=work_dir / "pm", tracker_lines=tracker_lines,
+            redcap_url=ARGO_REDCAP_URL))
 
     readme = work_dir / "README.md"
     if not readme.exists():
@@ -262,8 +237,8 @@ def ensure(work_dir: "Path | None" = None) -> int:
     print()
     print(f"     {env_path}")
     print()
-    print(" Open it in a text editor and paste in your REDCap web address")
-    print(" (REDCAP_URL) and any access keys you have, each after its = sign.")
+    print(" The ARGO REDCap address is already filled in. Open the file in a")
+    print(" text editor and paste your access keys after their = signs.")
     print(" Don't type keys as commands — commands get saved in transcripts.")
     print()
     print(" Most ARGO work needs NO keys at all (files downloaded from the")
