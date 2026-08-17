@@ -23,6 +23,9 @@ python3 "$SETUP" --ensure
 ```
 
 - `Settings found at <path> — setup skipped.` → carry on, nothing to explain.
+- In Cowork, the rule is: the user connects a folder from their own computer for ARGO work,
+  and setup lands in it automatically. If the banner warns the file may disappear with the
+  session, no folder is connected — have them connect one and run setup again.
 - The FIRST-TIME SETUP banner → relay its instructions in your own words: a settings file was
   created, here is where it is, the ARGO REDCap address is already filled in, and they paste
   their access keys into it **in a text editor** when they have them — and they can also just carry on, because most ARGO work needs no

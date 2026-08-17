@@ -12,6 +12,13 @@ or a tool like this — plain words, one thing at a time, no menus of options.
 
 ## Step 0 — make sure setup exists (always, first)
 
+**The ARGO rule for Cowork: every team member creates a folder on their own computer for ARGO
+work and connects it to the session.** Setup detects the connected folder and puts everything
+there — including the settings file — so work and keys persist on their computer between
+sessions. If the banner below says the file may disappear when the session ends, that's the sign
+no folder is connected yet: have them create one (any name with "ARGO" in it works best),
+connect it, and run setup again.
+
 The scripts are bundled in this skill's own `scripts/` folder. Locate and run them by search —
 never by a hardcoded path, because every environment lays skills out differently:
 

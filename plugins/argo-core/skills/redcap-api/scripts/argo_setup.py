@@ -214,6 +214,35 @@ def find_existing_settings() -> "Path | None":
     return None
 
 
+def find_connected_workspace(mnt: Path = Path("/mnt")) -> "Path | None":
+    """A folder the user connected for ARGO work, if one can be identified.
+
+    Cowork's standing instruction to the team: create a folder on your computer for ARGO work
+    and connect it to the session. Connected folders mount under /mnt and persist on the user's
+    own computer — unlike the session home, which is thrown away. So setup must land there.
+
+    Returns the folder to scaffold into, or None when nothing connected can be identified.
+    Never guesses between multiple unrelated folders.
+    """
+    if not mnt.is_dir():
+        return None
+    SYSTEM = {"skills", "user-data", "knowledge", "outputs"}
+    candidates = []
+    for entry in sorted(mnt.iterdir()):
+        if (not entry.is_dir() or entry.name.startswith(".")
+                or entry.name in SYSTEM or not os.access(entry, os.W_OK)):
+            continue
+        candidates.append(entry)
+    # A folder named for ARGO, or already holding an ARGO workspace, is unambiguous.
+    for entry in candidates:
+        if "argo" in entry.name.lower() or (entry / "argo-work").is_dir():
+            return entry if "argo" in entry.name.lower() else entry / "argo-work"
+    # Exactly one connected folder → that's the workspace they were told to connect.
+    if len(candidates) == 1:
+        return candidates[0] / "argo-work"
+    return None
+
+
 def ensure(work_dir: "Path | None" = None) -> int:
     """The default first step of any ARGO task: make sure a settings file exists.
 
@@ -225,7 +254,14 @@ def ensure(work_dir: "Path | None" = None) -> int:
         print(f"Settings found at {existing} — setup skipped.")
         return 0
 
-    work_dir = work_dir or Path(os.environ.get("ARGO_WORK_DIR", "~/argo-work")).expanduser()
+    connected = None
+    if work_dir is None:
+        override = os.environ.get("ARGO_WORK_DIR")
+        if override:
+            work_dir = Path(override).expanduser()
+        else:
+            connected = find_connected_workspace()
+            work_dir = connected or Path("~/argo-work").expanduser()
     env_path = scaffold(work_dir)
     if env_path is None:
         return 1
@@ -244,8 +280,14 @@ def ensure(work_dir: "Path | None" = None) -> int:
     print(" Most ARGO work needs NO keys at all (files downloaded from the")
     print(" REDCap website are enough), so you can also just carry on.")
     print()
-    print(" If this is a temporary session, this file disappears when the")
-    print(" session ends — keep your keys somewhere safe of your own.")
+    if connected:
+        print(" This is inside the folder you connected, so it lives on YOUR")
+        print(" computer and keeps your keys between sessions.")
+    else:
+        print(" NOTE — this session may be temporary, and this file would then")
+        print(" disappear when it ends. The ARGO way to keep your keys: create")
+        print(" a folder on your computer for ARGO work, connect it to the")
+        print(" session, and run setup again — it will move in there.")
     print("=" * 64)
     return 0
 

@@ -380,6 +380,30 @@ class TestSetupIsSafe(unittest.TestCase):
                               env=dict(os.environ, HOME="/nonexistent-home"), cwd="/tmp")
         self.assertNotIn("Traceback", proc.stdout + proc.stderr)
 
+    def test_connected_workspace_detection(self):
+        """Cowork rule: setup lands in the user's connected folder, and never guesses."""
+        import importlib.util, tempfile
+        spec = importlib.util.spec_from_file_location("argo_setup_ws", self.SETUP)
+        s = importlib.util.module_from_spec(spec); spec.loader.exec_module(s)
+        base = Path(tempfile.mkdtemp())
+        (base / "skills").mkdir()          # system mount — always ignored
+        # ARGO-named folder wins outright.
+        (base / "My ARGO Files").mkdir()
+        self.assertEqual(s.find_connected_workspace(base), base / "My ARGO Files")
+        # A lone generic folder gets an argo-work subfolder.
+        import shutil; shutil.rmtree(base / "My ARGO Files")
+        (base / "projects").mkdir()
+        self.assertEqual(s.find_connected_workspace(base), base / "projects" / "argo-work")
+        # Two unrelated folders: refuse to guess.
+        (base / "photos").mkdir()
+        self.assertIsNone(s.find_connected_workspace(base))
+
+    def test_client_searches_the_scaffolded_locations(self):
+        """The file --ensure creates must be findable by the client — this was a real gap."""
+        client_text = (PLUGINS / "argo-core/skills/redcap-api/scripts/argo_redcap_client.py").read_text()
+        self.assertIn('"argo-work" / ".env"', client_text,
+                      "load_env_file must search argo-work/.env under home and connected folders")
+
     def test_template_never_asks_for_a_token_on_the_command_line(self):
         text = self.SETUP.read_text()
         self.assertNotIn('"--token"', text)

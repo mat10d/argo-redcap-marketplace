@@ -143,6 +143,16 @@ What follows from that, and is already implemented:
 - **Always combine sourcing and running into one command.** Shell state doesn't survive between
   commands in either environment, so `source ...` on its own line is always lost.
 
+### The workspace rule in Cowork
+
+**Standing instruction to the team: create a dedicated folder on your own computer for ARGO work
+and connect it in every ARGO Cowork session.** This isn't a preference — it's the only way work
+and keys persist, because the session's home directory is thrown away. `argo_setup.py --ensure`
+detects the connected folder automatically (a folder with "ARGO" in its name, one already holding
+`argo-work/`, or the only connected folder) and scaffolds into it; with several unrelated folders
+connected it refuses to guess and asks. The shared client searches connected folders for the
+settings file on its own, so once the folder is connected, everything just finds it.
+
 ### Credentials in Cowork
 
 `~/.argo/.env` doesn't exist there, and that's structural — `$HOME` is ephemeral per session and

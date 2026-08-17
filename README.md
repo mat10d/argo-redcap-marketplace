@@ -81,6 +81,8 @@ claude.ai directly, separate from the marketplace. It bundles its own copies of 
 3. find the full plugin suite in the session and route into its `start-here` front door — or say
    plainly that the plugins aren't installed and how to get them.
 
+Team rule in Cowork: each person connects a folder from their own computer as their ARGO workspace — setup detects it and puts the working files and settings there, so everything persists between sessions.
+
 To install: upload the `argo-skill/` folder as a skill named **argo**. Update it whenever you
 update the plugins — same release, same version.
 

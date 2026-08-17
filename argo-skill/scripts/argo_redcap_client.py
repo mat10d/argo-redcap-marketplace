@@ -132,6 +132,7 @@ def load_env_file(explicit: str | None = None) -> "Path | None":
     if env_file:
         candidates.append(Path(env_file).expanduser())
     candidates.append(Path.home() / ".argo" / ".env")
+    candidates.append(Path.home() / "argo-work" / ".env")   # where --ensure scaffolds by default
     # Connected/working folders: a credentials file sitting alongside the work.
     # (list(...)[:2] rather than .parents[:2] — slicing parents needs Python 3.10.)
     for base in [Path.cwd()] + list(Path.cwd().parents)[:2]:
@@ -141,7 +142,8 @@ def load_env_file(explicit: str | None = None) -> "Path | None":
     if mnt.is_dir():
         for entry in sorted(mnt.iterdir()):
             if entry.is_dir() and not entry.name.startswith("."):
-                candidates += [entry / ".argo" / ".env", entry / "argo.env", entry / ".env"]
+                candidates += [entry / ".argo" / ".env", entry / "argo.env", entry / ".env",
+                               entry / "argo-work" / ".env"]  # a connected ARGO workspace folder
 
     for path in candidates:
         try:
