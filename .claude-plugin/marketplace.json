@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "AI-augmented research workflow plugins for the African Research Group for Oncology. Built around REDCap as the system of record for multi-site oncology cohorts.",
-    "version": "0.10.1"
+    "version": "0.11.0"
   },
   "plugins": [
     {
       "name": "argo-core",
       "source": "./plugins/argo-core",
-      "description": "Shared REDCap API conventions and reference material. Required by the other ARGO plugins."
+      "description": "Foundation required by every other ARGO plugin: the start-here front door, shared REDCap client, API conventions, and reference docs."
     },
     {
       "name": "argo-pm",

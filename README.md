@@ -10,14 +10,14 @@ New here? See **[SETUP.md](SETUP.md)** for step-by-step install and token setup.
 
 | Role | Plugin | Skills | What it does |
 |---|---|---|---|
-| **Everyone** (foundation) | `argo-core` | `redcap-api` + reference docs | Shared REDCap API conventions, safety rules, and reference tables (MDC codes, standard roles, data-dictionary spec). Required by every other plugin. |
+| **Everyone** (foundation) | `argo-core` | `start-here`, `redcap-api` + reference docs | **`start-here` is the front door** — orients anyone new, runs first-time setup, routes by role/task. Plus shared API conventions, the common client, safety rules, and reference tables. Required by every other plugin. |
 | **Builder** | `argo-build` | `redcap-build`, `redcap-admin` | Build a study end to end from a submitted request — triage readiness, construct/audit the data dictionary, set up files, and flip the Study Tracker's `build_tracking` flags as each step lands (`redcap-build`); manage user rights and roles on live projects (`redcap-admin`). |
 | **QA** | `argo-qa` | `redcap-qa` | Branching-logic-aware completeness QA — per-site (per-DAG) Excel worklists of applicable-but-blank fields for RAs to resolve in REDCap. |
 | **Data management** | `argo-data` | `data-export`, `study-linkage` | The token-holding role. Export/import records, metadata, files, audit logs via the API (`data-export`); link records across studies/sources with safe diff-only write-back (`study-linkage`). |
 | **Analyst** | `argo-analysis` | `run-analysis` | Reproducible, auditable analysis on a **local** export (no API token) — interview-driven plan, saved commented scripts (Python/R/Stata), organized outputs. |
 | **Admins** (2 seats) | `argo-pm` | `study-setup`, `study-portfolio` | Draft the new-study document package from canonical templates so the PM isn't the bottleneck (`study-setup`); weekly status dashboard across the admin REDCaps that also surfaces which studies are still unbuilt (`study-portfolio`). PMs set up and track — they don't build. |
 
-`argo-core` is a **library** (references only) and is required by every other plugin.
+`argo-core` is required by every other plugin. Anyone unsure where to begin starts with its `start-here` skill — say "help me get started with ARGO" and it takes it from there.
 
 ## Workflow shape
 

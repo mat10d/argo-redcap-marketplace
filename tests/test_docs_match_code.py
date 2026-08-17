@@ -254,6 +254,30 @@ class TestEverythingShipsInsideASkill(unittest.TestCase):
         )
 
 
+class TestWikilinksResolve(unittest.TestCase):
+    """Every [[name]] link must point at a real skill or reference doc.
+
+    The start-here front door is almost entirely links — a dangling one sends a brand-new user
+    to a skill that doesn't exist, which is the worst possible first experience. Applies
+    repo-wide: a rename that orphans links elsewhere fails here too.
+    """
+
+    def test_every_wikilink_has_a_target(self):
+        targets = set()
+        for path in PLUGINS.rglob("*"):
+            if path.is_dir() and path.parent.name == "skills":
+                targets.add(path.name)
+            if path.suffix == ".md" and path.parent.name == "references":
+                targets.add(path.stem)
+        dangling = []
+        for md in PLUGINS.rglob("*.md"):
+            for link in re.findall(r"\[\[([a-z0-9-]+)\]\]", md.read_text()):
+                if link not in targets:
+                    dangling.append(f"{md.relative_to(REPO)} -> [[{link}]]")
+        self.assertFalse(dangling,
+                         f"These links point at skills or reference docs that don't exist: {dangling}")
+
+
 class TestSetupIsSafe(unittest.TestCase):
     """argo_setup.py creates folders — so it must never do that just for being run."""
 
