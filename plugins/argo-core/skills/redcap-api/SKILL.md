@@ -106,7 +106,7 @@ python3 argo_setup.py --dir ~/argo-work          # local
 python3 argo_setup.py --dir /mnt/<folder>/argo-work   # a folder connected in Cowork
 ```
 
-It creates `exports/`, `worklists/`, `builds/`, `pm/`, a `.gitignore`, and a `.env` holding the
+It creates `exports/`, `worklists/`, `builds/`, `analysis/`, `pm/`, a `.gitignore`, and a `.env` holding the
 REDCap web address and any access keys — written `0600`, and never overwritten if it already
 exists. **The keys live in the working folder** so one connected folder is all anyone needs;
 `--separate-credentials` splits them out for anyone who wants a smaller footprint.

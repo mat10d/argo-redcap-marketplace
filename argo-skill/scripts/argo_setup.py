@@ -25,6 +25,9 @@ import stat
 import sys
 from pathlib import Path
 
+# The folders every ARGO workspace gets. One list, used by scaffold and every message about it.
+WORKSPACE_SUBDIRS = ("exports", "worklists", "builds", "analysis", "pm")
+
 # The admin trackers ARGO holds keys for permanently (Tier 1 in access-tiers.md).
 # Single source of truth: argo_trackers.py, next to this file.
 import sys as _sys
@@ -47,8 +50,10 @@ ARGO_PM_ROOT={pm_root}
 # --- ARGO admin tracker keys (ask the ARGO REDCap administrator) ---
 {tracker_lines}
 
-# --- Individual-study keys (e.g. CRC_TOKEN=) ---
-# These open patient data. Prefer supplying one per task instead of storing it here:
+# --- Individual-study keys — add as many as you need, named after the study ---
+# CRC_TOKEN=
+# GASTRIC_TOKEN=
+# These open patient data, so prefer supplying one per task instead of storing it here:
 #     CRC_TOKEN=... python3 export.py --token-env CRC_TOKEN ...
 """
 
@@ -65,6 +70,7 @@ This folder is where ARGO work happens. It was created by `argo_setup.py`.
 | `exports/` | Data and data dictionaries downloaded from REDCap |
 | `worklists/` | QA worklists sent to sites, and the ones they send back |
 | `builds/` | Working files for studies being built |
+| `analysis/` | Analysis scripts and their outputs (run-analysis works here) |
 | `pm/` | Portfolio snapshots and other project-management output |
 
 ## Using it
@@ -171,7 +177,7 @@ def scaffold(work_dir: Path, creds_dir: "Path | None" = None, say=print) -> "Pat
     creds_dir = creds_dir or work_dir
     env_path = creds_dir / ".env"
     try:
-        for sub in ("exports", "worklists", "builds", "pm"):
+        for sub in WORKSPACE_SUBDIRS:
             (work_dir / sub).mkdir(parents=True, exist_ok=True)
         creds_dir.mkdir(parents=True, exist_ok=True)
     except OSError as e:
@@ -212,6 +218,34 @@ def find_existing_settings() -> "Path | None":
         if path and path.is_file():
             return path
     return None
+
+
+def open_settings_file(env_path: Path, connected: bool = False) -> None:
+    """Put the freshly created settings file in front of the user so pasting keys is one step.
+
+    Local machine → open it in the default text editor. Sandboxed session → there's no editor
+    here, but the file lives in the user's connected folder ON THEIR COMPUTER, so tell them
+    exactly which file to open there. Never fatal; ARGO_SETUP_NO_OPEN=1 disables (tests use it).
+    """
+    if os.environ.get("ARGO_SETUP_NO_OPEN"):
+        return
+    import shutil
+    import subprocess
+    in_sandbox = Path("/mnt/skills").is_dir() or Path("/mnt/.remote-plugins").is_dir()
+    try:
+        if in_sandbox:
+            if connected:
+                print(f"\nOn your computer, open this file in any text editor and paste your keys in:")
+                print(f"    (your connected ARGO folder){str(env_path).replace(str(env_path.parents[1]), '', 1)}")
+            return
+        if sys.platform == "darwin":
+            subprocess.run(["open", "-t", str(env_path)], check=False, timeout=10)
+            print(f"\nOpened {env_path.name} in your text editor — paste your keys in and save.")
+        elif shutil.which("xdg-open"):
+            subprocess.run(["xdg-open", str(env_path)], check=False, timeout=10)
+            print(f"\nOpened {env_path.name} — paste your keys in and save.")
+    except Exception:
+        pass
 
 
 def find_connected_workspace(mnt: Path = Path("/mnt")) -> "Path | None":
@@ -289,6 +323,7 @@ def ensure(work_dir: "Path | None" = None) -> int:
         print(" a folder on your computer for ARGO work, connect it to the")
         print(" session, and run setup again — it will move in there.")
     print("=" * 64)
+    open_settings_file(env_path, connected=bool(connected))
     return 0
 
 
@@ -333,6 +368,7 @@ def main() -> int:
             "    exports/     data and data dictionaries downloaded from REDCap\n"
             "    worklists/   QA worklists sent to sites and returned by them\n"
             "    builds/      working files for studies being built\n"
+            "    analysis/    analysis scripts and their outputs\n"
             "    pm/          portfolio snapshots\n"
             "    .env         your REDCap web address and access keys (private to you)\n"
             "\n"
@@ -352,13 +388,14 @@ def main() -> int:
         return 1
 
     print(f"Working folder: {work_dir}")
-    for sub in ("exports", "worklists", "builds", "pm"):
+    for sub in WORKSPACE_SUBDIRS:
         print(f"  created {sub}/")
     if env_existed:
         print(f"\nSettings file already exists, leaving it alone: {env_path}")
         print("(Nothing was overwritten — your existing keys are untouched.)")
     else:
         print(f"\nSettings file: {env_path}  (only you can read it)")
+        open_settings_file(env_path)
 
     print("\n" + "=" * 60)
     print("Next step — put your REDCap details in, using a text editor:\n")

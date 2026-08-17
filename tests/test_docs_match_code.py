@@ -19,6 +19,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 PLUGINS = REPO / "plugins"
+os.environ.setdefault("ARGO_SETUP_NO_OPEN", "1")  # suites must not pop text editors
 PORTFOLIO_DIR = PLUGINS / "argo-pm/skills/study-portfolio"
 
 
@@ -335,6 +336,8 @@ class TestSetupIsSafe(unittest.TestCase):
                          "the settings file must be readable only by its owner")
         self.assertIn(".env", (work / ".gitignore").read_text(),
                       "the settings file must be git-ignored so keys can't be committed")
+        for sub in ("exports", "worklists", "builds", "analysis", "pm"):
+            self.assertTrue((work / sub).is_dir(), f"workspace is missing {sub}/")
 
     def test_setup_never_overwrites_existing_keys(self):
         import tempfile

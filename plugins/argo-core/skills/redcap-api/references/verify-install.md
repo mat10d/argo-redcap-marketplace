@@ -40,7 +40,7 @@ U=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name argo_setup.py 
 ```
 
 **Pass:** the first run explains itself and ends with "Nothing has been created yet"; the second
-creates `exports/ worklists/ builds/ pm/`, a `.gitignore`, and a `.env` with permissions
+creates `exports/ worklists/ builds/ analysis/ pm/`, a `.gitignore`, and a `.env` with permissions
 `-rw-------`. **Fail:** the no-argument run creates anything, or the `.env` is group/world
 readable.
 
