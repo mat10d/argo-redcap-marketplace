@@ -254,6 +254,31 @@ class TestEverythingShipsInsideASkill(unittest.TestCase):
         )
 
 
+class TestStandaloneBundleInSync(unittest.TestCase):
+    """argo-skill/'s bundled scripts must be byte-identical to argo-core's.
+
+    The standalone bootstrap skill is uploaded to Cowork separately from the marketplace, so it
+    carries copies of the shared scripts. Two copies is normally the disease this repo kills on
+    sight — here it's unavoidable, so instead it's mechanised: release.py syncs on every
+    release, and this test fails the moment they differ.
+    """
+
+    SOURCE = REPO / "plugins/argo-core/skills/redcap-api/scripts"
+    BUNDLE = REPO / "argo-skill/scripts"
+
+    def test_bundle_matches_source_exactly(self):
+        self.assertTrue(self.BUNDLE.is_dir(), "argo-skill/scripts is missing — run release.py")
+        src = {p.name: p.read_bytes() for p in self.SOURCE.glob("*.py")}
+        dst = {p.name: p.read_bytes() for p in self.BUNDLE.glob("*.py")}
+        self.assertEqual(sorted(src), sorted(dst),
+                         "the standalone bundle has different files than argo-core — run "
+                         "`python3 release.py --bump patch` to re-sync")
+        for name in src:
+            self.assertEqual(src[name], dst[name],
+                             f"argo-skill/scripts/{name} differs from argo-core's copy — run "
+                             "`python3 release.py --bump patch` to re-sync")
+
+
 class TestWikilinksResolve(unittest.TestCase):
     """Every [[name]] link must point at a real skill or reference doc.
 

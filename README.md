@@ -69,6 +69,21 @@ python3 plugins/argo-core/skills/redcap-api/scripts/argo_setup.py --check --dir 
 `.env` is gitignored — never commit tokens. See **[SETUP.md](SETUP.md)** for which tokens each
 skill needs.
 
+## The standalone bootstrap skill (Cowork / claude.ai)
+
+Sessions can load **skills before plugins** — so a front door that lives inside the plugin suite
+can't be the thing that opens it. `argo-skill/` is a self-contained skill you upload to Cowork /
+claude.ai directly, separate from the marketplace. It bundles its own copies of the setup scripts
+(synced automatically by `release.py`, byte-identical by test), so on any ARGO request it can:
+
+1. run first-time setup (`--ensure` — loud when needed, one skipped line when not),
+2. verify any configured access keys (`--check`),
+3. find the full plugin suite in the session and route into its `start-here` front door — or say
+   plainly that the plugins aren't installed and how to get them.
+
+To install: upload the `argo-skill/` folder as a skill named **argo**. Update it whenever you
+update the plugins — same release, same version.
+
 ## Distribution
 
 A GitHub repo is the keystone for both routes below — it's the portable source.

@@ -63,6 +63,30 @@ def show() -> int:
     return 1
 
 
+SCRIPTS_SOURCE = REPO / "plugins/argo-core/skills/redcap-api/scripts"
+STANDALONE_SCRIPTS = REPO / "argo-skill/scripts"
+
+
+def sync_standalone() -> None:
+    """Mirror argo-core's shared scripts into the standalone bootstrap skill.
+
+    The standalone skill (argo-skill/) is uploaded to Cowork separately from the marketplace,
+    so it bundles its own copies — which must be exact. This runs on every release, and a test
+    fails if the copies ever differ, so drift can't survive a release cycle.
+    """
+    STANDALONE_SCRIPTS.mkdir(parents=True, exist_ok=True)
+    for src in sorted(SCRIPTS_SOURCE.glob("*.py")):
+        dest = STANDALONE_SCRIPTS / src.name
+        if not dest.exists() or dest.read_bytes() != src.read_bytes():
+            dest.write_bytes(src.read_bytes())
+            print(f"  synced argo-skill/scripts/{src.name}")
+    # Remove strays so a deleted script doesn't linger in the bundle.
+    for dest in STANDALONE_SCRIPTS.glob("*.py"):
+        if not (SCRIPTS_SOURCE / dest.name).exists():
+            dest.unlink()
+            print(f"  removed stale argo-skill/scripts/{dest.name}")
+
+
 def write_version(new: str) -> None:
     for manifest in plugin_manifests():
         data = json.loads(manifest.read_text())
@@ -118,6 +142,7 @@ def main() -> int:
 
     print(f"Setting everything to {new} (was {current})\n")
     write_version(new)
+    sync_standalone()
     print(
         "\nDone. Nothing has been committed — check `git diff`, then commit.\n"
         "Remember to refresh the installed copies afterwards, or a running session will keep\n"
