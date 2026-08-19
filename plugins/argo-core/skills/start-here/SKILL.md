@@ -34,9 +34,17 @@ python3 "$SETUP" --ensure
 **Never ask them to paste an access key into the chat.** Keys typed into a conversation are saved
 in the transcript. If they start typing one, stop them and point at the settings file instead.
 
-## When they want to add their access keys
+## Offering and adding access keys
 
-Don't just mention the file — walk them to it and close the loop:
+**Offer it — don't wait to be asked.** When setup has just created a fresh settings file, your
+single routing question must include **"add my access keys"** as one of its options (alongside the
+task options). Most people will skip it, and that's fine — say so.
+
+When they choose it, or ask at any point, walk them to it and close the loop:
+
+0. **First, try to open the file for them.** Run: `open -t "<full path to the .env>"` — on some
+   setups that opens it on their screen immediately. If the command errors, that's normal here;
+   move to step 1 without comment.
 
 1. Easiest: tell them to open the ARGO folder on their computer and **double-click
    'Add keys here'** — the settings file opens in a text editor. Fallback: give the exact
