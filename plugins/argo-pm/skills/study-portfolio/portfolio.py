@@ -55,36 +55,14 @@ def state_dir() -> Path:
 # this list exists in exactly one place. If argo-core isn't reachable we fall back to a local
 # copy rather than failing outright — but the shared file is the source of truth.
 def _load_trackers():
-    # Self-contained locator: find_argo_core() is defined further down this file, and this runs
-    # at import time. Searches by marker file, never by directory name (see access-tiers.md).
+    # Vendored copy first (this skill's own scripts/), argo-core source tree as dev fallback.
     core = None
-    marker = "argo_redcap_client.py"
-    override = os.environ.get("ARGO_CORE_SCRIPTS")
-    if override and (Path(override).expanduser() / marker).exists():
-        core = str(Path(override).expanduser())
-    if core is None:
-        for parent in Path(__file__).resolve().parents:
-            for cand in (parent / "plugins" / "argo-core" / "skills" / "redcap-api" / "scripts",
-                         parent / "plugins" / "argo-core" / "scripts"):
-                if (cand / marker).exists():
-                    core = str(cand); break
-            if core:
-                break
-    if core is None:
-        for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/mnt", "~/.claude/plugins", "~/.claude/plugins/cache"):
-            base = Path(root).expanduser()
-            if base.is_dir():
-                hits = list(base.glob(f"**/{marker}"))
-                if hits:  # newest file, never name order
-                    core = str(max(hits, key=lambda h: h.stat().st_mtime).parent); break
-    if core is None:
-        for parent in Path(__file__).resolve().parents:
-            for cand in (parent / "plugins" / "argo-core" / "scripts",
-                         parent / "argo-core" / "scripts"):
-                if (cand / marker).exists():
-                    core = str(cand); break
-            if core:
-                break
+    _here = Path(__file__).resolve().parent
+    for cand in (_here / "scripts",
+                 *(par / "plugins/argo-core/skills/redcap-api/scripts" for par in _here.parents)):
+        if (cand / "argo_redcap_client.py").exists():
+            core = str(cand)
+            break
     if core:
         sys.path.insert(0, core)
         try:
@@ -283,32 +261,12 @@ def save(snapshot: dict, snap_dir: Path) -> Path:
 
 
 def find_argo_core() -> "str | None":
-    """Find the folder holding argo-core's shared REDCap code.
-
-    Searches for the FILE argo_redcap_client.py, never for a directory named "argo-core".
-    Plugin directories are named differently per environment — Claude Code uses
-    <marketplace>/<plugin>/<version>/, Cowork uses opaque plugin_<id>/ names with the plugin
-    name recorded only inside its manifest — so a name-based search finds nothing in some.
-    A relative '../argo-core' path never works either: plugins are siblings only in some layouts.
-    """
-    marker = "argo_redcap_client.py"
-    override = os.environ.get("ARGO_CORE_SCRIPTS")
-    if override and (Path(override).expanduser() / marker).exists():
-        return str(Path(override).expanduser())
-
-    for parent in Path(__file__).resolve().parents:
-        for candidate in (parent / "plugins" / "argo-core" / "skills" / "redcap-api" / "scripts",
-                          parent / "plugins" / "argo-core" / "scripts",
-                          parent / "argo-core" / "scripts"):
-            if (candidate / marker).exists():
-                return str(candidate)
-
-    for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/mnt", "~/.claude/plugins", "~/.claude/plugins/cache"):
-        base = Path(root).expanduser()
-        if base.is_dir():
-            hits = list(base.glob(f"**/{marker}"))
-            if hits:  # newest file, never name order — version dirs sort lexically ("0.9" > "0.12")
-                return str(max(hits, key=lambda h: h.stat().st_mtime).parent)
+    """The folder holding the shared ARGO scripts — this skill's own vendored copy."""
+    here = Path(__file__).resolve().parent
+    for cand in (here / "scripts",
+                 *(par / "plugins/argo-core/skills/redcap-api/scripts" for par in here.parents)):
+        if (cand / "argo_redcap_client.py").exists():
+            return str(cand)
     return None
 
 

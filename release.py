@@ -64,27 +64,35 @@ def show() -> int:
 
 
 SCRIPTS_SOURCE = REPO / "plugins/argo-core/skills/redcap-api/scripts"
-STANDALONE_SCRIPTS = REPO / "argo-skill/scripts"
+
+# Every skill that runs the shared scripts carries its OWN synced copy in <skill>/scripts/.
+# This is the simplification that killed cross-plugin discovery: imports are always
+# "the folder I'm standing in", identical in every environment, and the four locator bugs
+# (name-globbing, lexical version sort, /mnt/skills, ~/mnt) become structurally impossible.
+VENDOR_TARGETS = [
+    REPO / "argo-skill/scripts",
+    REPO / "plugins/argo-build/skills/redcap-build/scripts",
+    REPO / "plugins/argo-data/skills/data-export/scripts",
+    REPO / "plugins/argo-data/skills/study-linkage/scripts",
+    REPO / "plugins/argo-pm/skills/study-portfolio/scripts",
+    REPO / "plugins/argo-pm/skills/study-setup/scripts",
+    REPO / "plugins/argo-qa/skills/redcap-qa/scripts",
+]
 
 
 def sync_standalone() -> None:
-    """Mirror argo-core's shared scripts into the standalone bootstrap skill.
-
-    The standalone skill (argo-skill/) is uploaded to Cowork separately from the marketplace,
-    so it bundles its own copies — which must be exact. This runs on every release, and a test
-    fails if the copies ever differ, so drift can't survive a release cycle.
-    """
-    STANDALONE_SCRIPTS.mkdir(parents=True, exist_ok=True)
-    for src in sorted(SCRIPTS_SOURCE.glob("*.py")):
-        dest = STANDALONE_SCRIPTS / src.name
-        if not dest.exists() or dest.read_bytes() != src.read_bytes():
-            dest.write_bytes(src.read_bytes())
-            print(f"  synced argo-skill/scripts/{src.name}")
-    # Remove strays so a deleted script doesn't linger in the bundle.
-    for dest in STANDALONE_SCRIPTS.glob("*.py"):
-        if not (SCRIPTS_SOURCE / dest.name).exists():
-            dest.unlink()
-            print(f"  removed stale argo-skill/scripts/{dest.name}")
+    """Mirror argo-core's shared scripts into every vendored copy. Drift dies at release time."""
+    for target in VENDOR_TARGETS:
+        target.mkdir(parents=True, exist_ok=True)
+        for src in sorted(SCRIPTS_SOURCE.glob("*.py")):
+            dest = target / src.name
+            if not dest.exists() or dest.read_bytes() != src.read_bytes():
+                dest.write_bytes(src.read_bytes())
+                print(f"  synced {dest.relative_to(REPO)}")
+        for dest in target.glob("*.py"):
+            if not (SCRIPTS_SOURCE / dest.name).exists():
+                dest.unlink()
+                print(f"  removed stale {dest.relative_to(REPO)}")
 
 
 def write_version(new: str) -> None:

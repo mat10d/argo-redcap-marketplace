@@ -123,53 +123,23 @@ class TestHeadlessSafe(unittest.TestCase):
             f"forever in a headless run: {unguarded}",
         )
 
-    def test_cross_plugin_lookup_is_by_marker_file_not_directory_name(self):
-        """Cowork names plugin dirs plugin_<opaque-id>; only the manifest holds the name.
+    def test_no_script_globs_plugin_roots_anymore(self):
+        """Cross-plugin discovery is retired: every skill vendors its own scripts/ copy.
 
-        So any search for a directory literally called "argo-core" under a plugin root finds
-        nothing there. Searching for the file argo_redcap_client.py works in every environment.
+        Four separate locator bugs (directory-name globbing, lexical version sort, the
+        /mnt/skills layout, the ~/mnt layout) came from scripts hunting for argo-core across
+        environments. Imports are now same-folder. The shared client's find_argo_core keeps a
+        roots list for standalone --check use; no other script may grow one back.
         """
-        # Walking up from __file__ to find the marketplace repo layout is fine — that really is a
-        # directory called argo-core. What breaks is assuming that name inside an *installed*
-        # plugin tree, where Cowork uses opaque IDs and the marketplace name may differ too.
-        forbidden = (
-            'argo-redcap/argo-core',                     # hardcoded marketplace + plugin name
-            '"argo-redcap", "argo-core"',
-            '"cache" / "argo-redcap"',
-            'cache/argo-redcap',
-        )
-        offenders = []
         for py in PLUGINS.rglob("*.py"):
+            if py.parent.name == "scripts":
+                continue  # vendored copies of the client itself
             text = py.read_text()
-            for i, line in enumerate(text.splitlines(), 1):
-                if any(f in line for f in forbidden):
-                    offenders.append(f"{py.relative_to(REPO)}:{i}")
-        self.assertFalse(
-            offenders,
-            "These hardcode a marketplace/plugin directory name inside an installed plugin tree. "
-            "Cowork's plugin directories are opaque IDs, so this finds nothing there — search for "
-            f"the marker file argo_redcap_client.py instead: {offenders}",
-        )
-
-    def test_every_locator_checks_the_sandbox_plugin_root(self):
-        locators = [p for p in PLUGINS.rglob("*.py")
-                    if "_add_argo_core_to_path" in p.read_text() or "def find_argo_core" in p.read_text()]
-        self.assertTrue(locators, "expected at least one argo-core locator")
-        # Every root any environment has ever needed. When a new layout appears, add it here
-        # and the test forces it into every locator copy at once.
-        REQUIRED_ROOTS = ("/mnt/.remote-plugins", "/mnt/skills", "~/mnt", "~/.claude/plugins")
-        for py in locators:
-            text = py.read_text()
-            for root in REQUIRED_ROOTS:
-                self.assertIn(root, text,
-                              f"{py.relative_to(REPO)} doesn't search {root} — locator copies "
-                              "must stay identical across scripts")
-            self.assertIn("argo_redcap_client.py", text,
-                          f"{py.relative_to(REPO)} doesn't search by marker file")
+            self.assertNotIn("/mnt/.remote-plugins", text,
+                             f"{py.relative_to(REPO)} greps plugin roots — import from the "
+                             "skill's vendored scripts/ folder instead")
             self.assertNotIn("hits[-1]", text,
-                             f"{py.relative_to(REPO)} picks glob hits by name order — version "
-                             "directories sort lexically ('0.9' > '0.12'), so a stale cache wins "
-                             "forever. Pick by newest mtime instead.")
+                             f"{py.relative_to(REPO)} picks glob hits by name order")
 
     def test_no_relative_cross_plugin_paths_in_docs(self):
         """Plugins install into separate versioned dirs — '../other-plugin' never resolves."""
@@ -269,19 +239,23 @@ class TestStandaloneBundleInSync(unittest.TestCase):
     """
 
     SOURCE = REPO / "plugins/argo-core/skills/redcap-api/scripts"
-    BUNDLE = REPO / "argo-skill/scripts"
 
-    def test_bundle_matches_source_exactly(self):
-        self.assertTrue(self.BUNDLE.is_dir(), "argo-skill/scripts is missing — run release.py")
+    def test_every_vendored_copy_matches_source_exactly(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("release_mod", REPO / "release.py")
+        release = importlib.util.module_from_spec(spec); spec.loader.exec_module(release)
         src = {p.name: p.read_bytes() for p in self.SOURCE.glob("*.py")}
-        dst = {p.name: p.read_bytes() for p in self.BUNDLE.glob("*.py")}
-        self.assertEqual(sorted(src), sorted(dst),
-                         "the standalone bundle has different files than argo-core — run "
-                         "`python3 release.py --bump patch` to re-sync")
-        for name in src:
-            self.assertEqual(src[name], dst[name],
-                             f"argo-skill/scripts/{name} differs from argo-core's copy — run "
-                             "`python3 release.py --bump patch` to re-sync")
+        self.assertTrue(src, "argo-core has no shared scripts?")
+        for target in release.VENDOR_TARGETS:
+            self.assertTrue(target.is_dir(), f"{target} missing — run release.py")
+            dst = {p.name: p.read_bytes() for p in target.glob("*.py")}
+            self.assertEqual(sorted(src), sorted(dst),
+                             f"{target.relative_to(REPO)} has different files than argo-core — "
+                             "run `python3 release.py --bump patch` to re-sync")
+            for name in src:
+                self.assertEqual(src[name], dst[name],
+                                 f"{target.relative_to(REPO)}/{name} differs from argo-core — "
+                                 "run `python3 release.py --bump patch` to re-sync")
 
 
 class TestWikilinksResolve(unittest.TestCase):

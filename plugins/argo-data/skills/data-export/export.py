@@ -38,34 +38,15 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-def _add_argo_core_to_path():
-    """Find argo-core's scripts folder and make it importable.
-
-    Searches for the FILE argo_redcap_client.py, never for a directory named "argo-core":
-    plugin directories are named differently per environment (Claude Code uses
-    <marketplace>/<plugin>/<version>/; Cowork uses opaque plugin_<id>/ names with the plugin
-    name only inside its manifest), so a name-based search finds nothing in some of them.
-    """
-    from pathlib import Path as _P
-    marker = "argo_redcap_client.py"
-    override = os.environ.get("ARGO_CORE_SCRIPTS")
-    if override and (_P(override).expanduser() / marker).exists():
-        sys.path.insert(0, str(_P(override).expanduser())); return
-    for parent in _P(__file__).resolve().parents:
-        for cand in (parent / "plugins" / "argo-core" / "skills" / "redcap-api" / "scripts",
-                     parent / "plugins" / "argo-core" / "scripts",
-                     parent / "argo-core" / "scripts"):
-            if (cand / marker).exists():
-                sys.path.insert(0, str(cand)); return
-    for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/mnt", "~/.claude/plugins", "~/.claude/plugins/cache"):
-        base = _P(root).expanduser()
-        if base.is_dir():
-            hits = list(base.glob(f"**/{marker}"))
-            if hits:  # newest file, never name order — version dirs sort lexically ("0.9" > "0.12")
-                sys.path.insert(0, str(max(hits, key=lambda h: h.stat().st_mtime).parent)); return
-
-
-_add_argo_core_to_path()
+# The shared ARGO scripts are vendored into this skill's own scripts/ folder by release.py,
+# so imports never depend on where — or whether — other plugins are installed. The parents walk
+# is only for running from a source checkout before the first sync.
+_here = Path(__file__).resolve().parent
+for _cand in (_here / "scripts",
+              *(p / "plugins/argo-core/skills/redcap-api/scripts" for p in _here.parents)):
+    if (_cand / "argo_redcap_client.py").exists():
+        sys.path.insert(0, str(_cand))
+        break
 from argo_redcap_client import RedcapClient, RedcapError  # noqa: E402
 
 

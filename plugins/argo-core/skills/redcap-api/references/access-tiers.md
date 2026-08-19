@@ -125,10 +125,11 @@ at once.
 
 What follows from that, and is already implemented:
 
-- **Never locate a sibling plugin by directory name, and never by a relative `../` path.** Search
-  for the *marker file* `argo_redcap_client.py`. `find_argo_core()` in the shared client, and the
-  `_add_argo_core_to_path()` block at the top of each script, both do this — checking
-  `ARGO_CORE_SCRIPTS`, then `/mnt/.remote-plugins`, then the local plugin cache, then the repo.
+- **No cross-plugin discovery at all.** Every skill that runs the shared scripts carries its own
+  byte-identical copy in `<skill>/scripts/`, synced by `release.py` and enforced by test. Imports
+  are always same-folder, so the environment's plugin layout — which has produced four distinct
+  layouts so far — simply doesn't matter to the code. The `find ... -name argo_setup.py | head -1`
+  commands in the docs still work everywhere; all hits are identical copies.
 - **Never write next to a script.** The plugin directory is read-only. All state goes to an
   external location: snapshots to `$ARGO_PM_ROOT` (falling back to `~/.argo/pm`), dry-run receipts
   to `~/.argo/qa-dry-run-receipts`.
