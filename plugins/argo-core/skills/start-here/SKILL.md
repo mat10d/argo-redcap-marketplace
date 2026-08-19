@@ -38,8 +38,9 @@ in the transcript. If they start typing one, stop them and point at the settings
 
 Don't just mention the file — walk them to it and close the loop:
 
-1. Give the exact path of the settings file **on their computer** (the scaffold prints it), and
-   how to open it: any text editor; on a Mac, Finder → Cmd+Shift+G → paste the path.
+1. Easiest: tell them to open the ARGO folder on their computer and **double-click
+   'Add keys here'** — the settings file opens in a text editor. Fallback: give the exact
+   path (the scaffold prints it); on a Mac, Finder → Cmd+Shift+G → paste the path.
 2. Tell them which line each key goes on (the variable names are already in the file, one per
    tracker) and to save when done.
 3. **Wait.** Then verify for them: run `argo_setup.py --check` and then the client `--check`, and

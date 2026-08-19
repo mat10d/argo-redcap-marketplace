@@ -1,6 +1,6 @@
 {
   "name": "argo-data",
-  "version": "0.13.2",
+  "version": "0.13.3",
   "description": "Data management for ARGO REDCap projects \u2014 the token-holding role. Export and import records, metadata, files, and audit logs via the API (data-export), and link records across studies/sources with safe diff-only write-back (study-linkage). Distinct from argo-analysis, which works on local exports without API access.",
   "author": {
     "name": "ARGO"

@@ -1,6 +1,6 @@
 {
   "name": "argo-pm",
-  "version": "0.13.2",
+  "version": "0.13.3",
   "description": "Project management for ARGO admins (set up and track; no building). Draft the new-study document package from canonical templates to relieve the PM bottleneck (study-setup) and get a global weekly view across the admin REDCaps that surfaces which studies are still unbuilt (study-portfolio).",
   "author": {
     "name": "ARGO"

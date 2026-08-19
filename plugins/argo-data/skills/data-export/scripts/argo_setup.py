@@ -191,6 +191,19 @@ def scaffold(work_dir: Path, creds_dir: "Path | None" = None, say=print) -> "Pat
             env_path=env_path, pm_root=work_dir / "pm", tracker_lines=tracker_lines,
             redcap_url=ARGO_REDCAP_URL))
 
+    # A double-clickable way in for people who will never type a path: Finder -> double-click
+    # "Add keys here" -> the settings file opens in TextEdit. Matters most for Cowork, whose
+    # session runtime cannot open an editor on the user's screen but CAN write this file into
+    # the real connected folder.
+    opener = creds_dir / "Add keys here.command"
+    if not opener.exists():
+        opener.write_text(
+            '#!/bin/bash\n'
+            '# Double-click me to open your ARGO settings file in a text editor.\n'
+            'open -t "$(dirname "$0")/.env" 2>/dev/null || xdg-open "$(dirname "$0")/.env"\n'
+        )
+        opener.chmod(0o755)
+
     readme = work_dir / "README.md"
     if not readme.exists():
         readme.write_text(README)
@@ -237,9 +250,9 @@ def open_settings_file(env_path: Path, connected: bool = False) -> None:
 
     def explain():
         print("\nTo add your access keys:")
-        print(f"  1. On your computer, open this file in any text editor (TextEdit is fine):")
-        print(f"         {env_path}")
-        print("     (In Finder: press Cmd+Shift+G, paste the path above, press Enter.)")
+        print(f"  1. On your computer, open the ARGO folder and double-click 'Add keys here' —")
+        print(f"     the settings file opens in a text editor. (Or open it directly:")
+        print(f"         {env_path} )")
         print("  2. Paste each key after its = sign and save the file.")
         print("  3. Tell your assistant you've saved it — it will check the keys work.")
         print("  Never paste a key into the chat itself; it would be saved in the transcript.")
