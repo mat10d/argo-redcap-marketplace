@@ -442,62 +442,33 @@ class RedcapClient:
 
     # ---------------------------------------------------------------- confirmation
 
-    # Rights that a QA write-back account has no business holding. A REDCap token carries exactly
-    # the permissions of the account that made it — there's no way to scope a token down — so the
-    # only place this can be checked is the account itself (see [[access-tiers]] Tier 3).
-    EXCESSIVE_RIGHTS = {
-        "user_rights": "add and remove other users",
-        "design": "redesign forms and fields",
-        "record_delete": "delete records outright",
-        "data_export": "export the full dataset",
-    }
-
-    def account_rights(self) -> "dict | None":
-        """This token's own user record, or None if REDCap won't tell us (older versions)."""
-        try:
-            users = self._post(content="user")
-        except RedcapError:
-            return None
-        if not isinstance(users, list) or not users:
-            return None
-        # The API returns the calling account first when it can identify it.
-        return users[0]
-
     def warn_if_over_permissioned(self, purpose: str = "writing data") -> list:
         """Warn plainly if this token's account can do far more than the task needs.
 
-        Returns the list of concerning rights. This warns rather than blocks: a legitimate
-        one-off migration shouldn't be stranded by it. But the Tier 3 rule stops being purely a
-        sentence in a document that somebody has to remember.
+        REDCap's API has no "who am I" endpoint, so the calling account can't be identified from
+        the user list — an earlier version took the first listed user, which is just alphabetical
+        order, and misattributed a token because of it. What CAN be known for certain: REDCap only
+        lets accounts holding User Rights export the user list at all, so whether that export
+        succeeds is itself the check. Warns rather than blocks — a legitimate one-off migration
+        shouldn't be stranded by it — and returns the concerning findings.
         """
-        rights = self.account_rights()
-        if not rights:
-            print(
-                "  (Couldn't check what this access key is allowed to do — REDCap didn't say. "
-                "Carrying on.)",
-                file=sys.stderr,
-            )
+        try:
+            users = self._post(content="user")
+        except RedcapError:
+            # Refused — this account can't list users, which is exactly what a properly scoped
+            # QA account looks like. Nothing to warn about.
+            return []
+        if not isinstance(users, list) or not users:
             return []
 
-        # A right counts as held only when REDCap returns a truthy value for it. Absent or null
-        # means "not reported", which must not be read as "granted".
-        found = []
-        for field, desc in self.EXCESSIVE_RIGHTS.items():
-            value = rights.get(field)
-            if value is None:
-                continue
-            if str(value).strip() not in ("", "0", "false", "False"):
-                found.append((field, desc))
-        if not found:
-            return []
-
-        username = rights.get("username", "(unknown)")
         print("", file=sys.stderr)
         print("  ⚠ This access key belongs to an account with broad powers.", file=sys.stderr)
-        print(f"    Account: {username}", file=sys.stderr)
-        print(f"    As well as {purpose}, this key can:", file=sys.stderr)
-        for _field, desc in found:
-            print(f"      - {desc}", file=sys.stderr)
+        print(
+            f"    It just listed all {len(users)} of the project's user accounts — something\n"
+            f"    REDCap only allows accounts holding User Rights to do. As well as {purpose},\n"
+            "    an account like this can typically add and remove users, and often more.",
+            file=sys.stderr,
+        )
         print(
             "\n    A key can only ever do what its owner's account can do — there's no way to\n"
             "    limit a key by itself. For routine work, ask your REDCap administrator for a key\n"
@@ -505,7 +476,7 @@ class RedcapClient:
             "    Carrying on, because this may be deliberate.",
             file=sys.stderr,
         )
-        return [f for f, _ in found]
+        return ["user_rights"]
 
     def confirm_project(self, expect_title: str | None = None, expect_pid: str | None = None) -> dict:
         """Check this token points where the caller intended, before writing anything.
