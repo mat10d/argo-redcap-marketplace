@@ -34,6 +34,19 @@ python3 "$SETUP" --ensure
 **Never ask them to paste an access key into the chat.** Keys typed into a conversation are saved
 in the transcript. If they start typing one, stop them and point at the settings file instead.
 
+## When they want to add their access keys
+
+Don't just mention the file — walk them to it and close the loop:
+
+1. Give the exact path of the settings file **on their computer** (the scaffold prints it), and
+   how to open it: any text editor; on a Mac, Finder → Cmd+Shift+G → paste the path.
+2. Tell them which line each key goes on (the variable names are already in the file, one per
+   tracker) and to save when done.
+3. **Wait.** Then verify for them: run `argo_setup.py --check` and then the client `--check`, and
+   relay the result — "all five keys work" or exactly which one doesn't.
+4. If they start typing a key into the chat, stop them and point back at the file. A key pasted
+   here lands in the transcript permanently.
+
 ## Step 1 — find out what they're here to do
 
 If it isn't already obvious from what they said, ask **one** question — what are they trying to do

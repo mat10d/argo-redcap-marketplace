@@ -37,6 +37,19 @@ python3 "$SETUP" --ensure
 In Cowork, keys persist only via a connected folder holding the settings file; anything created
 in the session's own home disappears when the session ends. Say so if they ask about keys.
 
+## When they want to add their access keys
+
+Don't just mention the file — walk them to it and close the loop:
+
+1. Give the exact path of the settings file **on their computer** (the scaffold prints it), and
+   how to open it: any text editor; on a Mac, Finder → Cmd+Shift+G → paste the path.
+2. Tell them which line each key goes on (the variable names are already in the file, one per
+   tracker) and to save when done.
+3. **Wait.** Then verify for them: run `argo_setup.py --check` and then the client `--check`, and
+   relay the result — "all five keys work" or exactly which one doesn't.
+4. If they start typing a key into the chat, stop them and point back at the file. A key pasted
+   here lands in the transcript permanently.
+
 ## Step 1 — verify any keys that are configured
 
 If the settings file exists and this task will touch REDCap directly, check the keys work before

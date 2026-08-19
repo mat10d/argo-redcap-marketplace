@@ -223,29 +223,45 @@ def find_existing_settings() -> "Path | None":
 def open_settings_file(env_path: Path, connected: bool = False) -> None:
     """Put the freshly created settings file in front of the user so pasting keys is one step.
 
-    Local machine → open it in the default text editor. Sandboxed session → there's no editor
-    here, but the file lives in the user's connected folder ON THEIR COMPUTER, so tell them
-    exactly which file to open there. Never fatal; ARGO_SETUP_NO_OPEN=1 disables (tests use it).
+    On a local machine this opens the file in the default text editor. In a session runtime that
+    can't reach the user's screen (Cowork, chat containers — detectable because opening fails or
+    the environment is mounted), it prints exact instructions instead: the real path, how to open
+    it on their computer, and to say when they've saved so the keys can be verified. It must
+    never end silently — the user is holding a key with nowhere to put it. ARGO_SETUP_NO_OPEN=1
+    disables entirely (test suites use it).
     """
     if os.environ.get("ARGO_SETUP_NO_OPEN"):
         return
     import shutil
     import subprocess
-    in_sandbox = Path("/mnt/skills").is_dir() or Path("/mnt/.remote-plugins").is_dir()
+
+    def explain():
+        print("\nTo add your access keys:")
+        print(f"  1. On your computer, open this file in any text editor (TextEdit is fine):")
+        print(f"         {env_path}")
+        print("     (In Finder: press Cmd+Shift+G, paste the path above, press Enter.)")
+        print("  2. Paste each key after its = sign and save the file.")
+        print("  3. Tell your assistant you've saved it — it will check the keys work.")
+        print("  Never paste a key into the chat itself; it would be saved in the transcript.")
+
+    in_session_runtime = (Path("/mnt/skills").is_dir() or Path("/mnt/.remote-plugins").is_dir()
+                          or (Path.home() / "mnt").is_dir() or str(Path.home()).startswith("/sessions"))
     try:
-        if in_sandbox:
-            if connected:
-                print(f"\nOn your computer, open this file in any text editor and paste your keys in:")
-                print(f"    (your connected ARGO folder){str(env_path).replace(str(env_path.parents[1]), '', 1)}")
+        if in_session_runtime:
+            explain()
             return
         if sys.platform == "darwin":
-            subprocess.run(["open", "-t", str(env_path)], check=False, timeout=10)
+            subprocess.run(["open", "-t", str(env_path)], check=False, timeout=10,
+                           stderr=subprocess.DEVNULL)
             print(f"\nOpened {env_path.name} in your text editor — paste your keys in and save.")
         elif shutil.which("xdg-open"):
-            subprocess.run(["xdg-open", str(env_path)], check=False, timeout=10)
+            subprocess.run(["xdg-open", str(env_path)], check=False, timeout=10,
+                           stderr=subprocess.DEVNULL)
             print(f"\nOpened {env_path.name} — paste your keys in and save.")
+        else:
+            explain()
     except Exception:
-        pass
+        explain()
 
 
 def find_connected_workspace(mnt: "Path | None" = None) -> "Path | None":
