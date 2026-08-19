@@ -23,7 +23,7 @@ The scripts are bundled in this skill's own `scripts/` folder. Locate and run th
 never by a hardcoded path, because every environment lays skills out differently:
 
 ```bash
-SETUP=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins ~/skills -name argo_setup.py 2>/dev/null | head -1)
+SETUP=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins ~/skills -name argo_setup.py 2>/dev/null | head -1)
 python3 "$SETUP" --ensure
 ```
 
@@ -43,7 +43,7 @@ If the settings file exists and this task will touch REDCap directly, check the 
 building anything on them:
 
 ```bash
-CLIENT=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins ~/skills -name argo_redcap_client.py 2>/dev/null | head -1)
+CLIENT=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins ~/skills -name argo_redcap_client.py 2>/dev/null | head -1)
 python3 "$CLIENT" --check
 ```
 
@@ -55,7 +55,7 @@ failures in plain language; they're already written for it.
 This bootstrap doesn't do the work itself. Look for the plugin suite:
 
 ```bash
-find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -path "*start-here/SKILL.md" 2>/dev/null | head -1
+find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -path "*start-here/SKILL.md" 2>/dev/null | head -1
 ```
 
 - **Found** → read that file and follow its routing table: it matches what the user said to the

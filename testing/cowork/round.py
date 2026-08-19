@@ -23,8 +23,11 @@ import time
 from pathlib import Path
 
 WORKSPACE = Path.home() / "Desktop" / "ARGO-cowork"
-BASELINE = WORKSPACE / ".baseline"
-ROUNDS = Path.home() / "Desktop" / "ARGO-cowork-rounds"   # reports live OUTSIDE the workspace
+ROUNDS = Path.home() / "Desktop" / "ARGO-cowork-rounds"   # reports + baseline, OUTSIDE the workspace
+# The baseline holds REAL KEYS — it must never live inside the connected workspace,
+# because a connected folder is readable in full by every session. Round 1 proved it:
+# the session found .baseline/env-with-keys and helpfully merged the keys in.
+BASELINE = ROUNDS / "baseline"
 STORE = Path.home() / "Library" / "Application Support" / "Claude" / "local-agent-mode-sessions"
 STATE = BASELINE / "round-state.json"
 
@@ -99,10 +102,9 @@ def prepare(role: str) -> int:
     if not BASELINE.is_dir():
         sys.exit(f"No baseline at {BASELINE} — stage it first (env-with-keys + fixtures/).")
 
-    # Reset: everything in the workspace goes except the baseline itself.
+    # Reset: the workspace is wiped completely — the baseline lives outside it.
+    WORKSPACE.mkdir(exist_ok=True)
     for item in WORKSPACE.iterdir():
-        if item.name == ".baseline":
-            continue
         shutil.rmtree(item) if item.is_dir() else item.unlink()
 
     staged = []

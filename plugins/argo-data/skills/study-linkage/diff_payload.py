@@ -39,7 +39,7 @@ def _add_argo_core_to_path():
                      parent / "argo-core" / "scripts"):
             if (cand / marker).exists():
                 sys.path.insert(0, str(cand)); return
-    for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/.claude/plugins", "~/.claude/plugins/cache"):
+    for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/mnt", "~/.claude/plugins", "~/.claude/plugins/cache"):
         base = Path(root).expanduser()
         if base.is_dir():
             hits = list(base.glob(f"**/{marker}"))

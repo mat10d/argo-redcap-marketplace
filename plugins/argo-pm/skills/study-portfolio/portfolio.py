@@ -71,7 +71,7 @@ def _load_trackers():
             if core:
                 break
     if core is None:
-        for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/.claude/plugins", "~/.claude/plugins/cache"):
+        for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/mnt", "~/.claude/plugins", "~/.claude/plugins/cache"):
             base = Path(root).expanduser()
             if base.is_dir():
                 hits = list(base.glob(f"**/{marker}"))
@@ -303,7 +303,7 @@ def find_argo_core() -> "str | None":
             if (candidate / marker).exists():
                 return str(candidate)
 
-    for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/.claude/plugins", "~/.claude/plugins/cache"):
+    for root in ("/mnt/.remote-plugins", "/mnt/skills", "~/mnt", "~/.claude/plugins", "~/.claude/plugins/cache"):
         base = Path(root).expanduser()
         if base.is_dir():
             hits = list(base.glob(f"**/{marker}"))

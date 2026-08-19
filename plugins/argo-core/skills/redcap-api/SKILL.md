@@ -85,7 +85,7 @@ curl -X POST "$REDCAP_URL" \
 time. It costs one line when set up, and does the whole first-time setup when not:
 
 ```bash
-SETUP=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name argo_setup.py 2>/dev/null | head -1)
+SETUP=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name argo_setup.py 2>/dev/null | head -1)
 python3 "$SETUP" --ensure
 ```
 

@@ -65,6 +65,7 @@ class ProjectMismatch(RedcapError):
 PLUGIN_ROOTS = (
     "/mnt/.remote-plugins",   # Cowork: opaque plugin_<id> dirs, read-only
     "/mnt/skills",            # chat containers: /mnt/skills/plugins/<name>/, writable
+    "~/mnt",                  # local agent mode: HOME=/sessions/<name>, skills under ~/mnt/.claude/skills/
     "~/.claude/plugins",      # Claude Code
     "~/.claude/plugins/cache",
 )
@@ -141,12 +142,12 @@ def load_env_file(explicit: str | None = None) -> "Path | None":
     for base in [Path.cwd()] + list(Path.cwd().parents)[:2]:
         candidates += [base / ".argo" / ".env", base / "argo.env", base / ".env"]
     # Mounted folders in a sandboxed environment.
-    mnt = Path("/mnt")
-    if mnt.is_dir():
-        for entry in sorted(mnt.iterdir()):
-            if entry.is_dir() and not entry.name.startswith("."):
-                candidates += [entry / ".argo" / ".env", entry / "argo.env", entry / ".env",
-                               entry / "argo-work" / ".env"]  # a connected ARGO workspace folder
+    for mnt in (Path("/mnt"), Path.home() / "mnt"):   # cloud sandboxes and local agent mode
+        if mnt.is_dir():
+            for entry in sorted(mnt.iterdir()):
+                if entry.is_dir() and not entry.name.startswith("."):
+                    candidates += [entry / ".argo" / ".env", entry / "argo.env", entry / ".env",
+                                   entry / "argo-work" / ".env"]  # a connected ARGO workspace folder
 
     for path in candidates:
         try:

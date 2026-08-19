@@ -18,7 +18,7 @@ Before anything else, run the setup check. It costs one line if they're already 
 the whole first-time setup (loudly, with instructions) if not:
 
 ```bash
-SETUP=$(find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name argo_setup.py 2>/dev/null | head -1)
+SETUP=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name argo_setup.py 2>/dev/null | head -1)
 python3 "$SETUP" --ensure
 ```
 
@@ -70,7 +70,7 @@ Full decision record for who holds which key: [[access-tiers]].
 
 - Scripts live in different places per environment. Always locate them by search, never by a
   hardcoded or relative path:
-  `find /mnt/.remote-plugins /mnt/skills ~/.claude/plugins -name <script>.py 2>/dev/null | head -1`
+  `find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name <script>.py 2>/dev/null | head -1`
 - Shell state does not persist between commands anywhere ARGO runs. Any `source` must be combined
   with the command that uses it, in one line.
 - If a script says it can't reach REDCap or can't find the shared ARGO code, run the setup check

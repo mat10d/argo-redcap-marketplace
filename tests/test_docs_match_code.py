@@ -157,7 +157,7 @@ class TestHeadlessSafe(unittest.TestCase):
         self.assertTrue(locators, "expected at least one argo-core locator")
         # Every root any environment has ever needed. When a new layout appears, add it here
         # and the test forces it into every locator copy at once.
-        REQUIRED_ROOTS = ("/mnt/.remote-plugins", "/mnt/skills", "~/.claude/plugins")
+        REQUIRED_ROOTS = ("/mnt/.remote-plugins", "/mnt/skills", "~/mnt", "~/.claude/plugins")
         for py in locators:
             text = py.read_text()
             for root in REQUIRED_ROOTS:

@@ -248,7 +248,18 @@ def open_settings_file(env_path: Path, connected: bool = False) -> None:
         pass
 
 
-def find_connected_workspace(mnt: Path = Path("/mnt")) -> "Path | None":
+def find_connected_workspace(mnt: "Path | None" = None) -> "Path | None":
+    if mnt is None:
+        # Cloud sandboxes mount at /mnt; local agent mode mounts at ~/mnt.
+        for root in (Path("/mnt"), Path.home() / "mnt"):
+            found = find_connected_workspace(root)
+            if found:
+                return found
+        return None
+    return _find_connected_workspace_in(mnt)
+
+
+def _find_connected_workspace_in(mnt: Path) -> "Path | None":
     """A folder the user connected for ARGO work, if one can be identified.
 
     Cowork's standing instruction to the team: create a folder on your computer for ARGO work
