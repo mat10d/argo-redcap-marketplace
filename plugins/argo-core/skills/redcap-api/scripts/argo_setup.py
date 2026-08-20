@@ -378,8 +378,8 @@ def ensure(work_dir: "Path | None" = None) -> int:
     if env_path is None:
         return 1
     print("=" * 64)
-    print(" FIRST-TIME SETUP — one thing to do before ARGO tools can")
-    print(" talk to REDCap.")
+    print(f" FIRST-TIME SETUP — one thing to do before ARGO tools can")
+    print(f" talk to REDCap.  (ARGO toolkit {TOOLKIT_VERSION})")
     print()
     print(" I created your settings file:")
     print()

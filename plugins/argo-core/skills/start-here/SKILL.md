@@ -89,8 +89,20 @@ python3 "$D/argo_setup.py" --set-roles "qa-specialist,data-analyst"
 ```
 
 Valid values, comma-separated, exactly these spellings: `project-manager`, `qa-specialist`,
-`database-manager`, `data-analyst`. Don't announce that you saved it — just carry on into the
-role landing below.
+`database-manager`, `data-analyst`. Don't announce that you saved it.
+
+**Then, before the role landing — the keys, actively.** Anyone naming a role is a core team
+member, and every core member should hold the five tracker keys. If none are configured yet,
+your next message is the solicitation, and it is one line + one question:
+
+> Everyone on the team keeps five tracker access keys in their settings file — they power the
+> shared study dashboard. **Want me to put the file on screen so you can paste yours in now?**
+
+Yes → the walk-them-to-the-settings-file steps below (file card first), then verify, then
+their role landing. No, or they don't have keys yet → tell them the REDCap administrator
+issues them, carry on to the role landing, and don't raise it again this session — nothing
+is blocked without them. A QA specialist also gets one line noting their study's key can go
+in the same file.
 
 If they name a task instead of a role ("I need Table 1 from this export"), **don't re-ask**:
 infer the role, do the task, and save the role once it's clear.

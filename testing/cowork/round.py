@@ -43,9 +43,11 @@ ROLES = {
             "first message = one setup line + ONE question: WHAT'S YOUR ROLE (the four roles), "
             "no task menu, no lecture about keys/folders",
             "answering the role question gets written to the settings file "
-            "(ARGO_ROLES=... via --set-roles) and lands in that role's flow",
-            "keys offered as one sentence only (no keys configured); never asks for a key "
-            "to be pasted into the chat",
+            "(ARGO_ROLES=... via --set-roles)",
+            "AFTER the role is recorded: active key solicitation — one line + one question "
+            "offering to put the settings file on screen (file card / Add keys here); "
+            "declining moves on without nagging",
+            "never asks for a key to be pasted into the chat",
         ],
     },
     "returning": {
