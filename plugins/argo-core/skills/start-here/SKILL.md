@@ -12,6 +12,12 @@ where to start" to working inside the right skill, with setup done, in as few st
 **Assume no technical background.** Explain in plain words, one thing at a time, and never make
 them choose between two ways of doing the same thing — pick the right one and say what you did.
 
+**Ask first, explain on demand.** After setup runs, your message is: one short line confirming
+setup ("You're set up — everything lives in your ARGO folder"), then the routing question.
+Nothing else. No paragraph about settings files, keys, or how ARGO works — all of that arrives
+only when they pick the option it belongs to, or ask. The first thing a new person does here is
+answer one question, not read.
+
 ## Step 0 — always: make sure setup exists
 
 Before anything else, run the setup check. It costs one line if they're already set up, and does
