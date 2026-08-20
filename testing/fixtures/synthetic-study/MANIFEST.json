@@ -1,0 +1,412 @@
+{
+  "contract_version": 1,
+  "data_dictionary": {
+    "amber_field": "adjuvant_therapy",
+    "amber_logic": "datediff([dx_date],[surgery_date],'d') > 30",
+    "branching_shapes": {
+      "and_combo": {
+        "field": "chemo_cycles",
+        "logic": "[adjuvant_therapy] = '1' AND [surgery_done] = 1"
+      },
+      "checkbox": {
+        "field": "bleeding_severity",
+        "logic": "[symptoms(3)] = 1"
+      },
+      "numeric_comparison": {
+        "field": "alcohol_use",
+        "logic": "[age] >= 18"
+      },
+      "or_combo": {
+        "field": "support_needed",
+        "logic": "[follow_status] = '2' OR [follow_status] = '4'"
+      },
+      "quoted": {
+        "field": "pregnancy_status",
+        "logic": "[sex] = '2'"
+      },
+      "unparseable": {
+        "field": "adjuvant_therapy",
+        "logic": "datediff([dx_date],[surgery_date],'d') > 30"
+      },
+      "unquoted": {
+        "field": "dx_date",
+        "logic": "[consented] = 1"
+      }
+    },
+    "checkbox_field": "symptoms",
+    "forms": {
+      "clinical": 20,
+      "demographics": 14,
+      "follow_up": 11
+    },
+    "mdc_field_note_field": "occupation",
+    "mdc_select_fields": [
+      "histology_grade",
+      "adjuvant_therapy"
+    ],
+    "n_fields": 45
+  },
+  "linkage": {
+    "histology_grade": {
+      "both_blank": 4,
+      "conflict": 7,
+      "missing_from_source": 5,
+      "no_op": 164,
+      "safe_fill": 12,
+      "sentinel_redcap_source_blank": 8
+    },
+    "margin_status": {
+      "both_blank": 2,
+      "conflict": 5,
+      "missing_from_source": 5,
+      "no_op": 180,
+      "safe_fill": 8
+    },
+    "missing_from_source_ids": [
+      "SYN-0196",
+      "SYN-0197",
+      "SYN-0198",
+      "SYN-0199",
+      "SYN-0200"
+    ],
+    "orphan_rows": 5,
+    "source_rows_total": 200
+  },
+  "qa": {
+    "applicable_but_blank": {
+      "bleeding_severity": {
+        "site_alpha": 7,
+        "site_beta": 4
+      },
+      "histology_grade": {
+        "site_alpha": 10,
+        "site_beta": 6
+      },
+      "margin_status": {
+        "site_alpha": 6,
+        "site_beta": 4
+      },
+      "pregnancy_status": {
+        "site_alpha": 8,
+        "site_beta": 5
+      },
+      "recurrence_site": {
+        "site_alpha": 5,
+        "site_beta": 3
+      }
+    },
+    "engineered_cell_ids": {
+      "adjuvant_therapy_sentinel": {
+        "site_alpha": [
+          "SYN-0041",
+          "SYN-0042",
+          "SYN-0043",
+          "SYN-0044",
+          "SYN-0045",
+          "SYN-0046",
+          "SYN-0047",
+          "SYN-0048",
+          "SYN-0049"
+        ],
+        "site_beta": [
+          "SYN-0161",
+          "SYN-0162",
+          "SYN-0163",
+          "SYN-0164",
+          "SYN-0165",
+          "SYN-0166"
+        ]
+      },
+      "bleeding_severity": {
+        "site_alpha": [
+          "SYN-0006",
+          "SYN-0007",
+          "SYN-0009",
+          "SYN-0013",
+          "SYN-0014",
+          "SYN-0015",
+          "SYN-0017"
+        ],
+        "site_beta": [
+          "SYN-0122",
+          "SYN-0123",
+          "SYN-0124",
+          "SYN-0125"
+        ]
+      },
+      "histology_grade": {
+        "site_alpha": [
+          "SYN-0001",
+          "SYN-0002",
+          "SYN-0003",
+          "SYN-0004",
+          "SYN-0005",
+          "SYN-0006",
+          "SYN-0007",
+          "SYN-0008",
+          "SYN-0009",
+          "SYN-0010"
+        ],
+        "site_beta": [
+          "SYN-0121",
+          "SYN-0122",
+          "SYN-0123",
+          "SYN-0124",
+          "SYN-0125",
+          "SYN-0126"
+        ]
+      },
+      "histology_grade_sentinel": {
+        "site_alpha": [
+          "SYN-0031",
+          "SYN-0032",
+          "SYN-0033",
+          "SYN-0034",
+          "SYN-0035"
+        ],
+        "site_beta": [
+          "SYN-0147",
+          "SYN-0148",
+          "SYN-0149"
+        ]
+      },
+      "margin_status": {
+        "site_alpha": [
+          "SYN-0013",
+          "SYN-0014",
+          "SYN-0015",
+          "SYN-0016",
+          "SYN-0017",
+          "SYN-0018"
+        ],
+        "site_beta": [
+          "SYN-0133",
+          "SYN-0134",
+          "SYN-0135",
+          "SYN-0136"
+        ]
+      },
+      "pregnancy_status": {
+        "site_alpha": [
+          "SYN-0001",
+          "SYN-0002",
+          "SYN-0004",
+          "SYN-0005",
+          "SYN-0008",
+          "SYN-0009",
+          "SYN-0011",
+          "SYN-0012"
+        ],
+        "site_beta": [
+          "SYN-0121",
+          "SYN-0122",
+          "SYN-0123",
+          "SYN-0126",
+          "SYN-0127"
+        ]
+      },
+      "recurrence_site": {
+        "site_alpha": [
+          "SYN-0002",
+          "SYN-0003",
+          "SYN-0011",
+          "SYN-0012",
+          "SYN-0013"
+        ],
+        "site_beta": [
+          "SYN-0124",
+          "SYN-0125",
+          "SYN-0130"
+        ]
+      }
+    },
+    "expected_worklists": {
+      "clinical_core": {
+        "site_alpha/no_MDC": {
+          "amber_cells_per_field": {
+            "adjuvant_therapy": 0,
+            "bleeding_severity": 0,
+            "histology_grade": 0,
+            "margin_status": 0
+          },
+          "amber_cells_total": 0,
+          "rows_with_work": 16,
+          "yellow_cells_per_field": {
+            "adjuvant_therapy": 0,
+            "bleeding_severity": 7,
+            "histology_grade": 10,
+            "margin_status": 6
+          },
+          "yellow_cells_total": 23
+        },
+        "site_alpha/with_MDC": {
+          "amber_cells_per_field": {
+            "adjuvant_therapy": 9,
+            "bleeding_severity": 0,
+            "histology_grade": 0,
+            "margin_status": 0
+          },
+          "amber_cells_total": 9,
+          "rows_with_work": 30,
+          "yellow_cells_per_field": {
+            "adjuvant_therapy": 0,
+            "bleeding_severity": 7,
+            "histology_grade": 15,
+            "margin_status": 6
+          },
+          "yellow_cells_total": 28
+        },
+        "site_beta/no_MDC": {
+          "amber_cells_per_field": {
+            "adjuvant_therapy": 0,
+            "bleeding_severity": 0,
+            "histology_grade": 0,
+            "margin_status": 0
+          },
+          "amber_cells_total": 0,
+          "rows_with_work": 10,
+          "yellow_cells_per_field": {
+            "adjuvant_therapy": 0,
+            "bleeding_severity": 4,
+            "histology_grade": 6,
+            "margin_status": 4
+          },
+          "yellow_cells_total": 14
+        },
+        "site_beta/with_MDC": {
+          "amber_cells_per_field": {
+            "adjuvant_therapy": 6,
+            "bleeding_severity": 0,
+            "histology_grade": 0,
+            "margin_status": 0
+          },
+          "amber_cells_total": 6,
+          "rows_with_work": 19,
+          "yellow_cells_per_field": {
+            "adjuvant_therapy": 0,
+            "bleeding_severity": 4,
+            "histology_grade": 9,
+            "margin_status": 4
+          },
+          "yellow_cells_total": 17
+        }
+      },
+      "demo_followup": {
+        "site_alpha/no_MDC": {
+          "amber_cells_per_field": {
+            "pregnancy_status": 0,
+            "recurrence_site": 0
+          },
+          "amber_cells_total": 0,
+          "rows_with_work": 10,
+          "yellow_cells_per_field": {
+            "pregnancy_status": 8,
+            "recurrence_site": 5
+          },
+          "yellow_cells_total": 13
+        },
+        "site_alpha/with_MDC": {
+          "amber_cells_per_field": {
+            "pregnancy_status": 0,
+            "recurrence_site": 0
+          },
+          "amber_cells_total": 0,
+          "rows_with_work": 10,
+          "yellow_cells_per_field": {
+            "pregnancy_status": 8,
+            "recurrence_site": 5
+          },
+          "yellow_cells_total": 13
+        },
+        "site_beta/no_MDC": {
+          "amber_cells_per_field": {
+            "pregnancy_status": 0,
+            "recurrence_site": 0
+          },
+          "amber_cells_total": 0,
+          "rows_with_work": 8,
+          "yellow_cells_per_field": {
+            "pregnancy_status": 5,
+            "recurrence_site": 3
+          },
+          "yellow_cells_total": 8
+        },
+        "site_beta/with_MDC": {
+          "amber_cells_per_field": {
+            "pregnancy_status": 0,
+            "recurrence_site": 0
+          },
+          "amber_cells_total": 0,
+          "rows_with_work": 8,
+          "yellow_cells_per_field": {
+            "pregnancy_status": 5,
+            "recurrence_site": 3
+          },
+          "yellow_cells_total": 8
+        }
+      }
+    },
+    "not_applicable_blanks": {
+      "bleeding_severity": {
+        "site_alpha": 76,
+        "site_beta": 40
+      },
+      "dx_date": {
+        "site_alpha": 2,
+        "site_beta": 2
+      },
+      "pregnancy_status": {
+        "site_alpha": 44,
+        "site_beta": 45
+      },
+      "recurrence_site": {
+        "site_alpha": 81,
+        "site_beta": 52
+      },
+      "surgery_date": {
+        "site_alpha": 18,
+        "site_beta": 12
+      }
+    },
+    "sentinel_cells": {
+      "adjuvant_therapy": {
+        "site_alpha": 9,
+        "site_beta": 6
+      },
+      "histology_grade": {
+        "site_alpha": 5,
+        "site_beta": 3
+      }
+    },
+    "sentinel_codes": [
+      "-666",
+      "-777",
+      "-888",
+      "-999"
+    ],
+    "target_fields": [
+      "pregnancy_status",
+      "bleeding_severity",
+      "histology_grade",
+      "margin_status",
+      "adjuvant_therapy",
+      "recurrence_site"
+    ]
+  },
+  "study": {
+    "dags": {
+      "site_alpha": 120,
+      "site_beta": 80
+    },
+    "n_records": 200,
+    "nonconsented_ids": [
+      "SYN-0110",
+      "SYN-0111",
+      "SYN-0195",
+      "SYN-0196"
+    ],
+    "record_id_field": "syn_id",
+    "title": "SYN \u2014 Synthetic Colorectal Cohort (SYNTHETIC TEST STUDY)"
+  },
+  "synthetic": true
+}

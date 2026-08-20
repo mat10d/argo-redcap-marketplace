@@ -1,0 +1,9 @@
+# SYNTHETIC TEST STUDY fixture — build_worklists config for the SYN cohort.
+# Two workbooks over the six QA target fields (mixed forms).
+workbooks:
+  - name: clinical_core
+    title: Clinical Core
+    fields: [bleeding_severity, histology_grade, margin_status, adjuvant_therapy]
+  - name: demo_followup
+    title: Demographics and Follow-up
+    fields: [pregnancy_status, recurrence_site]

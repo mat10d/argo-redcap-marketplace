@@ -348,12 +348,12 @@ def missing_and_certainty_for(field: str, raw_row: pd.Series, meta_by: dict,
             if (k == field or k.startswith(f"{field}___")) and str(raw_row.get(k, "")) == "1"
         ]
         if not ticked:
-            return True
-        return flag_sentinels and all(t in SENTINEL_CODES for t in ticked)
+            return True, certain
+        return flag_sentinels and all(t in SENTINEL_CODES for t in ticked), certain
     val = str(raw_row.get(field, "")).strip()
     if val == "":
-        return True
-    return flag_sentinels and val in SENTINEL_CODES
+        return True, certain
+    return flag_sentinels and val in SENTINEL_CODES, certain
 
 
 def build_workbook(labeled: pd.DataFrame, raw_by_id: dict, meta_by: dict,
