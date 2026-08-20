@@ -20,7 +20,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 PLUGINS = REPO / "plugins"
 os.environ.setdefault("ARGO_SETUP_NO_OPEN", "1")  # suites must not pop text editors
-PORTFOLIO_DIR = PLUGINS / "argo-pm/skills/study-portfolio"
+PORTFOLIO_DIR = PLUGINS / "argo-project-manager/skills/monitor-studies"
 
 
 def load_portfolio():
@@ -156,9 +156,9 @@ class TestHeadlessSafe(unittest.TestCase):
 
 
 class TestVersionsAreInStep(unittest.TestCase):
-    """All six plugins and the marketplace share one version — they release as one unit.
+    """All five plugins and the marketplace share one version — they release as one unit.
 
-    argo-core ships the shared REDCap client that build/data/pm/qa import, so a mix of old and
+    argo-core ships the shared REDCap client that every role plugin vendors, so a mix of old and
     new plugins isn't a supported combination. Separate numbers would imply an independence that
     doesn't exist. Bumping everything each release also guarantees update-detection fires, which
     keys off the version field.
@@ -183,6 +183,23 @@ class TestVersionsAreInStep(unittest.TestCase):
             "Plugin versions have drifted apart. They ship as one unit — run "
             f"`python3 release.py --set <version>`. Found: {found}",
         )
+
+    def test_marketplace_descriptions_mirror_plugin_json(self):
+        """The marketplace's per-plugin descriptions are a copy of each plugin.json's
+        description, synced by release.py — a hand-edited third copy would silently drift."""
+        import json
+        plugin_desc = {}
+        for manifest in sorted(REPO.glob("plugins/*/.claude-plugin/plugin.json")):
+            data = json.loads(manifest.read_text())
+            plugin_desc[data.get("name", manifest.parents[1].name)] = data.get("description", "")
+        market = json.loads((REPO / ".claude-plugin" / "marketplace.json").read_text())
+        for entry in market.get("plugins", []):
+            name = entry.get("name")
+            if name in plugin_desc:
+                self.assertEqual(
+                    entry.get("description", ""), plugin_desc[name],
+                    f"marketplace.json's description for {name} drifted from its plugin.json — "
+                    "edit plugin.json and run release.py; never hand-edit marketplace.json")
 
     def test_runtime_stamp_matches(self):
         import re as _re
@@ -318,7 +335,7 @@ class TestSetupIsSafe(unittest.TestCase):
                          "the settings file must be readable only by its owner")
         self.assertIn(".env", (work / ".gitignore").read_text(),
                       "the settings file must be git-ignored so keys can't be committed")
-        for sub in ("exports", "worklists", "builds", "analysis", "pm"):
+        for sub in ("project-manager", "qa-specialist", "database-manager", "data-analyst"):
             self.assertTrue((work / sub).is_dir(), f"workspace is missing {sub}/")
 
     def test_setup_never_overwrites_existing_keys(self):

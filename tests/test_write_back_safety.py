@@ -2,7 +2,7 @@
 """Unit tests for ARGO's core write-back guarantee: computed values only ever fill blanks.
 
 This is the rule that stands between a linkage run and overwriting real clinical data. It used to
-be implemented twice — once in study-linkage, once bespoke inside redcap-qa's push scripts — so it
+be implemented twice — once in link-data, once bespoke inside qa-worklists's push scripts — so it
 was verified twice, differently, and could drift. It now lives in argo-core/argo_diff.py, and
 this is where it's proven.
 

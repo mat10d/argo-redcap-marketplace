@@ -37,7 +37,7 @@ def load(path: Path, name: str, env: dict | None = None):
 
 CLIENT = load(PLUGINS / "argo-core/skills/redcap-api/scripts/argo_redcap_client.py", "argo_redcap_client")
 PORTFOLIO = load(
-    PLUGINS / "argo-pm/skills/study-portfolio/portfolio.py",
+    PLUGINS / "argo-project-manager/skills/monitor-studies/portfolio.py",
     "portfolio",
     {"ARGO_PM_ROOT": str(Path(os.environ.get("TMPDIR", "/tmp")) / "argo-test-pm")},
 )
@@ -71,8 +71,12 @@ class TestUrlValidation(unittest.TestCase):
             CLIENT.check_url(None)
         except CLIENT.RedcapError as e:
             text = str(e)
-        self.assertIn("~/.argo/.env", text)
+        # Must point at the settings file in words a non-technical user can act on —
+        # never at ~/.argo/.env, which doesn't exist in Cowork.
+        self.assertIn("settings file", text)
+        self.assertIn("Add keys here", text)
         self.assertIn("REDCAP_URL=", text)
+        self.assertNotIn("~/.argo/.env", text)
 
 
 class TestTokenMasking(unittest.TestCase):
@@ -165,7 +169,7 @@ class TestComputeDiff(unittest.TestCase):
 class TestRecordIdRangeParsing(unittest.TestCase):
     def setUp(self):
         self.backfill = load(
-            PLUGINS / "argo-build/skills/redcap-build/backfill_sir_from_csv.py",
+            PLUGINS / "argo-database-manager/skills/build-study/backfill_sir_from_csv.py",
             "backfill_sir_from_csv",
         )
 
@@ -190,7 +194,7 @@ class TestQaDryRunReceipts(unittest.TestCase):
 
     def setUp(self):
         self.push = load(
-            PLUGINS / "argo-qa/skills/redcap-qa/push_updates.py", "push_updates"
+            PLUGINS / "argo-qa-specialist/skills/qa-worklists/push_updates.py", "push_updates"
         )
         import tempfile
         self.tmp = tempfile.mkdtemp()

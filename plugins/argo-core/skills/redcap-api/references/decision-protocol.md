@@ -36,9 +36,9 @@ Any choice that affects:
 
 This convention applies to:
 - Importing external/historical data — every column→field translation that isn't 1:1
-- `argo-build/redcap-build` Path B — every audit finding with a non-obvious fix
-- `argo-build/redcap-admin` — every write to a live project
-- Any `argo-pm` skill that closes a ticket or modifies an admin REDCap
+- `argo-database-manager/build-study` Path B — every audit finding with a non-obvious fix
+- `argo-database-manager/manage-redcaps` — every write to a live project
+- Any `argo-project-manager` skill that closes a ticket or modifies an admin REDCap
 
 ## See also
 - [[record-id-safety]] — never modify the record ID field without confirmation

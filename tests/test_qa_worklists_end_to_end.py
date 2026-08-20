@@ -22,7 +22,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 FIXTURE = REPO / "testing" / "fixtures" / "synthetic-study"
-BUILDER = REPO / "plugins" / "argo-qa" / "skills" / "redcap-qa" / "build_worklists.py"
+BUILDER = REPO / "plugins" / "argo-qa-specialist" / "skills" / "qa-worklists" / "build_worklists.py"
 
 try:
     import openpyxl  # noqa: F401

@@ -5,12 +5,13 @@ description: Base conventions for talking to REDCap APIs across ARGO projects �
 
 # redcap-api
 
-Shared API conventions used by every other ARGO plugin. If you are reading this directly you probably want a more specific skill (`redcap-build`, `data-export`, `study-portfolio`, etc.), or [[start-here]] if you don't know which — but the rules below apply universally.
+Shared API conventions used by every other ARGO plugin. If you are reading this directly you probably want a more specific skill (`build-study`, `export-data`, `monitor-studies`, etc.), or [[start-here]] if you don't know which — but the rules below apply universally.
 
 ## Tokens are optional — never block on one
 
-REDCap tokens are scarce and admin-gated; requesting one per study doesn't scale. **No skill may
-hard-require a token.** Check whether a token for the target project is present — if it is, use the
+Study-project keys are scarce and admin-gated; requesting one per study doesn't scale, and the
+five admin-tracker keys — which everyone on the team holds — are the exception, not the model.
+**No skill may hard-require a token.** Check whether a token for the target project is present — if it is, use the
 API; if not, take the no-token path (work from an on-disk export/download and produce files the
 user applies in the REDCap UI) and say so. Never error out demanding a token. This is the single
 most important cross-cutting rule — see **[[token-optional]]** for the per-operation fallback table.
@@ -55,7 +56,7 @@ Truncate to last 4 chars when echoing. Never write tokens to files committed to 
 
 ## Reference tables
 
-These live in `references/` and are linked from skills in `argo-build`, `argo-pm`, etc. Update them here, not in the downstream skills:
+These live in `references/` and are linked from skills in `argo-database-manager`, `argo-project-manager`, etc. Update them here, not in the downstream skills:
 
 - [[token-optional]] — **cross-cutting:** use the API only when a token is present; else fall back to files + UI
 - [[access-tiers]] — **decision record:** which skills hold tokens, and which pathway wins at each fork
@@ -99,14 +100,14 @@ automatically the first time a token lookup finds no settings file at all. So ev
 without `--ensure` ends with a file to fill in, never a dead end.
 
 To set up a specific folder instead (e.g. a connected folder), the explicit form still exists.
-Nothing exists by default: there is no settings file until someone (or `--ensure`) makes one.
 
 ```bash
 python3 argo_setup.py --dir ~/argo-work          # local
 python3 argo_setup.py --dir /mnt/<folder>/argo-work   # a folder connected in Cowork
 ```
 
-It creates `exports/`, `worklists/`, `builds/`, `analysis/`, `pm/`, a `.gitignore`, and a `.env` holding the
+It creates one folder per ARGO role — `project-manager/`, `qa-specialist/`, `database-manager/`,
+`data-analyst/` — a `.gitignore`, and a `.env` holding the
 REDCap web address and any access keys — written `0600`, and never overwritten if it already
 exists. **The keys live in the working folder** so one connected folder is all anyone needs;
 `--separate-credentials` splits them out for anyone who wants a smaller footprint.
@@ -128,9 +129,11 @@ works and still wins.
 Before doing anything else on a new machine, or if a skill says it can't reach REDCap:
 
 ```bash
-set -a; source ~/.argo/.env; set +a
-python3 plugins/argo-core/skills/redcap-api/scripts/argo_redcap_client.py --check
+C=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name argo_redcap_client.py 2>/dev/null | head -1)
+python3 "$C" --check
 ```
+
+(No `source` line needed — the client finds the settings file itself.)
 
 This prints one line per configured project — its title, its record-ID field name, and whether the
 token works — and says plainly what to do about anything that fails. It never prints a full token.
@@ -142,8 +145,9 @@ full decision record.
 
 - **Shared Python client, not raw curl.** `argo_redcap_client.py` is the one HTTP path. Raw `curl`
   remains in docs only for humans debugging by hand.
-- **Credentials live in `~/.argo/.env`**, one variable per project, sourced with
-  `set -a; source ~/.argo/.env; set +a`. Only Tier 1 admin-tracker tokens are stored there; Tier 2
-  and Tier 3 study tokens are supplied per task and not kept between uses.
+- **Credentials live in the ARGO working folder's settings file** (`.env` inside it), one
+  variable per project. The tools find it themselves; `set -a; source <file>; set +a` still
+  works and still wins. Everyone holds the five tracker keys; a study key is added per QA
+  assignment ([[access-tiers]] Tier 2). Tier 3 write-back keys are still supplied per task.
 - **Token check ships as `--check` on the shared client** (above) rather than a separate slash
   command, so it lives next to the code it validates.

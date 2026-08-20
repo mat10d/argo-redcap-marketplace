@@ -50,7 +50,7 @@ The following field types do NOT need MDC:
 ## Other exemptions
 
 - **Record identifier** (first field in the DD) — does not need MDC
-- **Administrative / system fields** — fields like `hospital_site` that are set by the study team, not by the patient, do not need MDC. These are listed in `MDC_EXEMPT_VARS` in `argo-build/skills/redcap-build/validate_dd.py`.
+- **Administrative / system fields** — fields like `hospital_site` that are set by the study team, not by the patient, do not need MDC. These are listed in `MDC_EXEMPT_VARS` in `argo-database-manager/skills/build-study/validate_dd.py`.
 
 ## Prohibited field type: `yesno`
 
@@ -59,4 +59,4 @@ The following field types do NOT need MDC:
 1, Yes | 0, No | -666, Patient does not know | -777, Patient refused to answer | -888, Missing in case notes | -999, Other missing (add comment for reason missing)
 ```
 
-This is checked by `validate_dd.py` and is one of the most common audit findings in [[redcap-build]] Path B.
+This is checked by `validate_dd.py` and is one of the most common audit findings in [[build-study]] Path B.

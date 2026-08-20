@@ -1,8 +1,0 @@
-{
-  "name": "argo-build",
-  "version": "0.16.4",
-  "description": "Build REDCap studies end to end. redcap-build runs the whole pipeline from a submitted SIR \u2014 triage readiness, construct or audit the data dictionary, set up files, and flip the Study Tracker's build_tracking flags as each step lands. redcap-admin administers user rights and roles on live projects.",
-  "author": {
-    "name": "ARGO"
-  }
-}

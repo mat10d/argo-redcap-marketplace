@@ -40,10 +40,10 @@ is created and they land in their role.
 
 | Role | Does | Keys | Skills |
 |---|---|---|---|
-| **Project manager** | Monitors what studies exist; builds study documents for new studies; submits new study requests | 5 tracker keys | study-portfolio, study-setup |
-| **QA specialist** | Builds and audits RA worklists for their assigned study | 5 trackers + THEIR study's key | redcap-qa |
-| **Database manager** | Builds REDCaps, adds users, exports data, **links data (the big one)**. Entry = what requests are outstanding → routed to the steps to fulfil them | 5 trackers + study keys as needed | redcap-build, redcap-admin, data-export, study-linkage |
-| **Data analyst** | Standard REDCap outputs (downloaded, NO API key); cleaning, analysis, QA; linkage when merging >1 database for analysis; Stata/R/Python; figures | none | run-analysis (+study-linkage read-side) |
+| **Project manager** | Monitors what studies exist; builds study documents for new studies; submits new study requests | 5 tracker keys | monitor-studies, new-study-documents |
+| **QA specialist** | Builds and audits RA worklists for their assigned study | 5 trackers + THEIR study's key | qa-worklists |
+| **Database manager** | Builds REDCaps, adds users, exports data, **links data (the big one)**. Entry = what requests are outstanding → routed to the steps to fulfil them | 5 trackers + study keys as needed | build-study, manage-redcaps, export-data, link-data |
+| **Data analyst** | Standard REDCap outputs (downloaded, NO API key); cleaning, analysis, QA; linkage when merging >1 database for analysis; Stata/R/Python; figures | none | run-analysis (+link-data read-side) |
 
 **Decided:** workspace uses ROLE-NAMED folders — `project-manager/ qa-specialist/
 database-manager/ data-analyst/` — each role's outputs land in their own folder (skills'
@@ -69,7 +69,30 @@ as-is; roles are the routing layer. DB manager's front door is the REQUEST QUEUE
 data / linking requests from the trackers) → route into the fulfilment skill. RAs are not a
 role here — QA specialists build FOR them; keep the lightweight RA pointer.
 
-## Phase 1 — re-review + ROLE RESTRUCTURE (one batch, 0.17.0)
+## Phase 1 — re-review + ROLE RESTRUCTURE (one batch, 0.17.0) — DONE 2026-08-20
+
+Shipped as 0.17.0: three parallel whole-read reviews (argo-core; pm+qa; build+data+analysis)
+found and fixed — start-here rewritten role-first with `ARGO_ROLES=` memory and
+`--set-roles`; role-named workspace folders everywhere (scaffold, README, gitignore, every
+skill's write paths); qa-worklists rebuilt task-shaped (its audit task was buried inside the
+deprecated push section; push extracted to references/migration-push.md); manage-redcaps
+inverted to CSV-upload-first; all `${CLAUDE_PLUGIN_ROOT}` user commands replaced with
+locate-by-find; stale key policy purged everywhere (incl. the client's self-contradicting
+study-key blocks and a `--check`-without-`--dir` no-op bug); `open_requests.py` added as the
+DB-manager landing (metadata-driven queues over 221/222/223/224); marketplace descriptions now
+sync from plugin.json via release.py + drift test; SETUP.md and README rewritten. Remaining
+loose ends logged in testing/cowork/NITS.md.
+
+**Also in 0.17.0 (Matteo, mid-batch): one plugin per role.** argo-build + argo-data merged;
+plugins renamed to the roles in full — `argo-core`, `argo-project-manager`,
+`argo-qa-specialist`, `argo-database-manager`, `argo-data-analyst` — and skills renamed
+task-shaped: `monitor-studies`, `new-study-documents`, `qa-worklists`, `build-study`,
+`manage-redcaps` (widened: task 1 = monitor the core tracking REDCaps / outstanding requests
+via open_requests.py, task 2 = access management), `export-data`, `link-data`, `run-analysis`.
+ORG ACTION REQUIRED with the refresh: the managed-settings enabledPlugins list changed —
+five plugins now, new names (JSON in SETUP.md).
+
+## Phase 1 (original scope, for reference)
 
 The whole-read review AND the role-first entry, shipped together as one coherent version:
 start-here rewritten role-first; scaffold + README aligned; each role's landing experience
@@ -137,9 +160,9 @@ Protocol per round, no exceptions:
 | # | Round | Prompt | Pass |
 |---|---|---|---|
 | A | returning | "help me with ARGO" | one-liner incl. "five tracker keys connect" + stamp; NO add-keys option; routing question; nothing else |
-| B | analyst | staged CRC export → Table 1 | routes to run-analysis, no token talk, script + table in analysis/, no patient rows in chat |
-| C | qa | staged export + qa_fields.yaml → worklists | no-token path, per-DAG xlsx in worklists/, yellow/amber semantics correct |
-| D | builder | toy concept note → SOP + questionnaire docx | mines the note, [TODO]s not inventions, real .docx in builds/ |
+| B | analyst | staged synthetic export → Table 1 | routes to run-analysis, no key talk, script + table in data-analyst/, no record rows in chat |
+| C | qa | staged export + qa_fields.yaml → worklists | no-key path, per-DAG xlsx in qa-specialist/, yellow/amber semantics correct |
+| D | builder | toy concept note → SOP + questionnaire docx | mines the note, [TODO]s not inventions, real .docx in project-manager/new-studies/ |
 | E | repeat A + B once each | same | reproducibility — same result twice |
 
 PM/portfolio: already witnessed live in round 5's continuation; re-run only if time allows.

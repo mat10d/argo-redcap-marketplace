@@ -21,7 +21,7 @@ fixtures and from the code itself, so they can be run on any machine, including 
 
 ### The drift checks are the interesting ones
 
-`test_docs_match_code.py` exists because `study-portfolio`'s `SKILL.md` and `portfolio.py` had
+`test_docs_match_code.py` exists because `monitor-studies`'s `SKILL.md` and `portfolio.py` had
 quietly diverged in four separate ways at once — a missing tracker, wrong done-marker fields,
 wrong project titles, a wrong build-step count, and a snapshot path that described a file where
 the code writes a directory. Each was individually plausible and collectively meant the doc

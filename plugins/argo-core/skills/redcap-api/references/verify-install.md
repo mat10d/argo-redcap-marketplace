@@ -5,7 +5,7 @@ description: Repro checklist for confirming an ARGO plugin install actually work
 
 # Verification pass — run this in a fresh Cowork chat
 
-Confirms the v0.7.0 hardening against the **actually-installed** plugin copies, rather than
+Confirms an ARGO install works against the **actually-installed** plugin copies, rather than
 re-auditing from scratch. Every check below is designed to run in Cowork: no REDCap access keys,
 no `~/.argo/.env`, no writes to the plugin tree.
 
@@ -28,6 +28,17 @@ If that prints nothing, the plugins aren't installed in this session — stop, n
 Expected: a path ending in `/scripts`. In Cowork the parent directory will be an **opaque ID**
 like `plugin_01Nb88PFMeGYARWh6p7i7MV2`, *not* `argo-core` — that's the point of check 5.
 
+## 0. Version stamp — is this session even running the release you think?
+
+```bash
+U=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name argo_setup.py 2>/dev/null | head -1)
+python3 "$U" --ensure 2>&1 | grep -o 'ARGO toolkit [0-9.]*'
+```
+
+**Pass:** matches the version you just released. **Fail:** an older number — the org marketplace
+hasn't been refreshed, or this session started before the refresh. Stop; nothing else below is
+meaningful against stale code.
+
 ---
 
 ## 0. First-time setup
@@ -40,7 +51,7 @@ U=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name argo_set
 ```
 
 **Pass:** the first run explains itself and ends with "Nothing has been created yet"; the second
-creates `exports/ worklists/ builds/ analysis/ pm/`, a `.gitignore`, and a `.env` with permissions
+creates `project-manager/ qa-specialist/ database-manager/ data-analyst/`, a `.gitignore`, and a `.env` with permissions
 `-rw-------`. **Fail:** the no-argument run creates anything, or the `.env` is group/world
 readable.
 
@@ -87,8 +98,10 @@ normal Cowork state, so this is the most representative check of the three.
 P=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name portfolio.py 2>/dev/null | head -1); python3 "$P" --check 2>&1 | tail -15
 ```
 
-**Pass:** it finds argo-core across the plugin boundary, then explains that the REDCap web address
-isn't set, in plain language, naming `~/.argo/.env` and the exact line to add. Exit code 1.
+**Pass:** it finds argo-core across the plugin boundary, then either lists the trackers as
+"no access key set up (skipping)" or scaffolds a settings file and names it (the REDCap web
+address is pre-filled by setup, so it is never blank after that path runs). Exit code 1 with no
+keys configured.
 **Fail:** a `Traceback`, an `ImportError`, or a complaint about `ARGO_PM_ROOT` — that variable must
 no longer be required just to run `--check`.
 
@@ -178,7 +191,8 @@ T=$(find /mnt -name run_all.py -path '*tests*' 2>/dev/null | head -1); [ -n "$T"
 ## Checks that need an access key — skip in Cowork unless a credentials folder is connected
 
 These are Tier 1/2/3 paths ([[access-tiers]]). In Cowork they only run if a folder containing an
-`argo.env` has been connected; the client searches cwd, its parents, `/mnt/*`, and `ARGO_ENV_FILE`.
+`.env` (the file setup creates) has been connected; the client searches cwd, its parents,
+`/mnt/*`, and `ARGO_ENV_FILE`.
 **Connect a folder holding only that file** — connected folders are readable in full.
 
 | Check | Expected |

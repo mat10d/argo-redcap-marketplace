@@ -5,7 +5,7 @@ description: Consolidated gotchas from real ARGO builds. Every entry here is som
 
 # Build pitfalls
 
-This is the running list of mistakes we've made on real ARGO builds and the rules we now follow to avoid repeating them. Reference from `redcap-build` and `redcap-admin`.
+This is the running list of mistakes we've made on real ARGO builds and the rules we now follow to avoid repeating them. Reference from `build-study` and `manage-redcaps`.
 
 ## DD construction
 
@@ -83,7 +83,7 @@ Do not batch the per-step writes at the end of a build. Immediately after each c
 The 7 build_tracking flags: `project_created`, `dd_uploaded`, `user_rights_complete`, `data_imported` (radio: 1=Yes/2=Prospective-not-required), `review_internal`, `review_pi`, `study_production`.
 
 ### 14. SIR records can have stale data after submission
-PIs often submit before IRB approval lands ("Pending" `irb_number`, blank `irb_approval_expires`). Backfill the SIR record once the cert is received — see `sir_update.py` in redcap-build. Future analyses pulling the SIR for tracker context need the corrected values.
+PIs often submit before IRB approval lands ("Pending" `irb_number`, blank `irb_approval_expires`). Backfill the SIR record once the cert is received — see `sir_update.py` in build-study. Future analyses pulling the SIR for tracker context need the corrected values.
 
 ## Decision protocol
 
@@ -111,9 +111,9 @@ SIR's `pi_first_name` may contain "DR." or "PROF." — strip before deriving the
 
 | Skill | When to consult |
 |---|---|
-| `argo-build/redcap-build` Path A | Before starting a new DD construction — items 1, 2, 3, 4, 5 |
-| `argo-build/redcap-build` Path B | Before auditing an existing DD — items 1-5 plus 8, 11 |
+| `argo-database-manager/build-study` Path A | Before starting a new DD construction — items 1, 2, 3, 4, 5 |
+| `argo-database-manager/build-study` Path B | Before auditing an existing DD — items 1-5 plus 8, 11 |
 | Importing external/historical data | Before designing an import pass — items 6-11 |
-| `argo-build/redcap-build` (triage) | Before generating a paste box / triaging a SIR — items 12, 13, 14, 17, 18, 19 |
-| `argo-build/redcap-admin` | Before any live-project write — items 12, 13, 14 |
+| `argo-database-manager/build-study` (triage) | Before generating a paste box / triaging a SIR — items 12, 13, 14, 17, 18, 19 |
+| `argo-database-manager/manage-redcaps` | Before any live-project write — items 12, 13, 14 |
 | All skills | Item 15 + 16 (decision protocol) always applies |

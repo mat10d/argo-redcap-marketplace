@@ -5,7 +5,7 @@ description: ARGO's four standard REDCap user roles (Study Builder, PI, PM, Data
 
 # Standard ARGO roles
 
-Every ARGO cohort REDCap is set up with these four roles. Used by [[redcap-admin]] when standing up a new study or copying roles between studies.
+Every ARGO cohort REDCap is set up with these four roles. Used by [[manage-redcaps]] when standing up a new study or copying roles between studies.
 
 Placeholders to replace:
 - `<all_forms>` — every form in the target study, set to the indicated access level
@@ -13,7 +13,7 @@ Placeholders to replace:
 
 ## Access-level values
 
-See `redcap-admin` SKILL.md for the full form-access and form-export level tables.
+See `manage-redcaps` SKILL.md for the full form-access and form-export level tables.
 
 ---
 

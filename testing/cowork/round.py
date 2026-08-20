@@ -62,7 +62,7 @@ ROLES = {
         "expect": [
             "routes to run-analysis; never asks for a token",
             "finds both CSVs in the connected folder on its own",
-            "produces a saved, commented script + Table 1 in analysis/",
+            "produces a saved, commented script + Table 1 in data-analyst/",
             "no patient-level data pasted into the chat",
         ],
     },
@@ -71,8 +71,8 @@ ROLES = {
         "prompt": ("I'm doing QA for the CRC study. Using the export, data dictionary and "
                    "qa_fields.yaml in my connected folder, build the per-site RA worklists."),
         "expect": [
-            "routes to redcap-qa, uses the no-token --records-csv/--metadata-csv path",
-            "worklists written under worklists/, split by DAG",
+            "routes to qa-worklists, uses the no-token --records-csv/--metadata-csv path",
+            "worklists written under qa-specialist/, split by DAG",
             "yellow = confirmed gap; amber only if a condition couldn't be read",
             "unparseable branching conditions listed at the end, if any",
         ],
@@ -80,12 +80,12 @@ ROLES = {
     "builder": {
         "env": True, "fixtures": ["concept-note-toy.md"],
         "prompt": ("A new study concept note is in my connected folder — draft the study SOP "
-                   "and the questionnaire proforma from it as Word documents, into builds/."),
+                   "and the questionnaire proforma from it as Word documents."),
         "expect": [
-            "routes to study-setup; mines the concept note instead of interviewing",
+            "routes to new-study-documents; mines the concept note instead of interviewing",
             "unknown facts become [TODO], never invented",
             "notes it's using markdown skeletons unless official templates are reachable",
-            "real .docx files land in builds/",
+            "real .docx files land in project-manager/new-studies/",
         ],
     },
     "pm": {
@@ -93,7 +93,7 @@ ROLES = {
         "prompt": ("I'm the ARGO program manager. Give me the weekly portfolio update across "
                    "the admin trackers."),
         "expect": [
-            "routes to study-portfolio; finds the .env in the connected folder",
+            "routes to monitor-studies; finds the .env in the connected folder",
             "if the sandbox has network: dashboard for all 5 trackers, keys never printed",
             "if egress is blocked: says it's an org restriction, NOT a bad key",
             "snapshot lands in the workspace or names where it went",

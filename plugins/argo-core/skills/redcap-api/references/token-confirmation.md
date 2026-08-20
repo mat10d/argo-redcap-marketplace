@@ -1,17 +1,25 @@
----
-name: token-confirmation
-description: Before any API call that modifies a REDCap project, confirm the token points at the intended project.
----
-
 # Token confirmation
 
-Multiple ARGO projects (admin REDCaps, four cohort REDCaps, dev/staging copies) share an API endpoint. The only thing distinguishing them is the token. A wrong token can silently destroy data in the wrong project.
+Many ARGO projects share one API endpoint. The only thing distinguishing them is the access
+key. A wrong key can silently write to the wrong project.
 
-**Before any write (`record import`, `metadata import`, `user import`, `file delete`, etc.):**
+**This is enforced in code, not by convention.** Every write method on the shared client
+(`import_records`, `import_records_csv`, `import_metadata`) calls `confirm_project()` before
+posting. Your job as a script author is one thing:
 
-1. Call `content=project` to fetch project info
-2. Echo `project_title` and `project_id` back to the user
-3. Wait for explicit confirmation
-4. Only then proceed
+**Pass `expect_pid=` (preferred — a project number is unambiguous) or `expect_title=` to every
+write call.** Omit it and the write is unguarded.
 
-This rule applies to every plugin in this marketplace. See [[record-id-safety]] for the parallel field-name rule.
+```python
+client.import_records(payload, expect_pid="224")             # best
+client.import_records(payload, expect_title="Study Tracker")  # acceptable
+```
+
+On mismatch the client raises `ProjectMismatch` with "Stopping before making any changes" and
+nothing is posted. An exact title match passes silently; a partial match passes with a warning.
+
+Do not re-implement this check per script, and do not substitute a prose "confirm with the
+user" step for it.
+
+See [[record-id-safety]] for the parallel field-name rule, [[access-tiers]] for the decision
+record.

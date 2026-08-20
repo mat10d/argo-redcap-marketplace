@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-BW = REPO / "plugins/argo-qa/skills/redcap-qa/build_worklists.py"
+BW = REPO / "plugins/argo-qa-specialist/skills/qa-worklists/build_worklists.py"
 
 
 def load():

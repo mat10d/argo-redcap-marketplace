@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Set the version of every ARGO plugin and the marketplace, together.
 
-All six plugins carry the SAME version as the marketplace. They are released as one unit
-because they behave as one unit: argo-core ships the shared REDCap client that argo-build,
-argo-data, argo-pm and argo-qa all import. A mix of old and new plugins is not a supported
-combination, so giving them separate version numbers would describe an independence that
-doesn't exist.
+All five plugins carry the SAME version as the marketplace. They are released as one unit
+because they behave as one unit: argo-core ships the shared REDCap client that every role
+plugin vendors and imports. A mix of old and new plugins is not a supported combination, so
+giving them separate version numbers would describe an independence that doesn't exist.
 
 There is a second, practical reason. Marketplace update-detection keys off the version field,
 and a session's plugin copies are an immutable snapshot taken when the conversation starts. A
@@ -71,12 +70,12 @@ SCRIPTS_SOURCE = REPO / "plugins/argo-core/skills/redcap-api/scripts"
 # "the folder I'm standing in", identical in every environment, and the four locator bugs
 # (name-globbing, lexical version sort, /mnt/skills, ~/mnt) become structurally impossible.
 VENDOR_TARGETS = [
-    REPO / "plugins/argo-build/skills/redcap-build/scripts",
-    REPO / "plugins/argo-data/skills/data-export/scripts",
-    REPO / "plugins/argo-data/skills/study-linkage/scripts",
-    REPO / "plugins/argo-pm/skills/study-portfolio/scripts",
-    REPO / "plugins/argo-pm/skills/study-setup/scripts",
-    REPO / "plugins/argo-qa/skills/redcap-qa/scripts",
+    REPO / "plugins/argo-database-manager/skills/build-study/scripts",
+    REPO / "plugins/argo-database-manager/skills/export-data/scripts",
+    REPO / "plugins/argo-database-manager/skills/link-data/scripts",
+    REPO / "plugins/argo-project-manager/skills/monitor-studies/scripts",
+    REPO / "plugins/argo-project-manager/skills/new-study-documents/scripts",
+    REPO / "plugins/argo-qa-specialist/skills/qa-worklists/scripts",
 ]
 
 
@@ -96,14 +95,21 @@ def sync_standalone() -> None:
 
 
 def write_version(new: str) -> None:
+    descriptions = {}
     for manifest in plugin_manifests():
         data = json.loads(manifest.read_text())
         data["version"] = new
         manifest.write_text(json.dumps(data, indent=2) + "\n")
+        descriptions[data.get("name", manifest.parents[1].name)] = data.get("description", "")
         print(f"  {manifest.parents[1].name} -> {new}")
 
     data = json.loads(MARKETPLACE.read_text())
     data["metadata"]["version"] = new
+    # The marketplace's per-plugin descriptions are a COPY of each plugin.json's description.
+    # They are synced here, never hand-edited — a drift test enforces it.
+    for entry in data.get("plugins", []):
+        if entry.get("name") in descriptions and descriptions[entry["name"]]:
+            entry["description"] = descriptions[entry["name"]]
     MARKETPLACE.write_text(json.dumps(data, indent=2) + "\n")
     print(f"  (marketplace) -> {new}")
 

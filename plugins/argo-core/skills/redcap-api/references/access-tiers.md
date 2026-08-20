@@ -18,7 +18,7 @@ Before reading the tiers, note the distinction that matters most in practice:
 |---|---|---|
 | Which projects | The 5 trackers: Study Tracker (SIR), SPR, Data Linking, Data Request, Support Ticket | Every individual cohort/study project |
 | Token situation | ARGO holds these already, permanently | Must be issued by a REDCap admin, per user, per project — **rarely happens in practice** |
-| Example scripts | `sir_update.py`, `portfolio.py`, `backfill_sir_from_csv.py` | `fill_new_project.py`, DD upload, `data-export`, `push_updates.py` |
+| Example scripts | `sir_update.py`, `portfolio.py`, `backfill_sir_from_csv.py` | `fill_new_project.py`, DD upload, `export-data`, `push_updates.py` |
 
 "We need admin support to get API access" is only ever true of the **right-hand** column. A script
 that writes to the SIR needs no per-study access at all — it uses a tracker token we already hold.
@@ -29,11 +29,11 @@ removes automation without removing any admin dependency.
 
 Configured permanently in the settings file — and **by everyone on the team**, not just whoever runs the weekly portfolio (revised 2026-08-20: the shared dashboard should work from any member's session). This is the only standing credential set.
 
-- `study-portfolio/portfolio.py` — read-only weekly pull across all 5 trackers. Writes nothing back
+- `monitor-studies/portfolio.py` — read-only weekly pull across all 5 trackers. Writes nothing back
   except a local snapshot file.
-- `redcap-build/sir_update.py` — writes build progress to the **SIR record** (Study Tracker, PID 224).
+- `build-study/sir_update.py` — writes build progress to the **SIR record** (Study Tracker, PID 224).
   One push per build step, no batching. This is what keeps the portfolio's progress column current.
-- `redcap-build/backfill_sir_from_csv.py` — bulk SIR record loads from a CSV. Same tracker token.
+- `build-study/backfill_sir_from_csv.py` — bulk SIR record loads from a CSV. Same tracker token.
 
 Low risk: these touch ARGO's own project-management records, never cohort/patient data.
 
@@ -45,7 +45,7 @@ actually needs (a key always carries its account's full rights — [[access-tier
 | Key | PID | API Export | API Import | Why |
 |---|---|---|---|---|
 | `STUDY_INITIATION_REQUEST` | 224 | yes | **yes** | `sir_update.py` writes build progress after every step; `backfill_sir_from_csv.py` bulk-loads records |
-| `STUDY_PERSONELL_REQUEST` | 221 | yes | **yes** (+ create records) | redcap-admin creates SPR records by API import |
+| `STUDY_PERSONELL_REQUEST` | 221 | yes | **yes** (+ create records) | manage-redcaps creates SPR records by API import |
 | `DATA_LINKING_REQUEST` | 222 | yes | no | portfolio reads only |
 | `DATA_REQUEST` | 223 | yes | no | portfolio reads only |
 | `SUPPORT_TICKET_REQUEST` | 225 | yes | no | portfolio reads only; triage is done in the UI |
@@ -58,10 +58,10 @@ in the suite uses them, and `--check` warns when a key's account has them.
 No standing config. A person supplies a token because they specifically want to do one thing today,
 and it isn't sitting around between uses.
 
-- `data-export` — exports and imports against a study project
-- `study-linkage` — cross-study record linkage and diff-only write-back
-- `redcap-admin/set_roles.py` — role assignment on a study
-- `redcap-build/fill_new_project.py` — project setup fields
+- `export-data` — exports and imports against a study project
+- `link-data` — cross-study record linkage and diff-only write-back
+- `manage-redcaps/set_roles.py` — role assignment on a study
+- `build-study/fill_new_project.py` — project setup fields
 
 **Revised 2026-08-20:** a study key is **encouraged for each study a person is QAing**, stored
 in their workspace settings file alongside the tracker keys — QA is the workflow where direct
@@ -80,7 +80,7 @@ Two cautions survive the revision, because they're about accounts, not storage:
 
 ## Tier 3 — one dedicated person, extra caution: QA write-back
 
-- `redcap-qa/push_updates.py` — the one script in the suite that can overwrite live clinical/research
+- `qa-worklists/push_updates.py` — the one script in the suite that can overwrite live clinical/research
   data at scale.
 
 Two requirements, both non-negotiable:
@@ -95,9 +95,9 @@ Two requirements, both non-negotiable:
 ## Tier 0 — no API access at all, and it should stay that way
 
 - `run-analysis` — works entirely from local exports
-- The local-file half of `redcap-build`: `dd_builder.py`, `validate_dd.py`, `validate_import.py`,
+- The local-file half of `build-study`: `dd_builder.py`, `validate_dd.py`, `validate_import.py`,
   `setup_brief.py --from-json`
-- `study-setup` — document drafting only
+- `new-study-documents` — document drafting only
 
 ## Which pathway wins at each fork
 
@@ -194,7 +194,8 @@ python3 argo_setup.py --dir /mnt/<connected-folder>/argo-work
 ```
 
 **Decided layout: one working folder, with the keys inside it.** `argo-work/` holds `.env`
-alongside `exports/`, `worklists/`, `builds/` and `pm/`. One folder to connect, and the shared
+alongside the four role folders (`project-manager/ qa-specialist/ database-manager/
+data-analyst/`). One folder to connect, and the shared
 client discovers the settings on its own when run from inside it. The trade-off was considered
 deliberately: a connected folder is readable in full, so the keys are visible whenever that folder
 is connected. That's accepted because these are admin-tracker keys for ARGO's own
@@ -225,7 +226,7 @@ One file: **`~/.argo/.env`**, loaded with `set -a; source ~/.argo/.env; set +a`.
 
 ## The trade-off that was considered and rejected
 
-Moving `redcap-build` to Tier 0 (no token ever) was proposed, on the grounds that it would shrink
+Moving `build-study` to Tier 0 (no token ever) was proposed, on the grounds that it would shrink
 the credential footprint. It was **rejected**: `sir_update.py` writes to an admin tracker we already
 hold a token for, so dropping it would remove the automatic build-progress marking — and with it
 the portfolio's live progress column — without removing a single admin-support dependency. The

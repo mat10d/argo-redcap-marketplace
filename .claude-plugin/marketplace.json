@@ -6,38 +6,33 @@
   },
   "metadata": {
     "description": "AI-augmented research workflow plugins for the African Research Group for Oncology. Built around REDCap as the system of record for multi-site oncology cohorts.",
-    "version": "0.16.4"
+    "version": "0.17.0"
   },
   "plugins": [
     {
       "name": "argo-core",
       "source": "./plugins/argo-core",
-      "description": "Foundation required by every other ARGO plugin: the start-here front door, shared REDCap client, API conventions, and reference docs."
+      "description": "The ARGO foundation, required by every other plugin: start-here (the front door \u2014 orients new users, runs first-time setup, routes to the right skill) plus shared REDCap API conventions, the common client, and reference docs."
     },
     {
-      "name": "argo-pm",
-      "source": "./plugins/argo-pm",
-      "description": "Project management for admins (PMs set up and track; they don't build). Draft the new-study document package to relieve the PM bottleneck (study-setup) and get a weekly view across admin REDCaps that surfaces unbuilt studies (study-portfolio)."
+      "name": "argo-project-manager",
+      "source": "./plugins/argo-project-manager",
+      "description": "For the ARGO project manager. See where every study stands and what requests are open (monitor-studies), and draft the document package for a new study (new-study-documents)."
     },
     {
-      "name": "argo-build",
-      "source": "./plugins/argo-build",
-      "description": "Build REDCap studies end to end \u2014 redcap-build runs the whole pipeline (triage a submitted SIR, construct/audit the data dictionary, set up files, and update the Study Tracker as each step lands); redcap-admin manages user rights and roles on live projects."
+      "name": "argo-database-manager",
+      "source": "./plugins/argo-database-manager",
+      "description": "For the ARGO database manager. See what requests are outstanding across the core tracking REDCaps, then fulfil them: build a study's REDCap from a submitted request (build-study), add people and manage access (manage-redcaps), get data out as files (export-data), and match records across studies with safe fill-blanks-only write-back (link-data). Works with or without an access key."
     },
     {
-      "name": "argo-qa",
-      "source": "./plugins/argo-qa",
-      "description": "Continuous data quality assurance for active REDCap cohorts. Branching-logic-aware completeness worklists per site (per-DAG) for RAs to resolve."
+      "name": "argo-qa-specialist",
+      "source": "./plugins/argo-qa-specialist",
+      "description": "For the ARGO QA specialist. Build the per-site worklists of missing data for your study's RAs, and audit what they send back."
     },
     {
-      "name": "argo-data",
-      "source": "./plugins/argo-data",
-      "description": "Data management \u2014 the token-holding role. Export/import REDCap records, metadata, files, and audit logs (data-export), and link records across studies/sources with safe diff-only write-back (study-linkage)."
-    },
-    {
-      "name": "argo-analysis",
-      "source": "./plugins/argo-analysis",
-      "description": "Analysis on a local REDCap export \u2014 no API token needed. Interview-driven analysis plan, saved well-commented scripts, and organized, auditable outputs (run-analysis)."
+      "name": "argo-data-analyst",
+      "source": "./plugins/argo-data-analyst",
+      "description": "Analysis on a local REDCap export \u2014 no access key needed. Interview-driven analysis plan, saved well-commented scripts (Python/R/Stata), and organized, auditable outputs (run-analysis). For API export/import and cross-study linkage, see argo-database-manager."
     }
   ]
 }
