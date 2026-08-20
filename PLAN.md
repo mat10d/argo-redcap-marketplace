@@ -47,8 +47,22 @@ is created and they land in their role.
 
 **Decided:** workspace uses ROLE-NAMED folders — `project-manager/ qa-specialist/
 database-manager/ data-analyst/` — each role's outputs land in their own folder (skills'
-write-paths updated accordingly; scaffold, README, harness fixtures follow). Role is remembered
-via `ARGO_ROLE=` in the settings file, so who-are-you is asked once.
+write-paths updated accordingly; scaffold, README, harness fixtures follow). Roles are remembered
+via `ARGO_ROLES=` (comma list — people hold several) in the settings file; who-are-you is
+asked once.
+
+**Refinements (Matteo, pre-compact):**
+- **Subskills are task-shaped within their role.** The role is the door; behind it, each skill
+  is shaped around that role's actual tasks (PM: monitor / draft the document package / submit
+  the request; DB manager: see outstanding requests -> fulfil one: build / add users / export /
+  link; QA: build worklists / audit returns; analyst: clean / analyse / figure). Skill
+  descriptions and internal structure follow the task, not the API surface.
+- **A user can hold MULTIPLE roles** — `ARGO_ROLES=` (comma list) in the settings file. The
+  door offers their roles' entry points; asks who-are-you only when unset.
+- **argo-core is plumbing, not a destination.** It keeps the cross-role machinery (client,
+  setup, references, start-here) but is minimally invoked directly — its capabilities surface
+  THROUGH the appropriate role skill. Nothing in core should compete with role skills for
+  triggers (start-here excepted: it IS the door).
 
 Notes: DB manager merges what the README called "Builder"+"Data management" — the plugins stay
 as-is; roles are the routing layer. DB manager's front door is the REQUEST QUEUES (personnel /
