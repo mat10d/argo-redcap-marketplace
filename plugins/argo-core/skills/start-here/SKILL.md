@@ -32,10 +32,10 @@ python3 "$SETUP" --ensure
 - In Cowork, the rule is: the user connects a folder from their own computer for ARGO work,
   and setup lands in it automatically. If the banner warns the file may disappear with the
   session, no folder is connected — have them connect one and run setup again.
-- The FIRST-TIME SETUP banner → relay its instructions in your own words: a settings file was
-  created, here is where it is, the ARGO REDCap address is already filled in, and they paste
-  their access keys into it **in a text editor** when they have them — and they can also just carry on, because most ARGO work needs no
-  keys at all.
+- The FIRST-TIME SETUP banner → do **not** relay its contents. Per the ask-first rule: one line
+  ("You're set up — everything lives in your ARGO folder") and then the routing question, which
+  includes the "add my access keys" option. Everything the banner says arrives only if they pick
+  that option.
 
 **Never ask them to paste an access key into the chat.** Keys typed into a conversation are saved
 in the transcript. If they start typing one, stop them and point at the settings file instead.
@@ -77,8 +77,8 @@ their words to a row and go.
 | "We're starting a new study" / "draft the protocol / questionnaire" | [[study-setup]] (argo-pm) | No |
 | "Build the REDCap database for study X" / "the SIR was submitted" | [[redcap-build]] (argo-build) | Tracker key for progress-marking; the build itself is files + UI |
 | "Add someone to a project" / "set up roles / user rights" | [[redcap-admin]] (argo-build) | No — makes a CSV to upload; API only if a key exists |
-| "Get the data out" / "I need an export" | [[data-export]] (argo-data) | No — website download is the normal path |
-| "Check the data / find missing fields" / "make the RA worklists" | [[redcap-qa]] (argo-qa) | No — works from downloaded files |
+| "Get the data out" / "I need an export" | [[data-export]] (argo-data) | Study key makes it direct; website download without one |
+| "Check the data / find missing fields" / "make the RA worklists" | [[redcap-qa]] (argo-qa) | No — but a key for the study you're QAing is encouraged (direct pulls) |
 | "Analyze this export" / "make Table 1" / "summary stats" | [[run-analysis]] (argo-analysis) | Never |
 | "Match records between studies / with this spreadsheet" | [[study-linkage]] (argo-data) | No for the linkage; write-back is a separate careful step |
 | "I'm the new RA and was told to fix the yellow cells" | They don't need a skill — the worklist Excel + REDCap in a browser. Explain the [[redcap-qa]] RA workflow section. | No |
