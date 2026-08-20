@@ -36,12 +36,16 @@ ROLES = {
         "env": False, "fixtures": [],
         "prompt": "help me get started with ARGO",
         "expect": [
-            "argo front-door skill fires (standalone or start-here)",
-            "setup scaffolds INTO the connected folder (not the sandbox home)",
-            ".env created with the ARGO REDCap URL pre-filled",
-            "asks at most ONE question; no menu of options",
-            "if keys are configured, verifies them up front and folds status into the one-liner",
-            "never asks for a key to be pasted into the chat",
+            "start-here fires; toolkit version stamp 0.17.0 visible in the setup output",
+            "setup scaffolds INTO the connected folder: role folders "
+            "(project-manager/ qa-specialist/ database-manager/ data-analyst/), "
+            ".env with the ARGO REDCap URL pre-filled, 'Add keys here.command'",
+            "first message = one setup line + ONE question: WHAT'S YOUR ROLE (the four roles), "
+            "no task menu, no lecture about keys/folders",
+            "answering the role question gets written to the settings file "
+            "(ARGO_ROLES=... via --set-roles) and lands in that role's flow",
+            "keys offered as one sentence only (no keys configured); never asks for a key "
+            "to be pasted into the chat",
         ],
     },
     "returning": {
