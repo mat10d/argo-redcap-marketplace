@@ -37,6 +37,13 @@ Ranked. The top two are silent-data-loss class.
    mechanized into one write path.
 9. Future fixture: a study-C with mistyped names/hospital numbers to exercise link-data's
    fuzzy-match path, which currently has no test.
+10. **run-analysis needs a language preflight** (analyst round, 2026-08-20): the Cowork
+    sandbox shell's PATH misses /usr/local/bin, so `command -v Rscript` reported "R is not
+    installed" on a machine where /usr/local/bin/Rscript exists and passes the parity test.
+    Fix: at scaffold time probe known locations (/usr/local/bin, /opt/homebrew/bin,
+    /usr/bin, /Applications/Stata*/...) for python3/Rscript/stata, report the three
+    languages' availability in plain words, and invoke by full path. Matteo: "python
+    (critical for all tasks), R, STATA should have some check/setup".
 
 - **generate.py: add `expected_workbooks` to MANIFEST** (name → {rows, yellow, amber} per
   workbook file) so tests/test_qa_worklists_end_to_end.py's row-count test stops self-skipping.
