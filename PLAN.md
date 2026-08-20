@@ -80,8 +80,9 @@ Read every SKILL.md **whole**, end to end — all 9 skills + start-here + key re
 (access-tiers, token-optional, verify-install). The two worst recent bugs were caught by
 whole-reads, not diffs. Looking for: internal contradictions from layered edits, stale policy
 references (key policy changed twice), instructions that fight the ask-first rule.
-Output: ONE batch release (0.17.0). Also delete/park: `VERIFY.md` pointer file check,
-round reports clutter.
+Output: ONE batch release (0.17.0). Root hygiene done 2026-08-20: VERIFY.md pointer and the
+argo-skill ghost directory deleted. Phase 1 also rewrites SETUP.md (currently
+Claude-Code-first and pre-roles) to match the role spec and Cowork-first reality.
 
 ## Phase 2 — the round ladder (against 0.17.0, then frozen again)
 

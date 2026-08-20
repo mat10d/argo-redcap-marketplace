@@ -69,15 +69,11 @@ python3 plugins/argo-core/skills/redcap-api/scripts/argo_setup.py --check --dir 
 `.env` is gitignored — never commit tokens. See **[SETUP.md](SETUP.md)** for which tokens each
 skill needs.
 
-## The standalone bootstrap skill — retired
+## History note
 
-A separately-uploaded `argo` skill used to exist as insurance against sessions that load skills
-but not plugins. Session-transcript evidence retired it (2026-08-19): across every observed
-surface — Cowork local agent mode, cloud sandboxes, chat containers — the org plugins loaded
-every time and `argo-core:start-here` answered every time, while the standalone fired never and
-cost a manual zip re-upload on every release plus a second front door for versions to skew
-across. One front door now: the plugin's `start-here`. If a plugin-less surface ever actually
-appears, resurrect it from git history (`argo-skill/` at tag 0.13.x) rather than by guessing.
+A separately-uploaded standalone `argo` skill existed through 0.13.x and was retired on
+transcript evidence (plugins load everywhere; it never fired). Resurrect from git history if a
+plugin-less surface ever appears.
 
 ## Distribution
 
