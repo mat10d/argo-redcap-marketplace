@@ -16,6 +16,13 @@ Pattern was developed on the R01 CRC cohort — see `REDCap/Analysis/linkages/R0
 - Pre-lock QA before a data freeze
 - Re-running after RAs have updated REDCap to confirm coverage
 
+## Your study's key
+
+If you're QAing a study, having that study's access key in your settings file is encouraged —
+worklist pulls then come straight from REDCap instead of manual downloads (`--token-env
+<STUDY>_TOKEN`). Ask the administrator for a key on a right-scoped account; the no-key
+`--records-csv`/`--metadata-csv` path remains fully supported. See [[access-tiers]].
+
 ## Shared references
 
 - [[mdc-rules]] — how MDC sentinels (-666/-777/-888/-999, 666=N/A) are interpreted

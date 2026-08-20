@@ -89,12 +89,12 @@ re-ask. This skill's job ends at the hand-off.
 ## The one thing to say about access keys, if it comes up
 
 No key is ever required — everything works from files downloaded off the REDCap website
-([[getting-files-from-redcap]] has click-by-click instructions). But keys make the main
-workflows direct, and **for the main cohort studies (CRC, gastric, prostate, breast) adding a
-study key is encouraged**: exports and QA pulls then happen right in the session, no manual
-downloads. The five tracker keys power the portfolio dashboard. Their REDCap administrator
-creates keys (ideally tied to accounts that can only do what's needed — export-only is often
-enough); there is nothing they can do in this chat to make one.
+([[getting-files-from-redcap]] has click-by-click instructions). The standing setup for
+**everyone on the team is the five tracker keys** (they power the shared portfolio dashboard).
+Beyond that, **add a study key for each study you're QAing** — pulls and exports for it then
+happen right in the session. The REDCap administrator creates keys (ideally tied to accounts
+that can only do what's needed — export-only is often enough); there is nothing anyone can do
+in this chat to make one.
 
 Full decision record for who holds which key: [[access-tiers]].
 

@@ -47,18 +47,16 @@ ENV_TEMPLATE = """\
 REDCAP_URL={redcap_url}
 ARGO_PM_ROOT={pm_root}
 
-# --- ARGO admin tracker keys (ask the ARGO REDCap administrator) ---
+# --- The five ARGO tracker keys — EVERYONE on the team should have these. ---
+# They power the shared portfolio dashboard. Ask the ARGO REDCap administrator.
 {tracker_lines}
 
-# --- Study keys — encouraged for the main studies you work on ---
-# These unlock direct exports and QA pulls for that study. They open patient
-# data, so keep this folder private, and ask the administrator for keys tied
-# to accounts that can only do what you need (export-only is often enough).
-CRC_TOKEN=
-GASTRIC_TOKEN=
-PROSTATE_TOKEN=
-BREAST_TOKEN=
-# Add more as needed, named after the study.
+# --- Study keys — add one for each study you are QAing. ---
+# A study key lets QA pulls and exports for that study happen directly. It opens
+# patient data, so keep this folder private, and ask the administrator for a key
+# tied to an account that can only do what you need (export-only is often enough).
+# Name it after the study, e.g.:
+# CRC_TOKEN=
 """
 
 README = """\
