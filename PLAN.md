@@ -2,6 +2,30 @@
 
 Read this first after any context compaction. It is the agreed state and plan.
 
+## CURRENT STATE + TODO (updated 2026-08-20 evening — supersedes the phase details below)
+
+Done today: 0.17.0 (role-first restructure, one plugin per role, task-named skills),
+Phase 1.5 wave 2 (191 tests, per-role synthetic fixtures), 0.17.1 (active key solicitation
+at onboarding). **Rounds 10–11 (onboarding, from scratch) PASSED live and reproducibly** on
+current code; the user's real workspace is onboarded, all 6 keys verified; that state is
+banked as `baseline/env-onboarded`.
+
+The list to Monday, in order:
+1. **Returning-user round** — `help me with ARGO` on the already-onboarded workspace. The
+   one unproven piece of the core loop. Pass: "five tracker keys connect" + 0.17.1 stamp,
+   no key offer, no role question, one routing question.
+2. **Analyst round** on the SYNTHETIC study (first: switch harness baseline fixtures from
+   the real CRC export to testing/fixtures/synthetic-study — patient data leaves the loop).
+3. **QA round** (synthetic export + qa_fields.yaml → per-site workbooks in qa-specialist/).
+4. **DB-manager round** — "show my outstanding requests", first live open_requests.py run.
+5. **Repeat 1+2** once each → they become the Monday demo script.
+6. **0.17.2 fix batch (tomorrow)** — the ranked defect queue at the top of
+   testing/cowork/NITS.md. Needs Matteo's call: SIR progress rule, lenient vs strict
+   (recommendation: lenient, applied to both portfolio and open_requests).
+7. **Matteo, admin**: batch tracker-key request to the OAU admin (rights matrix in
+   access-tiers; longest lead time — send first); org refresh after 0.17.2.
+8. **Fri/Sat**: one-page team handout (Claude drafts, Matteo reviews); demo = rounds 1+2.
+
 ## Honest stocktake
 
 **Proven live, witnessed in real Cowork sessions:**
