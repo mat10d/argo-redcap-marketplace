@@ -230,12 +230,11 @@ class TestEverythingShipsInsideASkill(unittest.TestCase):
 
 
 class TestStandaloneBundleInSync(unittest.TestCase):
-    """argo-skill/'s bundled scripts must be byte-identical to argo-core's.
+    """Every skill's vendored scripts/ must be byte-identical to argo-core's source.
 
-    The standalone bootstrap skill is uploaded to Cowork separately from the marketplace, so it
-    carries copies of the shared scripts. Two copies is normally the disease this repo kills on
-    sight — here it's unavoidable, so instead it's mechanised: release.py syncs on every
-    release, and this test fails the moment they differ.
+    Vendored copies are what killed cross-plugin discovery (each skill is self-contained), and
+    many copies is normally the disease this repo kills on sight — so it's mechanised instead:
+    release.py syncs every target on every release, and this test fails the moment any differs.
     """
 
     SOURCE = REPO / "plugins/argo-core/skills/redcap-api/scripts"

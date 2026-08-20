@@ -70,7 +70,6 @@ SCRIPTS_SOURCE = REPO / "plugins/argo-core/skills/redcap-api/scripts"
 # "the folder I'm standing in", identical in every environment, and the four locator bugs
 # (name-globbing, lexical version sort, /mnt/skills, ~/mnt) become structurally impossible.
 VENDOR_TARGETS = [
-    REPO / "argo-skill/scripts",
     REPO / "plugins/argo-build/skills/redcap-build/scripts",
     REPO / "plugins/argo-data/skills/data-export/scripts",
     REPO / "plugins/argo-data/skills/study-linkage/scripts",

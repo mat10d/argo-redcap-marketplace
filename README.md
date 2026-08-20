@@ -69,22 +69,15 @@ python3 plugins/argo-core/skills/redcap-api/scripts/argo_setup.py --check --dir 
 `.env` is gitignored — never commit tokens. See **[SETUP.md](SETUP.md)** for which tokens each
 skill needs.
 
-## The standalone bootstrap skill (Cowork / claude.ai)
+## The standalone bootstrap skill — retired
 
-Sessions can load **skills before plugins** — so a front door that lives inside the plugin suite
-can't be the thing that opens it. `argo-skill/` is a self-contained skill you upload to Cowork /
-claude.ai directly, separate from the marketplace. It bundles its own copies of the setup scripts
-(synced automatically by `release.py`, byte-identical by test), so on any ARGO request it can:
-
-1. run first-time setup (`--ensure` — loud when needed, one skipped line when not),
-2. verify any configured access keys (`--check`),
-3. find the full plugin suite in the session and route into its `start-here` front door — or say
-   plainly that the plugins aren't installed and how to get them.
-
-Team rule in Cowork: each person connects a folder from their own computer as their ARGO workspace — setup detects it and puts the working files and settings there, so everything persists between sessions.
-
-To install: upload the `argo-skill/` folder as a skill named **argo**. Update it whenever you
-update the plugins — same release, same version.
+A separately-uploaded `argo` skill used to exist as insurance against sessions that load skills
+but not plugins. Session-transcript evidence retired it (2026-08-19): across every observed
+surface — Cowork local agent mode, cloud sandboxes, chat containers — the org plugins loaded
+every time and `argo-core:start-here` answered every time, while the standalone fired never and
+cost a manual zip re-upload on every release plus a second front door for versions to skew
+across. One front door now: the plugin's `start-here`. If a plugin-less surface ever actually
+appears, resurrect it from git history (`argo-skill/` at tag 0.13.x) rather than by guessing.
 
 ## Distribution
 
