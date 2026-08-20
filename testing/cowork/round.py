@@ -40,6 +40,7 @@ ROLES = {
             "setup scaffolds INTO the connected folder (not the sandbox home)",
             ".env created with the ARGO REDCap URL pre-filled",
             "asks at most ONE question; no menu of options",
+            "if keys are configured, verifies them up front and folds status into the one-liner",
             "never asks for a key to be pasted into the chat",
         ],
     },

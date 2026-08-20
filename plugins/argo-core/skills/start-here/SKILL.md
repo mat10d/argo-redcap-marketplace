@@ -13,22 +13,28 @@ where to start" to working inside the right skill, with setup done, in as few st
 them choose between two ways of doing the same thing — pick the right one and say what you did.
 
 **Ask first, explain on demand.** After setup runs, your message is: one short line confirming
-setup ("You're set up — everything lives in your ARGO folder"), then the routing question.
+setup **and key status** ("You're set up — your five tracker keys connect"), then the routing
+question.
 Nothing else. No paragraph about settings files, keys, or how ARGO works — all of that arrives
 only when they pick the option it belongs to, or ask. The first thing a new person does here is
 answer one question, not read.
 
-## Step 0 — always: make sure setup exists
+## Step 0 — always: make sure setup exists AND the keys start up
 
-Before anything else, run the setup check. It costs one line if they're already set up, and does
-the whole first-time setup (loudly, with instructions) if not:
+Before anything else, ensure setup and verify any configured keys, in one go. The client check
+finds and loads the settings file on its own:
 
 ```bash
-SETUP=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name argo_setup.py 2>/dev/null | head -1)
-python3 "$SETUP" --ensure
+D=$(dirname "$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name argo_setup.py 2>/dev/null | head -1)")
+python3 "$D/argo_setup.py" --ensure && python3 "$D/argo_redcap_client.py" --check
 ```
 
-- `Settings found at <path> — setup skipped.` → carry on, nothing to explain.
+- `Settings found …` + keys verified → fold the result into your ONE confirmation line:
+  all green → "You're set up — your five tracker keys connect." A key failing is the exception
+  to brevity: name it plainly ("your Data Request key isn't working — the others are fine"),
+  say you can help fix it after, then ask the routing question anyway. Never block on it.
+- Settings found but **no keys configured** → confirm setup in one line; the routing question's
+  "add my access keys" option covers the rest. Don't lecture about keys here.
 - In Cowork, the rule is: the user connects a folder from their own computer for ARGO work,
   and setup lands in it automatically. If the banner warns the file may disappear with the
   session, no folder is connected — have them connect one and run setup again.
