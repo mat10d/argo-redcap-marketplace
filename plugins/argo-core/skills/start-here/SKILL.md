@@ -42,9 +42,12 @@ task options). Most people will skip it, and that's fine — say so.
 
 When they choose it, or ask at any point, walk them to it and close the loop:
 
-0. **First, try to open the file for them.** Run: `open -t "<full path to the .env>"` — on some
-   setups that opens it on their screen immediately. If the command errors, that's normal here;
-   move to step 1 without comment.
+0. **Best: put the file itself into the chat.** Cowork sessions have a file-presenting tool
+   (`present_files` on the cowork tool server) — present the settings file with it, unprompted.
+   It renders as a clickable card that opens the file in a text editor on their computer, which
+   is the whole journey in one click. Only if no such tool exists: try
+   `open -t "<full path to the .env>"` (opens on-screen on some setups; errors harmlessly on
+   others), then fall back to the double-click below.
 
 1. Easiest: tell them to open the ARGO folder on their computer and **double-click
    'Add keys here'** — the settings file opens in a text editor. Fallback: give the exact

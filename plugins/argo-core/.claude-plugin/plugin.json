@@ -1,6 +1,6 @@
 {
   "name": "argo-core",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "The ARGO foundation, required by every other plugin: start-here (the front door \u2014 orients new users, runs first-time setup, routes to the right skill) plus shared REDCap API conventions, the common client, and reference docs.",
   "author": {
     "name": "ARGO"
