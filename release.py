@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -156,6 +157,17 @@ def main() -> int:
     print(f"Setting everything to {new} (was {current})\n")
     write_version(new)
     sync_standalone()
+
+    print("\nRunning the test suite (a failing suite stops the release)...")
+    result = subprocess.run([sys.executable, str(REPO / "tests" / "run_all.py")],
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        tail = "\n".join((result.stdout + result.stderr).strip().splitlines()[-12:])
+        print(tail)
+        print("\nRELEASE BLOCKED: tests failed. Versions were written but nothing should be")
+        print("committed until the suite is green.")
+        return 1
+    print("  all tests passed")
     print(
         "\nDone. Nothing has been committed — check `git diff`, then commit.\n"
         "Remember to refresh the installed copies afterwards, or a running session will keep\n"
