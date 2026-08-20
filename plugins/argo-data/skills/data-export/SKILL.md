@@ -38,11 +38,11 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/data-export/export.py --token-env CRC_TOKEN
 Useful flags: `--what records|metadata|both`, `--forms a,b,c`, `--raw` (codes instead of labels),
 `--expect-project NAME_OR_PID`.
 
-## The default path is the REDCap website, not the API
+## No key? The REDCap website path works for everything
 
-Most ARGO studies have **no API token** — one has to be issued by a REDCap administrator, per
-person, per project, and that rarely happens ([[project-no-super-token]]). So the normal way to
-get data out is:
+A key has to be issued by a REDCap administrator per person, per project
+([[project-no-super-token]]) — so plenty of people won't have one, and nothing here requires it.
+Without a key, the way to get data out is:
 
 1. Open the study in REDCap in a browser.
 2. **Data Exports, Reports, and Stats** → "All data" → export as CSV.

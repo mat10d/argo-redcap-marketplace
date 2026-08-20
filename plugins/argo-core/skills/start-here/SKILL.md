@@ -88,12 +88,13 @@ re-ask. This skill's job ends at the hand-off.
 
 ## The one thing to say about access keys, if it comes up
 
-Most ARGO work needs no key: data comes out of REDCap as files downloaded from the website
-([[getting-files-from-redcap]] has click-by-click instructions), and changes go in as files
-uploaded through it. A key (REDCap calls it an API token) only speeds up specific jobs, the main
-one being the weekly portfolio dashboard — and those five tracker keys are normally set up once by
-whoever runs it, not by every team member. If someone genuinely needs a key, their REDCap
-administrator creates it; there is nothing they can do in this chat to make one.
+No key is ever required — everything works from files downloaded off the REDCap website
+([[getting-files-from-redcap]] has click-by-click instructions). But keys make the main
+workflows direct, and **for the main cohort studies (CRC, gastric, prostate, breast) adding a
+study key is encouraged**: exports and QA pulls then happen right in the session, no manual
+downloads. The five tracker keys power the portfolio dashboard. Their REDCap administrator
+creates keys (ideally tied to accounts that can only do what's needed — export-only is often
+enough); there is nothing they can do in this chat to make one.
 
 Full decision record for who holds which key: [[access-tiers]].
 

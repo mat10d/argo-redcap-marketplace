@@ -50,11 +50,15 @@ ARGO_PM_ROOT={pm_root}
 # --- ARGO admin tracker keys (ask the ARGO REDCap administrator) ---
 {tracker_lines}
 
-# --- Individual-study keys — add as many as you need, named after the study ---
-# CRC_TOKEN=
-# GASTRIC_TOKEN=
-# These open patient data, so prefer supplying one per task instead of storing it here:
-#     CRC_TOKEN=... python3 export.py --token-env CRC_TOKEN ...
+# --- Study keys — encouraged for the main studies you work on ---
+# These unlock direct exports and QA pulls for that study. They open patient
+# data, so keep this folder private, and ask the administrator for keys tied
+# to accounts that can only do what you need (export-only is often enough).
+CRC_TOKEN=
+GASTRIC_TOKEN=
+PROSTATE_TOKEN=
+BREAST_TOKEN=
+# Add more as needed, named after the study.
 """
 
 README = """\
@@ -142,16 +146,9 @@ def run_check(work_dir: Path) -> int:
     study_keys = [k for k in filled
                   if k not in tracker_vars and k not in ("REDCAP_URL", "ARGO_PM_ROOT")]
     if study_keys:
-        print(
-            f"\n⚠ This file also holds {len(study_keys)} access key(s) for individual studies:\n"
-            f"    {', '.join(study_keys)}\n"
-            "\n"
-            "Those open patient data, unlike the tracker keys. If this folder is one you share\n"
-            "with Claude, everything in it can be read — so consider supplying a study key only\n"
-            "for the command that needs it, or moving study keys to their own folder:\n"
-            "\n"
-            f"    python3 {Path(__file__).name} --separate-credentials"
-        )
+        print(f"\nStudy keys configured ({len(study_keys)}): {', '.join(study_keys)}")
+        print("These open patient data — keep this folder private. The connection check\n"
+              "(argo_redcap_client.py --check) verifies these too.")
 
     if "REDCAP_URL" in blank or "REDCAP_URL" not in filled:
         print(

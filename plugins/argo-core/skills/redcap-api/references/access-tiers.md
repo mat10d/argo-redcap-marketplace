@@ -63,10 +63,20 @@ and it isn't sitting around between uses.
 - `redcap-admin/set_roles.py` — role assignment on a study
 - `redcap-build/fill_new_project.py` — project setup fields
 
-**Because per-study tokens rarely materialise, the CSV-via-UI path is the documented default for
-this tier and the API path is the enhancement** — not the other way round. A skill in this tier
-should assume no token, produce the file the user applies in the REDCap UI, and only take the API
-shortcut if a token happens to be present. See [[project-no-super-token]].
+**Revised 2026-08-20:** study keys for the **main cohort studies** (CRC, gastric, prostate,
+breast) are now **encouraged and stored in the workspace settings file**, alongside the tracker
+keys. The original store-nothing posture dated from when API access in team sessions was
+hypothetical; live Cowork validation (keys verified and the portfolio run inside a native
+session) settled it. With a key configured, the API is the normal path — direct exports, QA
+pulls, no manual downloads. Website-download remains the full-featured fallback for anyone
+without a key, and [[token-optional]] still governs: never block on one.
+
+Two cautions survive the revision, because they're about accounts, not storage:
+
+- Study keys open **patient data** — the workspace folder is private to its owner, and stays that way.
+- A key carries its account's full rights. Ask the administrator for keys tied to accounts that
+  can only do what the person needs — export-only is often enough. The over-permission warning
+  on write paths stays.
 
 ## Tier 3 — one dedicated person, extra caution: QA write-back
 

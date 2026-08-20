@@ -665,6 +665,24 @@ def run_check() -> int:
             "    python3 argo_setup.py --separate-credentials"
         )
 
+    # Study keys (encouraged for the main cohort studies) get verified too, not just listed.
+    tier1 = {env for env, *_ in TIER1_PROJECTS}
+    study_keys = sorted(k for k in os.environ
+                        if k.endswith("_TOKEN") and k not in tier1 and os.environ.get(k))
+    if study_keys:
+        print("\nStudy keys:")
+        for name in study_keys:
+            client = RedcapClient.from_env(name)
+            try:
+                info = client.project_info()
+                print(f"  ✓ {name}: {(info.get('project_title') or '?').strip()[:55]!r} "
+                      f"(project {info.get('project_id', '?')}), key {mask(client.token)}")
+                working += 1
+            except RedcapError as e:
+                print(f"  ✗ {name}: {str(e).strip().splitlines()[0]}")
+                broken += 1
+        print("  (Study keys open patient data — keep this folder private.)")
+
     print("\n" + "-" * 60)
     print(f"{working} working, {missing} not set up, {broken} not working")
 
