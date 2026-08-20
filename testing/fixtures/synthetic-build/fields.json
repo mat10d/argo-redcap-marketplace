@@ -1,0 +1,216 @@
+[
+  {
+    "var": "synb_id",
+    "type": "text",
+    "label": "Synthetic registration ID (TEST DATA)",
+    "form": "screening",
+    "section": "SYNTHETIC TEST STUDY \u2014 fabricated data, no real patients"
+  },
+  {
+    "var": "hospital_number",
+    "type": "text",
+    "label": "Hospital number",
+    "identifier": "y",
+    "form": "screening"
+  },
+  {
+    "var": "hospital_site",
+    "type": "radio",
+    "label": "Recruiting site",
+    "choices": "1, Alpha Teaching Hospital | 2, Beta General Hospital",
+    "form": "screening"
+  },
+  {
+    "var": "enrol_date",
+    "type": "text",
+    "label": "Date of enrolment",
+    "valid": "date_dmy",
+    "form": "screening"
+  },
+  {
+    "var": "age_years",
+    "type": "text",
+    "label": "Age at enrolment (years)",
+    "valid": "integer",
+    "min": "18",
+    "max": "99",
+    "form": "screening"
+  },
+  {
+    "var": "sex",
+    "type": "radio",
+    "label": "Sex",
+    "choices": "1, Male | 2, Female",
+    "form": "screening"
+  },
+  {
+    "var": "education",
+    "type": "dropdown",
+    "label": "Highest level of education",
+    "choices": "1, None | 2, Primary | 3, Secondary | 4, Tertiary",
+    "form": "screening"
+  },
+  {
+    "var": "marital_status",
+    "type": "radio",
+    "label": "Marital status",
+    "choices": "1, Single | 2, Married | 3, Widowed | 4, Divorced",
+    "form": "screening"
+  },
+  {
+    "var": "occupation",
+    "type": "text",
+    "label": "Occupation",
+    "form": "screening"
+  },
+  {
+    "var": "pregnant_now",
+    "type": "radio",
+    "label": "Currently pregnant?",
+    "choices": "1, Yes | 0, No",
+    "branching": "[sex] = '2'",
+    "form": "screening"
+  },
+  {
+    "var": "consent_given",
+    "type": "radio",
+    "label": "Written consent obtained?",
+    "choices": "1, Yes | 0, No",
+    "form": "screening"
+  },
+  {
+    "var": "screening_notes",
+    "type": "notes",
+    "label": "Screening notes",
+    "form": "screening"
+  },
+  {
+    "var": "assess_intro",
+    "type": "descriptive",
+    "label": "<div>Complete the assessment from the case notes.</div>",
+    "form": "assessment",
+    "section": "Clinical assessment"
+  },
+  {
+    "var": "symptom_list",
+    "type": "checkbox",
+    "label": "Presenting symptoms (tick all that apply)",
+    "choices": "1, Abdominal pain | 2, Bleeding | 3, Weight loss | 4, Fatigue",
+    "form": "assessment"
+  },
+  {
+    "var": "bleeding_days",
+    "type": "text",
+    "label": "Duration of bleeding (days)",
+    "valid": "integer",
+    "min": "0",
+    "max": "365",
+    "branching": "[symptom_list(2)] = '1'",
+    "form": "assessment"
+  },
+  {
+    "var": "onset_date",
+    "type": "text",
+    "label": "Date of symptom onset",
+    "valid": "date_dmy",
+    "form": "assessment"
+  },
+  {
+    "var": "weight_kg",
+    "type": "text",
+    "label": "Weight (kg)",
+    "valid": "number",
+    "min": "20",
+    "max": "200",
+    "form": "assessment"
+  },
+  {
+    "var": "height_cm",
+    "type": "text",
+    "label": "Height (cm)",
+    "valid": "integer",
+    "min": "100",
+    "max": "220",
+    "form": "assessment"
+  },
+  {
+    "var": "bmi_calc",
+    "type": "calc",
+    "label": "BMI (auto-calculated)",
+    "choices": "round([weight_kg]/(([height_cm]/100)*([height_cm]/100)),1)",
+    "form": "assessment"
+  },
+  {
+    "var": "sev_pain",
+    "type": "radio",
+    "label": "Abdominal pain",
+    "choices": "0, None | 1, Mild | 2, Moderate | 3, Severe",
+    "matrix": "sev_grid",
+    "align": "RH",
+    "form": "assessment",
+    "section": "Symptom severity in the past week"
+  },
+  {
+    "var": "sev_nausea",
+    "type": "radio",
+    "label": "Nausea",
+    "choices": "0, None | 1, Mild | 2, Moderate | 3, Severe",
+    "matrix": "sev_grid",
+    "align": "RH",
+    "form": "assessment"
+  },
+  {
+    "var": "sev_fatigue",
+    "type": "radio",
+    "label": "Fatigue",
+    "choices": "0, None | 1, Mild | 2, Moderate | 3, Severe",
+    "matrix": "sev_grid",
+    "align": "RH",
+    "form": "assessment"
+  },
+  {
+    "var": "sev_appetite",
+    "type": "radio",
+    "label": "Loss of appetite",
+    "choices": "0, None | 1, Mild | 2, Moderate | 3, Severe",
+    "matrix": "sev_grid",
+    "align": "RH",
+    "form": "assessment"
+  },
+  {
+    "var": "sev_sleep",
+    "type": "radio",
+    "label": "Poor sleep",
+    "choices": "0, None | 1, Mild | 2, Moderate | 3, Severe",
+    "matrix": "sev_grid",
+    "align": "RH",
+    "form": "assessment"
+  },
+  {
+    "var": "tumor_stage",
+    "type": "dropdown",
+    "label": "Stage at assessment",
+    "choices": "1, Stage I | 2, Stage II | 3, Stage III | 4, Stage IV",
+    "form": "assessment"
+  },
+  {
+    "var": "referral_source",
+    "type": "text",
+    "label": "Referred from (free text)",
+    "form": "assessment"
+  },
+  {
+    "var": "followup_plan",
+    "type": "radio",
+    "label": "Follow-up plan",
+    "choices": "1, Clinic review | 2, Phone review | 3, No follow-up",
+    "branching": "[consent_given] = '1'",
+    "form": "assessment"
+  },
+  {
+    "var": "path_report_file",
+    "type": "file",
+    "label": "Pathology report (upload)",
+    "form": "assessment"
+  }
+]

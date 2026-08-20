@@ -1,0 +1,520 @@
+{
+  "contract_version": 1,
+  "dirty_dd": {
+    "checks": {
+      "branching_unbalanced_brackets": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "brack_var"
+        ],
+        "match_regex": "unbalanced brackets",
+        "rows": [
+          26
+        ],
+        "severity": "error"
+      },
+      "branching_undefined_reference": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "ref_var"
+        ],
+        "match_regex": "hasn't been defined yet",
+        "rows": [
+          27
+        ],
+        "severity": "warning"
+      },
+      "choices_required": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "tumor_grade"
+        ],
+        "match_regex": "field requires choices",
+        "rows": [
+          15
+        ],
+        "severity": "error"
+      },
+      "duplicate_variable_name": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "vital_status"
+        ],
+        "match_regex": "duplicate variable name",
+        "rows": [
+          5
+        ],
+        "severity": "error"
+      },
+      "empty_variable_name": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          ""
+        ],
+        "match_regex": "variable name is empty",
+        "rows": [
+          6
+        ],
+        "severity": "error"
+      },
+      "field_label_empty": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "unlabelled_var"
+        ],
+        "match_regex": "field label is empty",
+        "rows": [
+          14
+        ],
+        "severity": "warning"
+      },
+      "first_field_not_text": {
+        "count": 1,
+        "field_named_in_message": false,
+        "fields": [
+          "reg_id"
+        ],
+        "match_regex": "first field must be",
+        "rows": [
+          2
+        ],
+        "severity": "error"
+      },
+      "form_name_empty": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "no_form_var"
+        ],
+        "match_regex": "form name is empty",
+        "rows": [
+          10
+        ],
+        "severity": "error"
+      },
+      "form_name_invalid_chars": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "bad_form_var"
+        ],
+        "match_regex": "form name '[^']*' must be lowercase",
+        "rows": [
+          11
+        ],
+        "severity": "error"
+      },
+      "invalid_custom_alignment": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "bmi_value"
+        ],
+        "match_regex": "invalid custom alignment",
+        "rows": [
+          21
+        ],
+        "severity": "error"
+      },
+      "invalid_field_type": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "odd_type_var"
+        ],
+        "match_regex": "invalid field type",
+        "rows": [
+          12
+        ],
+        "severity": "error"
+      },
+      "invalid_identifier_value": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "patient_initials"
+        ],
+        "match_regex": "invalid identifier value",
+        "rows": [
+          19
+        ],
+        "severity": "error"
+      },
+      "invalid_matrix_ranking_value": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "rank_item"
+        ],
+        "match_regex": "invalid matrix ranking value",
+        "rows": [
+          25
+        ],
+        "severity": "error"
+      },
+      "invalid_required_value": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "consent_given"
+        ],
+        "match_regex": "invalid required value",
+        "rows": [
+          20
+        ],
+        "severity": "error"
+      },
+      "invalid_validation_type": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "onset_date"
+        ],
+        "match_regex": "invalid validation type",
+        "rows": [
+          17
+        ],
+        "severity": "error"
+      },
+      "matrix_group_name_invalid_chars": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "matrix_bad_name"
+        ],
+        "match_regex": "matrix group name must be lowercase",
+        "rows": [
+          23
+        ],
+        "severity": "error"
+      },
+      "matrix_group_name_too_long": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "matrix_long_name"
+        ],
+        "match_regex": "matrix group name exceeds",
+        "rows": [
+          22
+        ],
+        "severity": "error"
+      },
+      "matrix_group_wrong_field_type": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "matrix_text_item"
+        ],
+        "match_regex": "matrix group fields must be radio or checkbox",
+        "rows": [
+          24
+        ],
+        "severity": "error"
+      },
+      "mdc_date_field_has_text_format": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "dx_date"
+        ],
+        "match_regex": "date field has text-format mdc",
+        "rows": [
+          30
+        ],
+        "severity": "error"
+      },
+      "mdc_date_field_missing": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "surgery_date"
+        ],
+        "match_regex": "date field missing date-format mdc",
+        "rows": [
+          31
+        ],
+        "severity": "error"
+      },
+      "mdc_missing_in_choices": {
+        "count": 3,
+        "field_named_in_message": true,
+        "fields": [
+          "tumor_grade",
+          "single_choice",
+          "smoking_status"
+        ],
+        "match_regex": "missing mdc in choices",
+        "rows": [
+          15,
+          16,
+          28
+        ],
+        "severity": "error"
+      },
+      "mdc_text_field_has_date_format": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "referral_source"
+        ],
+        "match_regex": "field has date-format mdc",
+        "rows": [
+          32
+        ],
+        "severity": "error"
+      },
+      "mdc_text_field_missing": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "clinical_summary"
+        ],
+        "match_regex": "field missing text-format mdc",
+        "rows": [
+          33
+        ],
+        "severity": "error"
+      },
+      "redundant_mdc_in_field_note": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "alcohol_use"
+        ],
+        "match_regex": "redundant mdc in field note",
+        "rows": [
+          29
+        ],
+        "severity": "warning"
+      },
+      "single_choice_select": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "single_choice"
+        ],
+        "match_regex": "has only 1 choice",
+        "rows": [
+          16
+        ],
+        "severity": "warning"
+      },
+      "validation_on_non_text_field": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "contact_pref"
+        ],
+        "match_regex": "only valid on 'text' fields",
+        "rows": [
+          18
+        ],
+        "severity": "error"
+      },
+      "variable_name_invalid_chars": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "Weight_KG"
+        ],
+        "match_regex": "variable name '[^']*' must be lowercase",
+        "rows": [
+          8
+        ],
+        "severity": "error"
+      },
+      "variable_name_starts_with_digit": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "2nd_visit_date"
+        ],
+        "match_regex": "variable name '[^']*' cannot begin with a number",
+        "rows": [
+          7
+        ],
+        "severity": "error"
+      },
+      "variable_name_too_long": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "very_long_variable_name_for_testing"
+        ],
+        "match_regex": "recommended max 26",
+        "rows": [
+          9
+        ],
+        "severity": "warning"
+      },
+      "wrong_column_count": {
+        "count": 1,
+        "field_named_in_message": false,
+        "fields": [
+          "short_row_var"
+        ],
+        "match_regex": "has \\d+ columns, expected 18",
+        "rows": [
+          34
+        ],
+        "severity": "error"
+      },
+      "yesno_field_type_prohibited": {
+        "count": 1,
+        "field_named_in_message": true,
+        "fields": [
+          "surgery_done"
+        ],
+        "match_regex": "'yesno' field type cannot",
+        "rows": [
+          13
+        ],
+        "severity": "error"
+      }
+    },
+    "expected_errors_total": 28,
+    "expected_warnings_total": 5,
+    "file": "dirty_datadictionary.csv",
+    "n_data_rows": 33,
+    "not_engineerable": [
+      {
+        "check": "header_column_count",
+        "message": "Header has N columns, expected 18",
+        "reason": "validate_dd returns immediately after this error, so no other violation on the file could be observed. Needs a single-purpose fixture file."
+      },
+      {
+        "check": "no_data_rows",
+        "message": "No data rows found",
+        "reason": "Requires a header-only file \u2014 mutually exclusive with every row-level check."
+      },
+      {
+        "check": "patient_level_hospital_number_missing",
+        "message": "--patient-level: required field 'hospital_number' not present",
+        "reason": "Mutually exclusive with patient_level_identifier_flag, which needs the field to be present. Only one of the three --patient-level checks can fire per file."
+      },
+      {
+        "check": "patient_level_hospital_number_wrong_type",
+        "message": "hospital_number must be type 'text'",
+        "reason": "Same row as patient_level_identifier_flag; engineering it too would put two violations on one row and make hospital_number non-text, which drags in the MDC checks. One check per row is the fixture's rule."
+      }
+    ],
+    "patient_level_only": {
+      "checks": {
+        "patient_level_identifier_flag": {
+          "count": 1,
+          "field_named_in_message": true,
+          "fields": [
+            "hospital_number"
+          ],
+          "match_regex": "hospital_number must have identifier",
+          "rows": [
+            3
+          ],
+          "severity": "error"
+        }
+      },
+      "flag": "--patient-level",
+      "note": "With --patient-level these fire IN ADDITION to every check above."
+    },
+    "row_numbering": "validate_dd numbers the first data row 'Row 2' (header is row 1)",
+    "validator": "plugins/argo-database-manager/skills/build-study/validate_dd.py"
+  },
+  "fields_json": {
+    "branching_fields": {
+      "bleeding_days": "[symptom_list(2)] = '1'",
+      "followup_plan": "[consent_given] = '1'",
+      "pregnant_now": "[sex] = '2'"
+    },
+    "consumer": "dd_builder.py (CLI: python3 dd_builder.py fields.json out.csv)",
+    "expected_validate_dd": {
+      "errors": 0,
+      "patient_level_flag_safe": true,
+      "warnings": 0
+    },
+    "field_types": {
+      "calc": 1,
+      "checkbox": 1,
+      "descriptive": 1,
+      "dropdown": 2,
+      "file": 1,
+      "notes": 1,
+      "radio": 11,
+      "text": 10
+    },
+    "file": "fields.json",
+    "forms": {
+      "assessment": 16,
+      "screening": 12
+    },
+    "identifier_fields": [
+      "hospital_number"
+    ],
+    "matrix_groups": {
+      "sev_grid": [
+        "sev_pain",
+        "sev_nausea",
+        "sev_fatigue",
+        "sev_appetite",
+        "sev_sleep"
+      ]
+    },
+    "mdc_applied_fields": [
+      "enrol_date",
+      "age_years",
+      "sex",
+      "education",
+      "marital_status",
+      "occupation",
+      "pregnant_now",
+      "consent_given",
+      "screening_notes",
+      "symptom_list",
+      "bleeding_days",
+      "onset_date",
+      "weight_kg",
+      "height_cm",
+      "sev_pain",
+      "sev_nausea",
+      "sev_fatigue",
+      "sev_appetite",
+      "sev_sleep",
+      "tumor_stage",
+      "referral_source",
+      "followup_plan"
+    ],
+    "mdc_exempt_fields": [
+      "synb_id",
+      "hospital_number",
+      "hospital_site",
+      "assess_intro",
+      "bmi_calc",
+      "path_report_file"
+    ],
+    "n_fields": 28,
+    "record_id_field": "synb_id",
+    "validation_types": [
+      "date_dmy",
+      "integer",
+      "number"
+    ]
+  },
+  "notes": [
+    "Every row in dirty_datadictionary.csv is otherwise clean: it carries only the violations listed for it, so the manifest is an exact expectation, not a floor.",
+    "Two rows unavoidably raise two violations each: a select with no choices and a select with a single choice both also fail the MDC-in-choices check, because MDC choices cannot exist without pipe-separated options.",
+    "fields.json contains no validated Likert/psychometric scale. ARGO practice exempts those from MDC, but validate_dd.py implements no waiver, so including one would make the clean fixture fail by design. The sev_grid matrix is a study-authored severity grid and takes MDC normally.",
+    "match_regex values are lowercase, wording-tolerant patterns; tests lowercase the validator's messages before matching."
+  ],
+  "seed": 20260820,
+  "study": {
+    "purpose": "Database-manager build-task inputs: a clean dd_builder spec and a deliberately dirty data dictionary with a known violation set.",
+    "title": "SYNBUILD \u2014 Synthetic Build Study (SYNTHETIC TEST FIXTURE)"
+  },
+  "synthetic": true
+}

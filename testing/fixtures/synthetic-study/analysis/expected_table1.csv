@@ -1,0 +1,41 @@
+variable,level,statistic,site_alpha,site_beta,overall
+records,,n,120,80,200
+age,,n,120,80,200
+age,,missing,0,0,0
+age,,mean,56.46,57.74,56.97
+age,,sd,21.82,23.20,22.33
+sex,Male,n,44,45,89
+sex,Male,pct,36.67,56.25,44.50
+sex,Female,n,76,35,111
+sex,Female,pct,63.33,43.75,55.50
+sex,,missing,0,0,0
+education,None,n,35,20,55
+education,None,pct,29.17,25.00,27.50
+education,Primary,n,31,22,53
+education,Primary,pct,25.83,27.50,26.50
+education,Secondary,n,26,17,43
+education,Secondary,pct,21.67,21.25,21.50
+education,Tertiary,n,28,21,49
+education,Tertiary,pct,23.33,26.25,24.50
+education,,missing,0,0,0
+marital_status,Single,n,18,15,33
+marital_status,Single,pct,15.00,18.75,16.50
+marital_status,Married,n,41,21,62
+marital_status,Married,pct,34.17,26.25,31.00
+marital_status,Widowed,n,32,26,58
+marital_status,Widowed,pct,26.67,32.50,29.00
+marital_status,Divorced,n,29,18,47
+marital_status,Divorced,pct,24.17,22.50,23.50
+marital_status,,missing,0,0,0
+tobacco_use,No,n,63,33,96
+tobacco_use,No,pct,52.50,41.25,48.00
+tobacco_use,Yes,n,57,47,104
+tobacco_use,Yes,pct,47.50,58.75,52.00
+tobacco_use,,missing,0,0,0
+histology_grade,Well differentiated,n,38,15,53
+histology_grade,Well differentiated,pct,36.19,21.13,30.11
+histology_grade,Moderately differentiated,n,26,25,51
+histology_grade,Moderately differentiated,pct,24.76,35.21,28.98
+histology_grade,Poorly differentiated,n,41,31,72
+histology_grade,Poorly differentiated,pct,39.05,43.66,40.91
+histology_grade,,missing,15,9,24

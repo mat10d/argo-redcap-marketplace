@@ -69,17 +69,21 @@ class TestWorklistBuilderEndToEnd(unittest.TestCase):
 
     def test_row_counts_match_the_manifest(self):
         """The fixture's MANIFEST states exact expected rows per workbook — assert them."""
-        expected = self.manifest.get("expected_workbooks", {})
-        if not expected:
-            self.skipTest("MANIFEST has no expected_workbooks block")
-        for name, spec in expected.items():
-            matches = list(self.out.rglob(name))
-            self.assertTrue(matches, f"{name} not produced")
-            wb = openpyxl.load_workbook(matches[0])
-            ws = wb.active
-            data_rows = ws.max_row - 2  # header + prereq rows
-            self.assertEqual(data_rows, spec["rows"],
-                             f"{name}: {data_rows} data rows, MANIFEST says {spec['rows']}")
+        expected = self.manifest.get("qa", {}).get("expected_worklists", {})
+        self.assertTrue(expected, "MANIFEST lost its qa.expected_worklists block")
+        for workbook, variants in expected.items():
+            for key, spec in variants.items():
+                site, variant = key.split("/")
+                matches = [p for p in self.out.rglob(f"{workbook}_{site}.xlsx")
+                           if p.parent.name == variant]
+                self.assertTrue(matches, f"{variant}/{workbook}_{site}.xlsx not produced")
+                wb = openpyxl.load_workbook(matches[0])
+                ws = wb.active
+                data_rows = ws.max_row - 2  # header + prereq rows
+                self.assertEqual(
+                    data_rows, spec["rows_with_work"],
+                    f"{workbook} {key}: {data_rows} data rows, "
+                    f"MANIFEST says {spec['rows_with_work']}")
 
 
 if __name__ == "__main__":

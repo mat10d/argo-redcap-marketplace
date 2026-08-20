@@ -1,0 +1,131 @@
+{
+  "contract_version": 1,
+  "data_dictionary": {
+    "comparable_fields": [
+      "histology_grade",
+      "margin_status"
+    ],
+    "comparable_fields_note": "Same field names and same coded values as the primary study, so the two exports join with no crosswalk.",
+    "forms": {
+      "biobank": 6,
+      "pathology": 9
+    },
+    "n_fields": 15
+  },
+  "expected_diff": {
+    "cells_compared": 120,
+    "compared_fields": [
+      "histology_grade",
+      "margin_status"
+    ],
+    "conflict_cells": 24,
+    "conflict_cells_shared_ids_only": 24,
+    "conflicts_csv_rows": 24,
+    "fill_cells": 43,
+    "fill_cells_shared_ids_only": 13,
+    "id_field": "syn_id",
+    "noop_cells": 53,
+    "noop_cells_shared_ids_only": 53,
+    "orphan_cells_classified_fill": 30,
+    "overwrite_csv_rows": 12,
+    "update_csv_rows": 28
+  },
+  "known_defects": {
+    "orphans_classified_as_fills": "diff_payload.py / argo_diff.diff_records iterate the computed side and treat an id absent from the current side as an all-blank record, so every study-B-only id becomes a safe-fill row in *_update.csv. Importing that file would CREATE those records in REDCap. Neither script emits an orphan report, though link-data's SKILL.md promises gap/orphan reports. tests/test_linkage_merge.py pins the current behaviour and marks it."
+  },
+  "overlap": {
+    "ids_by_class": {
+      "agree": [
+        "SYN-0029",
+        "SYN-0030",
+        "SYN-0036",
+        "SYN-0037",
+        "SYN-0038",
+        "SYN-0039",
+        "SYN-0040",
+        "SYN-0041",
+        "SYN-0042",
+        "SYN-0043",
+        "SYN-0044",
+        "SYN-0045",
+        "SYN-0046",
+        "SYN-0047",
+        "SYN-0048",
+        "SYN-0049",
+        "SYN-0050",
+        "SYN-0051",
+        "SYN-0052",
+        "SYN-0053"
+      ],
+      "b_only": [
+        "SYN-8001",
+        "SYN-8002",
+        "SYN-8003",
+        "SYN-8004",
+        "SYN-8005",
+        "SYN-8006",
+        "SYN-8007",
+        "SYN-8008",
+        "SYN-8009",
+        "SYN-8010",
+        "SYN-8011",
+        "SYN-8012",
+        "SYN-8013",
+        "SYN-8014",
+        "SYN-8015"
+      ],
+      "conflict": [
+        "SYN-0011",
+        "SYN-0012",
+        "SYN-0019",
+        "SYN-0020",
+        "SYN-0021",
+        "SYN-0022",
+        "SYN-0023",
+        "SYN-0024",
+        "SYN-0025",
+        "SYN-0026",
+        "SYN-0027",
+        "SYN-0028"
+      ],
+      "fill_grade": [
+        "SYN-0001",
+        "SYN-0002",
+        "SYN-0003",
+        "SYN-0004",
+        "SYN-0005",
+        "SYN-0006",
+        "SYN-0007",
+        "SYN-0008"
+      ],
+      "fill_margin": [
+        "SYN-0013",
+        "SYN-0014",
+        "SYN-0015",
+        "SYN-0016",
+        "SYN-0017"
+      ]
+    },
+    "n_only_in_primary": 155,
+    "n_only_in_study_b": 15,
+    "n_records_primary": 200,
+    "n_records_study_b": 60,
+    "n_shared_agreeing": 20,
+    "n_shared_conflicting": 12,
+    "n_shared_conflicting_fields": 2,
+    "n_shared_fill_histology_grade": 8,
+    "n_shared_fill_margin_status": 5,
+    "n_shared_ids": 45
+  },
+  "study": {
+    "dags": {
+      "site_alpha": 45,
+      "site_gamma": 15
+    },
+    "n_records": 60,
+    "record_id_field": "syn_id",
+    "shares_id_space_with": "testing/fixtures/synthetic-study",
+    "title": "SYN-B \u2014 Synthetic Pathology & Biobank Sub-study (SYNTHETIC TEST STUDY)"
+  },
+  "synthetic": true
+}

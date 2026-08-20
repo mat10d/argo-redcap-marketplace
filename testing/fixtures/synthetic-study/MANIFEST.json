@@ -393,6 +393,216 @@
       "recurrence_site"
     ]
   },
+  "returned": {
+    "expected_review_responses": {
+      "clinical_core_site_alpha": {
+        "amber_cells_detected": 0,
+        "changed_cells": 13,
+        "note_only_records": 3,
+        "out_of_scope_edits_detected": 0,
+        "records_with_proposed_updates": 12,
+        "response_column_present": true
+      },
+      "clinical_core_site_beta": {
+        "amber_cells_detected": 0,
+        "changed_cells": 8,
+        "note_only_records": 2,
+        "out_of_scope_edits_detected": 0,
+        "records_with_proposed_updates": 7,
+        "response_column_present": true
+      },
+      "demo_followup_site_alpha": {
+        "amber_cells_detected": 0,
+        "changed_cells": 6,
+        "note_only_records": 2,
+        "out_of_scope_edits_detected": 0,
+        "records_with_proposed_updates": 6,
+        "response_column_present": true
+      },
+      "demo_followup_site_beta": {
+        "amber_cells_detected": 0,
+        "changed_cells": 4,
+        "note_only_records": 1,
+        "out_of_scope_edits_detected": 0,
+        "records_with_proposed_updates": 4,
+        "response_column_present": true
+      }
+    },
+    "generator": "generate_returns.py",
+    "note": "RA-returned workbooks are generated at test time; no .xlsx is committed.",
+    "per_file": {
+      "clinical_core_site_alpha": {
+        "amber_cells_filled": 3,
+        "amber_cells_total": 9,
+        "amber_filled_record_ids": [
+          "SYN-0041",
+          "SYN-0042",
+          "SYN-0043"
+        ],
+        "changed_cells_total": 13,
+        "filled_with_mdc": 5,
+        "filled_with_mdc_on_mdc_enabled_field": 4,
+        "filled_with_value": 8,
+        "left_untouched": 15,
+        "note_only_record_ids": [
+          "SYN-0003",
+          "SYN-0010",
+          "SYN-0013"
+        ],
+        "notes_on_changed_rows": 4,
+        "notes_only_rows": 3,
+        "out_of_scope_detail": [
+          {
+            "column": "Presenting symptoms",
+            "now": "Fatigue",
+            "record": "SYN-0016",
+            "was": "Abdominal pain"
+          },
+          {
+            "column": "Resection margin status",
+            "now": "Not assessed",
+            "record": "SYN-0043",
+            "was": "Negative"
+          },
+          {
+            "column": "Histology grade",
+            "now": "Poorly differentiated",
+            "record": "SYN-0048",
+            "was": "Well differentiated"
+          }
+        ],
+        "out_of_scope_edits": 3,
+        "records_with_changed_cells": 12,
+        "returned_file": "clinical_core_site_alpha_RETURNED.xlsx",
+        "source_worklist": "clinical_core_site_alpha.xlsx",
+        "yellow_cells_total": 28
+      },
+      "clinical_core_site_beta": {
+        "amber_cells_filled": 2,
+        "amber_cells_total": 6,
+        "amber_filled_record_ids": [
+          "SYN-0162",
+          "SYN-0164"
+        ],
+        "changed_cells_total": 8,
+        "filled_with_mdc": 3,
+        "filled_with_mdc_on_mdc_enabled_field": 2,
+        "filled_with_value": 5,
+        "left_untouched": 9,
+        "note_only_record_ids": [
+          "SYN-0125",
+          "SYN-0133"
+        ],
+        "notes_on_changed_rows": 3,
+        "notes_only_rows": 2,
+        "out_of_scope_detail": [
+          {
+            "column": "Adjuvant therapy given",
+            "now": "Radiotherapy",
+            "record": "SYN-0148",
+            "was": "Chemotherapy"
+          },
+          {
+            "column": "Presenting symptoms",
+            "now": "Fatigue",
+            "record": "SYN-0161",
+            "was": "Abdominal pain"
+          }
+        ],
+        "out_of_scope_edits": 2,
+        "records_with_changed_cells": 7,
+        "returned_file": "clinical_core_site_beta_RETURNED.xlsx",
+        "source_worklist": "clinical_core_site_beta.xlsx",
+        "yellow_cells_total": 17
+      },
+      "demo_followup_site_alpha": {
+        "amber_cells_filled": 0,
+        "amber_cells_total": 0,
+        "amber_filled_record_ids": [],
+        "changed_cells_total": 6,
+        "filled_with_mdc": 2,
+        "filled_with_mdc_on_mdc_enabled_field": 0,
+        "filled_with_value": 4,
+        "left_untouched": 7,
+        "note_only_record_ids": [
+          "SYN-0001",
+          "SYN-0002"
+        ],
+        "notes_on_changed_rows": 2,
+        "notes_only_rows": 2,
+        "out_of_scope_detail": [
+          {
+            "column": "Sex",
+            "now": "Female",
+            "record": "SYN-0013",
+            "was": "Male"
+          },
+          {
+            "column": "Status at follow-up",
+            "now": "Lost to follow-up",
+            "record": "SYN-0013",
+            "was": "Recurrence"
+          }
+        ],
+        "out_of_scope_edits": 2,
+        "records_with_changed_cells": 6,
+        "returned_file": "demo_followup_site_alpha_RETURNED.xlsx",
+        "source_worklist": "demo_followup_site_alpha.xlsx",
+        "yellow_cells_total": 13
+      },
+      "demo_followup_site_beta": {
+        "amber_cells_filled": 0,
+        "amber_cells_total": 0,
+        "amber_filled_record_ids": [],
+        "changed_cells_total": 4,
+        "filled_with_mdc": 2,
+        "filled_with_mdc_on_mdc_enabled_field": 0,
+        "filled_with_value": 2,
+        "left_untouched": 4,
+        "note_only_record_ids": [
+          "SYN-0122"
+        ],
+        "notes_on_changed_rows": 2,
+        "notes_only_rows": 1,
+        "out_of_scope_detail": [
+          {
+            "column": "Status at follow-up",
+            "now": "Alive, no recurrence",
+            "record": "SYN-0123",
+            "was": "Lost to follow-up"
+          },
+          {
+            "column": "Pregnancy status at enrolment",
+            "now": "Not pregnant",
+            "record": "SYN-0130",
+            "was": "Pregnant"
+          }
+        ],
+        "out_of_scope_edits": 2,
+        "records_with_changed_cells": 4,
+        "returned_file": "demo_followup_site_beta_RETURNED.xlsx",
+        "source_worklist": "demo_followup_site_beta.xlsx",
+        "yellow_cells_total": 8
+      }
+    },
+    "seed": 20260820,
+    "source_mode": "with_MDC",
+    "synthetic": true,
+    "totals": {
+      "amber_cells_filled": 5,
+      "amber_cells_total": 15,
+      "changed_cells_total": 31,
+      "filled_with_mdc": 12,
+      "filled_with_mdc_on_mdc_enabled_field": 6,
+      "filled_with_value": 19,
+      "left_untouched": 35,
+      "notes_on_changed_rows": 11,
+      "notes_only_rows": 8,
+      "out_of_scope_edits": 9,
+      "records_with_changed_cells": 29,
+      "yellow_cells_total": 66
+    }
+  },
   "study": {
     "dags": {
       "site_alpha": 120,

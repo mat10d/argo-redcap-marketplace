@@ -1,0 +1,295 @@
+{
+  "contract_version": 1,
+  "seed": 20260820,
+  "generated_by": "generate.py",
+  "synthetic": true,
+  "id_field": "record_id",
+  "done_value": "Yes",
+  "boring_fields": [
+    "assigned_to",
+    "assignment_date",
+    "completed",
+    "notes",
+    "resolution_date"
+  ],
+  "label_fallback_field": "severity",
+  "sir_build_steps": [
+    "project_created",
+    "dd_uploaded",
+    "user_rights_complete",
+    "data_imported",
+    "review_internal",
+    "review_pi",
+    "study_production"
+  ],
+  "trackers": {
+    "STUDY_INITIATION_REQUEST": {
+      "records_file": "study_tracker.json",
+      "metadata_file": "metadata_study_tracker.json",
+      "project_title": "Study Tracker",
+      "pid": "224",
+      "source_form": "study_initiation_request",
+      "done_marker": "study_production",
+      "total": 12,
+      "open": 10,
+      "done": 2,
+      "open_record_ids": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10"
+      ],
+      "done_record_ids": [
+        "11",
+        "12"
+      ],
+      "open_with_no_details": [
+        "2"
+      ],
+      "form_field_count": 8,
+      "expected_first_label": {
+        "1": "Full study title",
+        "2": "",
+        "3": "Full study title",
+        "4": "Full study title",
+        "5": "Full study title",
+        "6": "Full study title",
+        "7": "Full study title",
+        "8": "Full study title",
+        "9": "Full study title",
+        "10": "Full study title",
+        "11": "Full study title",
+        "12": "Full study title"
+      },
+      "sir_progress_strict": {
+        "0/7": 2,
+        "1/7": 2,
+        "2/7": 1,
+        "3/7": 2,
+        "4/7": 1,
+        "5/7": 1,
+        "6/7": 1,
+        "7/7": 2
+      },
+      "sir_progress_lenient": {
+        "0/7": 2,
+        "1/7": 2,
+        "2/7": 1,
+        "3/7": 1,
+        "4/7": 2,
+        "5/7": 1,
+        "6/7": 1,
+        "7/7": 2
+      },
+      "sir_progress_per_record": {
+        "1": {
+          "strict": "0/7",
+          "lenient": "0/7"
+        },
+        "2": {
+          "strict": "0/7",
+          "lenient": "0/7"
+        },
+        "3": {
+          "strict": "1/7",
+          "lenient": "1/7"
+        },
+        "4": {
+          "strict": "1/7",
+          "lenient": "1/7"
+        },
+        "5": {
+          "strict": "2/7",
+          "lenient": "2/7"
+        },
+        "6": {
+          "strict": "3/7",
+          "lenient": "3/7"
+        },
+        "7": {
+          "strict": "3/7",
+          "lenient": "4/7"
+        },
+        "8": {
+          "strict": "4/7",
+          "lenient": "4/7"
+        },
+        "9": {
+          "strict": "5/7",
+          "lenient": "5/7"
+        },
+        "10": {
+          "strict": "6/7",
+          "lenient": "6/7"
+        },
+        "11": {
+          "strict": "7/7",
+          "lenient": "7/7"
+        },
+        "12": {
+          "strict": "7/7",
+          "lenient": "7/7"
+        }
+      },
+      "progress_divergence_record_ids": [
+        "7"
+      ]
+    },
+    "STUDY_PERSONELL_REQUEST": {
+      "records_file": "personnel_requests.json",
+      "metadata_file": "metadata_personnel_requests.json",
+      "project_title": "Study Personnel Request",
+      "pid": "221",
+      "source_form": "study_personnel_request",
+      "done_marker": "completed",
+      "total": 9,
+      "open": 5,
+      "done": 4,
+      "open_record_ids": [
+        "1",
+        "2",
+        "4",
+        "6",
+        "7"
+      ],
+      "done_record_ids": [
+        "3",
+        "5",
+        "8",
+        "9"
+      ],
+      "open_with_no_details": [
+        "6"
+      ],
+      "form_field_count": 13,
+      "expected_first_label": {
+        "1": "Given name",
+        "2": "Given name",
+        "3": "Given name",
+        "4": "Given name",
+        "5": "Given name",
+        "6": "",
+        "7": "Given name",
+        "8": "Given name",
+        "9": "Given name"
+      }
+    },
+    "DATA_LINKING_REQUEST": {
+      "records_file": "data_linking_requests.json",
+      "metadata_file": "metadata_data_linking_requests.json",
+      "project_title": "Data Linking Request",
+      "pid": "222",
+      "source_form": "data_linking_request",
+      "done_marker": "completed",
+      "total": 6,
+      "open": 4,
+      "done": 2,
+      "open_record_ids": [
+        "1",
+        "3",
+        "4",
+        "6"
+      ],
+      "done_record_ids": [
+        "2",
+        "5"
+      ],
+      "open_with_no_details": [
+        "4"
+      ],
+      "form_field_count": 11,
+      "expected_first_label": {
+        "1": "Name of the person requesting",
+        "2": "Name of the person requesting",
+        "3": "Name of the person requesting",
+        "4": "",
+        "5": "Name of the person requesting",
+        "6": "Name of the person requesting"
+      }
+    },
+    "DATA_REQUEST": {
+      "records_file": "data_requests.json",
+      "metadata_file": "metadata_data_requests.json",
+      "project_title": "Data Request",
+      "pid": "223",
+      "source_form": "data_request",
+      "done_marker": "completed",
+      "total": 7,
+      "open": 3,
+      "done": 4,
+      "open_record_ids": [
+        "2",
+        "4",
+        "5"
+      ],
+      "done_record_ids": [
+        "1",
+        "3",
+        "6",
+        "7"
+      ],
+      "open_with_no_details": [
+        "5"
+      ],
+      "form_field_count": 12,
+      "expected_first_label": {
+        "1": "Name of the person requesting",
+        "2": "Name of the person requesting",
+        "3": "Name of the person requesting",
+        "4": "Name of the person requesting",
+        "5": "",
+        "6": "Name of the person requesting",
+        "7": "Name of the person requesting"
+      }
+    },
+    "SUPPORT_TICKET_REQUEST": {
+      "records_file": "support_tickets.json",
+      "metadata_file": "metadata_support_tickets.json",
+      "project_title": "Support Ticket Request",
+      "pid": "225",
+      "source_form": "support_ticket",
+      "done_marker": "completed",
+      "total": 8,
+      "open": 6,
+      "done": 2,
+      "open_record_ids": [
+        "1",
+        "2",
+        "3",
+        "5",
+        "6",
+        "8"
+      ],
+      "done_record_ids": [
+        "4",
+        "7"
+      ],
+      "open_with_no_details": [
+        "8"
+      ],
+      "form_field_count": 11,
+      "expected_first_label": {
+        "1": "Given name",
+        "2": "Given name",
+        "3": "Given name",
+        "4": "Given name",
+        "5": "Given name",
+        "6": "Given name",
+        "7": "Given name",
+        "8": ""
+      }
+    }
+  },
+  "long_label": {
+    "tracker": "DATA_LINKING_REQUEST",
+    "field": "linking_purpose",
+    "raw": "Purpose of the linkage, including which\n        analysis it feeds and why it is needed",
+    "expected_rendered": "Purpose of the linkage, including which "
+  }
+}

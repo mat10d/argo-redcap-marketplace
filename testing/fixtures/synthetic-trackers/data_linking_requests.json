@@ -1,0 +1,80 @@
+[
+  {
+    "record_id": "1",
+    "request_for_name": "Dario Mockford",
+    "needed_by": "2026-09-19",
+    "linking_purpose": "Join the synthetic registry to the fabricated pathology sheet for a fictional descriptive analysis.",
+    "source_database": "SYNTH-B",
+    "target_database": "SYNTH-C",
+    "assigned_to": "",
+    "completed": "No",
+    "resolution_date": "",
+    "notes": "",
+    "data_linking_request_complete": "Complete"
+  },
+  {
+    "record_id": "2",
+    "request_for_name": "Greta Stubbins",
+    "needed_by": "2026-08-11",
+    "linking_purpose": "Join the synthetic registry to the fabricated pathology sheet for a fictional descriptive analysis.",
+    "source_database": "SYNTH-C",
+    "target_database": "SYNTH-G",
+    "assigned_to": "Synthetic Database Team",
+    "completed": "Yes",
+    "resolution_date": "2026-07-15",
+    "notes": "Linked and pushed in the synthetic project.",
+    "data_linking_request_complete": "Complete"
+  },
+  {
+    "record_id": "3",
+    "request_for_name": "Jonas Trialsen",
+    "needed_by": "2026-06-19",
+    "linking_purpose": "Join the synthetic registry to the fabricated pathology sheet for a fictional descriptive analysis.",
+    "source_database": "SYNTH-G",
+    "target_database": "SYNTH-K",
+    "assigned_to": "",
+    "completed": "No",
+    "resolution_date": "",
+    "notes": "",
+    "data_linking_request_complete": "Complete"
+  },
+  {
+    "record_id": "4",
+    "request_for_name": "",
+    "needed_by": "",
+    "linking_purpose": "",
+    "source_database": "",
+    "target_database": "",
+    "assigned_to": "",
+    "completed": "No",
+    "resolution_date": "",
+    "notes": "",
+    "data_linking_request_complete": "Incomplete"
+  },
+  {
+    "record_id": "5",
+    "request_for_name": "Dario Mockford",
+    "needed_by": "2026-06-20",
+    "linking_purpose": "Join the synthetic registry to the fabricated pathology sheet for a fictional descriptive analysis.",
+    "source_database": "SYNTH-A",
+    "target_database": "SYNTH-B",
+    "assigned_to": "Synthetic Database Team",
+    "completed": "Yes",
+    "resolution_date": "2026-07-15",
+    "notes": "Linked and pushed in the synthetic project.",
+    "data_linking_request_complete": "Complete"
+  },
+  {
+    "record_id": "6",
+    "request_for_name": "Greta Stubbins",
+    "needed_by": "2026-08-23",
+    "linking_purpose": "Join the synthetic registry to the fabricated pathology sheet for a fictional descriptive analysis.",
+    "source_database": "SYNTH-B",
+    "target_database": "SYNTH-C",
+    "assigned_to": "",
+    "completed": "No",
+    "resolution_date": "",
+    "notes": "",
+    "data_linking_request_complete": "Complete"
+  }
+]
