@@ -120,14 +120,13 @@ def find_argo_core() -> str:
     )
 
 
-def load_env_file(explicit: str | None = None) -> "Path | None":
-    """Load REDCap settings from a .env file, if one can be found and isn't already loaded.
+def settings_candidates(explicit: "str | None" = None) -> list:
+    """Every place a settings file may live, in search order — THE single copy of this list.
 
-    In a terminal you normally do this yourself with `set -a; source ~/.argo/.env; set +a`.
-    In a sandboxed environment there may be no home directory to keep that file in — the settings
-    then live in a folder the user has connected. Look in both kinds of place.
-
-    Never overwrites a variable that is already set, so an inline export always wins.
+    Used by load_env_file (which loads) and by setup's find_existing_settings (which only checks
+    existence). It used to exist twice; the copies drifted on the ~/mnt root, and a returning
+    user with a perfectly good settings file in their connected folder got the FIRST-TIME SETUP
+    banner followed one breath later by "all five keys connect".
     """
     candidates = []
     if explicit:
@@ -137,19 +136,29 @@ def load_env_file(explicit: str | None = None) -> "Path | None":
         candidates.append(Path(env_file).expanduser())
     candidates.append(Path.home() / ".argo" / ".env")
     candidates.append(Path.home() / "argo-work" / ".env")   # where --ensure scaffolds by default
-    # Connected/working folders: a credentials file sitting alongside the work.
-    # (list(...)[:2] rather than .parents[:2] — slicing parents needs Python 3.10.)
+    # Working directory and just above it. (list(...)[:2] — slicing parents needs Python 3.10.)
     for base in [Path.cwd()] + list(Path.cwd().parents)[:2]:
         candidates += [base / ".argo" / ".env", base / "argo.env", base / ".env"]
-    # Mounted folders in a sandboxed environment.
-    for mnt in (Path("/mnt"), Path.home() / "mnt"):   # cloud sandboxes and local agent mode
+    # Mounted folders: cloud sandboxes (/mnt) and local agent mode (~/mnt).
+    for mnt in (Path("/mnt"), Path.home() / "mnt"):
         if mnt.is_dir():
             for entry in sorted(mnt.iterdir()):
                 if entry.is_dir() and not entry.name.startswith("."):
                     candidates += [entry / ".argo" / ".env", entry / "argo.env", entry / ".env",
-                                   entry / "argo-work" / ".env"]  # a connected ARGO workspace folder
+                                   entry / "argo-work" / ".env"]
+    return candidates
 
-    for path in candidates:
+
+def load_env_file(explicit: str | None = None) -> "Path | None":
+    """Load REDCap settings from a .env file, if one can be found and isn't already loaded.
+
+    In a terminal you normally do this yourself with `set -a; source ~/.argo/.env; set +a`.
+    In a sandboxed environment there may be no home directory to keep that file in — the settings
+    then live in a folder the user has connected. Look in both kinds of place.
+
+    Never overwrites a variable that is already set, so an inline export always wins.
+    """
+    for path in settings_candidates(explicit):
         try:
             if not path.is_file():
                 continue

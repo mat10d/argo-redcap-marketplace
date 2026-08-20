@@ -333,6 +333,27 @@ class TestSetupIsSafe(unittest.TestCase):
         self.assertIn("DATA_REQUEST=keepme", env_file.read_text(),
                       "re-running setup destroyed a key the user had filled in")
 
+    def test_returning_user_in_local_agent_mode_is_recognised(self):
+        """Round 7's bug: a staged .env in a ~/mnt connected folder got the FIRST-TIME banner."""
+        import tempfile
+        home = Path(tempfile.mkdtemp())
+        (home / "mnt" / "ARGO-work").mkdir(parents=True)
+        (home / "mnt" / "ARGO-work" / ".env").write_text("REDCAP_URL=https://x.org/api/\n")
+        proc = subprocess.run([sys.executable, str(self.SETUP), "--ensure"],
+                              capture_output=True, text=True, timeout=60,
+                              env=dict(os.environ, HOME=str(home), ARGO_SETUP_NO_OPEN="1"),
+                              cwd=str(home))
+        self.assertIn("setup skipped", proc.stdout,
+                      "a settings file in a local-agent-mode mount must be recognised")
+        self.assertNotIn("FIRST-TIME", proc.stdout)
+
+    def test_setup_has_no_private_search_list(self):
+        """The search list lives once, in the client. Setup must delegate, never copy."""
+        text = (PLUGINS / "argo-core/skills/redcap-api/scripts/argo_setup.py").read_text()
+        self.assertIn("settings_candidates", text)
+        self.assertNotIn('candidates.append(Path.home() / ".argo" / ".env")', text,
+                         "argo_setup grew its own copy of the search paths again")
+
     def test_ensure_skips_when_settings_exist(self):
         import tempfile
         home = Path(tempfile.mkdtemp())

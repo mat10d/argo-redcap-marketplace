@@ -209,106 +209,15 @@ def scaffold(work_dir: Path, creds_dir: "Path | None" = None, say=print) -> "Pat
 
 
 def find_existing_settings() -> "Path | None":
-    """Whether a settings file already exists anywhere the tools look. Loads nothing."""
-    candidates = [Path(os.environ.get("ARGO_ENV_FILE", "")).expanduser()
-                  if os.environ.get("ARGO_ENV_FILE") else None,
-                  Path.home() / ".argo" / ".env",
-                  Path.home() / "argo-work" / ".env"]
-    for base in [Path.cwd()] + list(Path.cwd().parents)[:2]:
-        candidates += [base / ".argo" / ".env", base / "argo.env", base / ".env"]
-    mnt = Path("/mnt")
-    if mnt.is_dir():
-        for entry in sorted(mnt.iterdir()):
-            if entry.is_dir() and not entry.name.startswith("."):
-                candidates += [entry / ".argo" / ".env", entry / "argo.env", entry / ".env",
-                               entry / "argo-work" / ".env"]
-    for path in candidates:
+    """Whether a settings file already exists anywhere the tools look. Loads nothing.
+
+    Delegates to the client's settings_candidates() — the one copy of the search list — so this
+    can never again disagree with what load_env_file will actually find.
+    """
+    from argo_redcap_client import settings_candidates
+    for path in settings_candidates():
         if path and path.is_file():
             return path
-    return None
-
-
-def open_settings_file(env_path: Path, connected: bool = False) -> None:
-    """Put the freshly created settings file in front of the user so pasting keys is one step.
-
-    On a local machine this opens the file in the default text editor. In a session runtime that
-    can't reach the user's screen (Cowork, chat containers — detectable because opening fails or
-    the environment is mounted), it prints exact instructions instead: the real path, how to open
-    it on their computer, and to say when they've saved so the keys can be verified. It must
-    never end silently — the user is holding a key with nowhere to put it. ARGO_SETUP_NO_OPEN=1
-    disables entirely (test suites use it).
-    """
-    if os.environ.get("ARGO_SETUP_NO_OPEN"):
-        return
-    import shutil
-    import subprocess
-
-    def explain():
-        print("\nTo add your access keys:")
-        print(f"  1. On your computer, open the ARGO folder and double-click 'Add keys here' —")
-        print(f"     the settings file opens in a text editor. (Or open it directly:")
-        print(f"         {env_path} )")
-        print("  2. Paste each key after its = sign and save the file.")
-        print("  3. Tell your assistant you've saved it — it will check the keys work.")
-        print("  Never paste a key into the chat itself; it would be saved in the transcript.")
-
-    in_session_runtime = (Path("/mnt/skills").is_dir() or Path("/mnt/.remote-plugins").is_dir()
-                          or (Path.home() / "mnt").is_dir() or str(Path.home()).startswith("/sessions"))
-    try:
-        if in_session_runtime:
-            explain()
-            return
-        if sys.platform == "darwin":
-            subprocess.run(["open", "-t", str(env_path)], check=False, timeout=10,
-                           stderr=subprocess.DEVNULL)
-            print(f"\nOpened {env_path.name} in your text editor — paste your keys in and save.")
-        elif shutil.which("xdg-open"):
-            subprocess.run(["xdg-open", str(env_path)], check=False, timeout=10,
-                           stderr=subprocess.DEVNULL)
-            print(f"\nOpened {env_path.name} — paste your keys in and save.")
-        else:
-            explain()
-    except Exception:
-        explain()
-
-
-def find_connected_workspace(mnt: "Path | None" = None) -> "Path | None":
-    if mnt is None:
-        # Cloud sandboxes mount at /mnt; local agent mode mounts at ~/mnt.
-        for root in (Path("/mnt"), Path.home() / "mnt"):
-            found = find_connected_workspace(root)
-            if found:
-                return found
-        return None
-    return _find_connected_workspace_in(mnt)
-
-
-def _find_connected_workspace_in(mnt: Path) -> "Path | None":
-    """A folder the user connected for ARGO work, if one can be identified.
-
-    Cowork's standing instruction to the team: create a folder on your computer for ARGO work
-    and connect it to the session. Connected folders mount under /mnt and persist on the user's
-    own computer — unlike the session home, which is thrown away. So setup must land there.
-
-    Returns the folder to scaffold into, or None when nothing connected can be identified.
-    Never guesses between multiple unrelated folders.
-    """
-    if not mnt.is_dir():
-        return None
-    SYSTEM = {"skills", "user-data", "knowledge", "outputs"}
-    candidates = []
-    for entry in sorted(mnt.iterdir()):
-        if (not entry.is_dir() or entry.name.startswith(".")
-                or entry.name in SYSTEM or not os.access(entry, os.W_OK)):
-            continue
-        candidates.append(entry)
-    # A folder named for ARGO, or already holding an ARGO workspace, is unambiguous.
-    for entry in candidates:
-        if "argo" in entry.name.lower() or (entry / "argo-work").is_dir():
-            return entry if "argo" in entry.name.lower() else entry / "argo-work"
-    # Exactly one connected folder → that's the workspace they were told to connect.
-    if len(candidates) == 1:
-        return candidates[0] / "argo-work"
     return None
 
 
