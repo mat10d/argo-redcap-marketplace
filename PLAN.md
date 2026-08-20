@@ -32,7 +32,30 @@ round exposes a genuine showstopper. Nits found during rounds get LOGGED in
 `testing/cowork/NITS.md`, not fixed inline. One fix-batch maximum per day, released as one
 version, then rounds continue against it.
 
-## Phase 1 — re-review (before more rounds)
+## THE PRODUCT SPEC (Matteo, 2026-08-20) — Phase 1 implements this
+
+**Entry point (role-first, not task-first):** "set up ARGO" → asks WHO YOU ARE. Core members
+(the four roles below) get solicited to add API keys as part of onboarding. Then the workspace
+is created and they land in their role.
+
+| Role | Does | Keys | Skills |
+|---|---|---|---|
+| **Project manager** | Monitors what studies exist; builds study documents for new studies; submits new study requests | 5 tracker keys | study-portfolio, study-setup |
+| **QA specialist** | Builds and audits RA worklists for their assigned study | 5 trackers + THEIR study's key | redcap-qa |
+| **Database manager** | Builds REDCaps, adds users, exports data, **links data (the big one)**. Entry = what requests are outstanding → routed to the steps to fulfil them | 5 trackers + study keys as needed | redcap-build, redcap-admin, data-export, study-linkage |
+| **Data analyst** | Standard REDCap outputs (downloaded, NO API key); cleaning, analysis, QA; linkage when merging >1 database for analysis; Stata/R/Python; figures | none | run-analysis (+study-linkage read-side) |
+
+Notes: DB manager merges what the README called "Builder"+"Data management" — the plugins stay
+as-is; roles are the routing layer. DB manager's front door is the REQUEST QUEUES (personnel /
+data / linking requests from the trackers) → route into the fulfilment skill. RAs are not a
+role here — QA specialists build FOR them; keep the lightweight RA pointer.
+
+## Phase 1 — re-review + ROLE RESTRUCTURE (one batch, 0.17.0)
+
+The whole-read review AND the role-first entry, shipped together as one coherent version:
+start-here rewritten role-first; scaffold + README aligned; each role's landing experience
+defined (PM → portfolio; QA → key check + worklist flow; DB manager → outstanding requests;
+analyst → point me at your export).
 
 Read every SKILL.md **whole**, end to end — all 9 skills + start-here + key references
 (access-tiers, token-optional, verify-install). The two worst recent bugs were caught by
