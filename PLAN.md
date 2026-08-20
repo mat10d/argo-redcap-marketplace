@@ -98,6 +98,31 @@ engineered counts so tests assert numbers, not vibes. On top: per-role feasibili
 analyst: data supports a scripted Table 1; PM: scriptable parts) wired into run_all.py.
 No patient data anywhere in fixtures or rounds thereafter.
 
+**The per-role/task INPUT INVENTORY (define post-compaction — the "what is this, in essence"
+question).** Wave 1 (agent running 2026-08-20) builds only the SUBSTRATE: one synthetic study
+(DD + records + linkage source + manifest). The full principle: every role-task pair gets the
+synthetic input its test needs. Draft inventory to correct:
+
+| Role | Task | Input needed | Status |
+|---|---|---|---|
+| PM | monitor studies | synthetic tracker records (SIR-like set, statuses mixed) | to build |
+| PM | draft study documents | concept note | wave 1 |
+| PM | submit new study request | intake.json | wave 1 |
+| QA | build worklists | DD + records + qa_fields | wave 1 |
+| QA | audit RA returns | a RETURNED workbook (RA-filled xlsx w/ engineered edits+notes) | to build |
+| DB mgr | see outstanding requests | synthetic personnel/data/linking request records | to build |
+| DB mgr | build a REDCap | fields.json (dd_builder input) + a DIRTY DD w/ known violations | to build |
+| DB mgr | add users | roles/users input (who→role table) | to define |
+| DB mgr | export data | the study itself | wave 1 |
+| DB mgr | link data (the big one) | linkage source w/ engineered fills/conflicts/orphans | wave 1 |
+| Analyst | clean/analyse/figures | records + DD | wave 1 |
+| Analyst | multi-database merge-analysis | a SECOND synthetic study sharing ids | to build |
+| Analyst | Stata/R/Python parity | same data, three reference scripts | to define |
+
+Open essence-questions for post-compaction: do tracker-record fixtures imitate the API's JSON
+or live as CSVs? Is the returned-workbook fixture generated or hand-crafted once? How much
+Stata/R parity is testable headless (no Stata license on CI)?
+
 **Tier 2 — Cowork rounds (the existing ladder)** = agent-behavior + UI check only, staged on
 the synthetic study. Built by subagents; results reviewed before merge.
 
