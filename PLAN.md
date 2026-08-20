@@ -45,6 +45,11 @@ is created and they land in their role.
 | **Database manager** | Builds REDCaps, adds users, exports data, **links data (the big one)**. Entry = what requests are outstanding → routed to the steps to fulfil them | 5 trackers + study keys as needed | redcap-build, redcap-admin, data-export, study-linkage |
 | **Data analyst** | Standard REDCap outputs (downloaded, NO API key); cleaning, analysis, QA; linkage when merging >1 database for analysis; Stata/R/Python; figures | none | run-analysis (+study-linkage read-side) |
 
+**Decided:** workspace uses ROLE-NAMED folders — `project-manager/ qa-specialist/
+database-manager/ data-analyst/` — each role's outputs land in their own folder (skills'
+write-paths updated accordingly; scaffold, README, harness fixtures follow). Role is remembered
+via `ARGO_ROLE=` in the settings file, so who-are-you is asked once.
+
 Notes: DB manager merges what the README called "Builder"+"Data management" — the plugins stay
 as-is; roles are the routing layer. DB manager's front door is the REQUEST QUEUES (personnel /
 data / linking requests from the trackers) → route into the fulfilment skill. RAs are not a
