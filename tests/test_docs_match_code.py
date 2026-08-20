@@ -184,6 +184,15 @@ class TestVersionsAreInStep(unittest.TestCase):
             f"`python3 release.py --set <version>`. Found: {found}",
         )
 
+    def test_runtime_stamp_matches(self):
+        import re as _re
+        trackers = (REPO / "plugins/argo-core/skills/redcap-api/scripts/argo_trackers.py").read_text()
+        stamp = _re.search(r'TOOLKIT_VERSION = "([^"]+)"', trackers).group(1)
+        marketplace = self.versions()["(marketplace)"]
+        self.assertEqual(stamp, marketplace,
+                         "argo_trackers.TOOLKIT_VERSION drifted from the release version — "
+                         "release.py stamps it; don't edit by hand")
+
     def test_versions_are_plain_semver(self):
         for name, version in self.versions().items():
             self.assertIsNotNone(version, f"{name} has no version")

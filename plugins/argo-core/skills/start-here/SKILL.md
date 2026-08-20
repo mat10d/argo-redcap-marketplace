@@ -48,9 +48,14 @@ in the transcript. If they start typing one, stop them and point at the settings
 
 ## Offering and adding access keys
 
-**Offer it — don't wait to be asked.** When setup has just created a fresh settings file, your
-single routing question must include **"add my access keys"** as one of its options (alongside the
-task options). Most people will skip it, and that's fine — say so.
+**The option is conditional — read the check's result first:**
+
+- **No keys configured** (fresh scaffold, or all lines blank) → the routing question includes
+  **"add my access keys"** as one option. Most people skip it; that's fine.
+- **Keys configured and verified** → say they connect in your one-liner and do **not** offer
+  anything about keys. There is nothing to add; an add-keys option here reads as "your keys
+  didn't take" and undermines the confirmation.
+- **A key failing** → name it in the one-liner; offer "fix my key" as an option, not "add".
 
 When they choose it, or ask at any point, walk them to it and close the loop:
 

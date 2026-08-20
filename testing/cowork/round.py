@@ -44,6 +44,16 @@ ROLES = {
             "never asks for a key to be pasted into the chat",
         ],
     },
+    "returning": {
+        "env": True, "fixtures": [],
+        "prompt": "help me with ARGO",
+        "expect": [
+            "one-liner INCLUDES key status: 'your five tracker keys connect'",
+            "NO 'add my access keys' option — keys exist and verified",
+            "toolkit version visible in the --ensure/--check output",
+            "then the routing question, nothing else",
+        ],
+    },
     "analyst": {
         "env": True, "fixtures": ["records", "dd"],
         "prompt": ("I'm the ARGO analyst. There's a CRC export and its data dictionary in my "

@@ -106,6 +106,12 @@ def write_version(new: str) -> None:
     MARKETPLACE.write_text(json.dumps(data, indent=2) + "\n")
     print(f"  (marketplace) -> {new}")
 
+    trackers = SCRIPTS_SOURCE / "argo_trackers.py"
+    t = trackers.read_text()
+    t = re.sub(r'TOOLKIT_VERSION = "[^"]*"', f'TOOLKIT_VERSION = "{new}"', t, count=1)
+    trackers.write_text(t)
+    print(f"  (runtime stamp) -> {new}")
+
 
 def bump(current: str, part: str) -> str:
     major, minor, patch = (int(x) for x in current.split("."))

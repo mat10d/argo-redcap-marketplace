@@ -597,7 +597,8 @@ TIER1_PROJECTS = [(env, title, pid) for env, title, pid, _marker in ADMIN_TRACKE
 
 def run_check() -> int:
     """Print one line per configured project saying whether it works. Returns a shell exit code."""
-    print("Checking your REDCap setup\n" + "=" * 60)
+    from argo_trackers import TOOLKIT_VERSION
+    print(f"Checking your REDCap setup (ARGO toolkit {TOOLKIT_VERSION})\n" + "=" * 60)
 
     found = load_env_file()
     if found:

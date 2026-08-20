@@ -32,7 +32,7 @@ WORKSPACE_SUBDIRS = ("exports", "worklists", "builds", "analysis", "pm")
 # Single source of truth: argo_trackers.py, next to this file.
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
-from argo_trackers import ADMIN_TRACKERS, ARGO_REDCAP_URL  # noqa: E402
+from argo_trackers import ADMIN_TRACKERS, ARGO_REDCAP_URL, TOOLKIT_VERSION  # noqa: E402
 
 TIER1 = [(env, f"{title}{'' if pid else ' (no key issued yet)'}")
          for env, title, pid, _marker in ADMIN_TRACKERS]
@@ -320,7 +320,7 @@ def ensure(work_dir: "Path | None" = None) -> int:
     """
     existing = find_existing_settings()
     if existing:
-        print(f"Settings found at {existing} — setup skipped.")
+        print(f"Settings found at {existing} — setup skipped. (ARGO toolkit {TOOLKIT_VERSION})")
         return 0
 
     connected = None
