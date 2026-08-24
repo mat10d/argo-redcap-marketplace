@@ -63,9 +63,18 @@ def load_dictionary():
     record_id = dd[var_col].iloc[0]
     # Build code -> label maps for radio/dropdown/checkbox fields from the
     # "Choices, Calculations, OR Slider Labels" column ("1, Yes | 2, No").
-    choice_col = next((c for c in dd.columns if "Choices" in c), None)
-    type_col = next((c for c in dd.columns if c.strip().lower() == "field type"), None)
+    # Two header styles exist: the website download ("Field Type", "Choices, Calculations,
+    # OR Slider Labels") and the API/export style (field_type, select_choices_or_calculations).
+    choice_col = next((c for c in dd.columns
+                       if "Choices" in c or c.strip() == "select_choices_or_calculations"), None)
+    type_col = next((c for c in dd.columns
+                     if c.strip().lower() in ("field type", "field_type")), None)
     choice_maps = {}
+    if not choice_col or not type_col:
+        print("WARNING: couldn't find the field-type / choices columns in the data dictionary — "
+              "coded fields won't be labelled. Expected 'Field Type' + 'Choices, Calculations, "
+              "OR Slider Labels' (website download) or field_type + "
+              "select_choices_or_calculations (API export).")
     if choice_col:
         for _, row in dd.iterrows():
             ftype = (row.get(type_col, "") if type_col else "")

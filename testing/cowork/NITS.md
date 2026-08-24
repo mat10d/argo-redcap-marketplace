@@ -102,3 +102,67 @@ Ranked. The top two are silent-data-loss class.
     two-workbook config — the layout mismatch made the session invent "the RAs merged the
     workbooks". Either ship qa-returns generated from a three-workbook build matching what the
     DD-driven config produces, or have generate_returns.py accept an arbitrary worklists dir.
+
+## Found by the Tier 1.5 walkthroughs on the 0.17.2 checkpoint (2026-08-24) — fix BEFORE release
+19. **SECURITY: `argo_redcap_client.run_check()` harvests every `*_TOKEN` env var and POSTs it to
+    REDCap** as a study key (sent CLAUDE_CODE_MESSAGING_TOKEN in a walkthrough), then reports
+    a false "not working" to the user with exit 1. Scope study-key discovery to variables
+    defined in the settings file it just loaded — never the whole process environment.
+20. **export.py defaults to labelled data; the QA builder and getting-files-from-redcap assume
+    raw.** The skill calls the key path and the website path interchangeable — they aren't.
+    Default export.py to raw (add --labels), and say which encoding each file is.
+21. export.py: a relative `--out` is cwd-anchored; anchor it at the settings file's folder (the
+    workspace) when not absolute.
+22. testing/walkthroughs/prepare.py: ARGO_PM_ROOT is templated from the task name, so a run dir
+    renamed after preparing points outside itself — add --name.
+23. **export.py reports physical line counts as "rows"** — 2,143 claimed vs 1,525 actual
+    patients (multi-line free-text fields). Count with csv.reader; say "patients/records" only
+    after checking for repeat-instrument rows.
+24. **BLOCKING: portfolio.py never loads the settings file** (`REDCAP_URL = os.environ.get(...)`
+    at import; ignores ARGO_ENV_FILE) — the weekly check's Part 1 fails as documented unless the
+    user sources the file by hand. Call the shared client's load_env_file() first, like every
+    other script. Add a guard test: every ARGO script that talks to REDCap must self-load.
+25. portfolio.py `--diff` on a first run says nothing about being the baseline — print "first
+    snapshot, nothing to compare against yet" explicitly.
+26. open_requests.py: doubled colons in summaries (DD labels already end with ':'); build-queue
+    lines should show the study's short name + PI like the portfolio does, so both halves of
+    the weekly check identify studies the same way.
+27. (nit) portfolio.py lives at the skill root instead of scripts/ — only such script; move or
+    document.
+28. qa-worklists SKILL.md never says which variant the RAs get. Decide: **with_MDC is the
+    default** (RAs revisit coded-missing cells too); no_MDC only when the QA specialist says
+    not to. State it in "Hand it to the RAs".
+29. **"Yellow" cells are rose (#FFC7CE).** Every RA instruction says yellow. Make the fill an
+    actual yellow (one constant shared by build_worklists, review_responses, ingest_response,
+    generate_returns) so the word and the colour agree; amber stays distinct.
+30. qa-worklists SKILL.md "Run it" block still opens with `set -a; source ~/.argo/.env` —
+    delete; the scripts self-load the settings file. Amber prerequisite row shows the raw
+    datediff expression — acceptable, but prefix it "couldn't read this condition:".
+31. qa-worklists Task 2 has no defined stopping state when there's no post-RA export (the common
+    no-key case): "confirm the gaps closed" and VERIFY both assume one. Say: send the questions,
+    ask for a fresh export, and stop — the round closes on the next pull.
+32. summarize_for_ra.py site-header parsing takes the first word (`## Site Alpha` → "site");
+    warn on collisions / use the whole header.
+33. **link-data read side speaks in write-back language**: diff_payload's file names
+    (*_update/_overwrite) and stdout ("Push ... with overwriteBehavior") when the user only wants
+    an analysis merge. Add `--for-analysis`: names files *_fills / *_disagreements, suppresses
+    push instructions.
+34. **link-data promises master_linkage.csv + *_integrity.csv but ships no code for them** — the
+    walkthrough hand-wrote build_master_linkage.py (adopt it: reads the diff engine's outputs,
+    adds cohort_linked/pathology_linked/link_class + suffixed duplicate columns, integrity table
+    worst-first).
+35. diff_payload.py and portfolio.py live at skill roots rather than scripts/ — fine, but
+    document the convention: a skill's OWN scripts at its root, the SHARED vendored ones in scripts/.
+36. start-here contradiction: Step 0 "a failing key is the exception to brevity — name it
+    plainly" vs the analyst landing's "no key talk at all". Resolve: a role landing that says no
+    key talk WINS for data-analyst-only users; key status is folded in silently.
+37. run-analysis scaffold.py's 00_explore template matches only website-style DD headers
+    ("Field Type", "Choices, ...") — on an API-style dictionary (field_type,
+    select_choices_or_calculations) it prints "Coded fields w/ map: 0" with no warning. Accept
+    both header styles (build_worklists already does) and warn when neither is found.
+38. run-analysis SKILL.md: say that categorical levels are reported in codebook order, never
+    alphabetical.
+39. new-study-documents template search (`find /mnt ~ -maxdepth 4 -iname "ARGO*Template*"`)
+    misses the nested tree fetch_templates.py itself writes, and searching all of `~` can pick
+    a stale copy from an unrelated folder. Search ONLY the workspace's
+    project-manager/templates-official, recursively.

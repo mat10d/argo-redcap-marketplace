@@ -2,41 +2,38 @@
 
 Read this first after any context compaction. It is the agreed state and plan.
 
-## CURRENT STATE + TODO (updated 2026-08-20 evening — supersedes the phase details below)
+## CURRENT STATE + TODO (updated 2026-08-24 — supersedes the phase details below)
 
-Done today: 0.17.0 (role-first restructure, one plugin per role, task-named skills),
-Phase 1.5 wave 2 (191 tests, per-role synthetic fixtures), 0.17.1 (active key solicitation
-at onboarding). **Rounds 10–11 (onboarding, from scratch) PASSED live and reproducibly** on
-current code; the user's real workspace is onboarded, all 6 keys verified; that state is
-banked as `baseline/env-onboarded`.
+**Live on Cowork (0.17.1), all passed:** onboarding ×2, returning user, analyst Table 1
+(numbers verified), QA worklists (cells verified), queue landing, a REAL study build (study 17:
+309 fields from File-Repository questionnaires), documents from a real protocol (parked for
+collaborator review), QA audit (worked by improvisation → fixed), export/QA with no key.
 
-The list to Monday, in order:
-1. **Returning-user round** — `help me with ARGO` on the already-onboarded workspace. The
-   one unproven piece of the core loop. Pass: "five tracker keys connect" + 0.17.1 stamp,
-   no key offer, no role question, one routing question.
-2. **Analyst round** on the SYNTHETIC study (first: switch harness baseline fixtures from
-   the real CRC export to testing/fixtures/synthetic-study — patient data leaves the loop).
-3. **QA round** (synthetic export + qa_fields.yaml → per-site workbooks in qa-specialist/).
-4. **DB-manager round** — "show my outstanding requests", first live open_requests.py run.
-5. **Repeat 1+2** once each → they become the Monday demo script.
-6. **0.17.2 fix batch (tomorrow)** — the ranked defect queue at the top of
-   testing/cowork/NITS.md. Two calls settled and implemented in the batch:
-   - **SIR progress rule = LENIENT everywhere.** A step counts as done when its field holds any
-     settled answer that isn't "No"/"0"/"" (radios like `data_imported` = "Prospective study,
-     not required" count). One helper, `argo_trackers.sir_progress(record) -> (done, total)`,
-     imported by both `portfolio.py` and `open_requests.py`; the divergence-pinning test now
-     asserts they agree.
-   - **The database manager owns monitoring.** `monitor-studies` moved from
-     argo-project-manager to argo-database-manager as **`weekly-check`**, and absorbed the
-     open-request queue: one run = programme status (`portfolio.py --diff`) + the queues
-     (`open_requests.py`), routed to build-study / export-data / link-data. **`manage-redcaps`
-     retired entirely** — `make_roles_csv.py` moved into build-study step 4, `set_roles.py`
-     deleted, the roles-CSV reference folded into `standard-roles.md`, and adding people is
-     now plainly a REDCap-UI job (there is no add-users skill). The PM plugin keeps only
-     `new-study-documents`. Snapshots land in `database-manager/weekly-check/`.
-7. **Matteo, admin**: batch tracker-key request to the OAU admin (rights matrix in
-   access-tiers; longest lead time — send first); org refresh after 0.17.2.
-8. **Fri/Sat**: one-page team handout (Claude drafts, Matteo reviews); demo = rounds 1+2.
+**0.17.2 is built and checkpoint-committed (e352863), NOT yet released.** Five slices +
+Tier 1.5 walkthroughs: eight tasks walked through by subagents on the new code, persona-answered,
+**8/8 pass, every number matched engineered truth**. They found 21 more defects (NITS 19–39,
+incl. a security-shaped one: --check posted any `*_TOKEN` env var to REDCap); all fixed or in
+the pre-release fix batch. Q/A logs for Matteo's review: testing/walkthroughs/REVIEW-2026-08-24.md.
+
+**The reorg in 0.17.2:** database manager = `weekly-check` (status + queues, absorbed the old
+monitor-studies + queue) → `build-study` → `export-data` → `link-data`; `manage-redcaps`
+retired (add-users wiped; roles CSV lives in build-study); PM = `new-study-documents` only.
+Lenient progress rule everywhere. Language preflight (Python/R/Stata) in --check and
+run-analysis. IRB changelog rule in build-study.
+
+Next, in order:
+1. Fix-batch lands → suite green → whole-read touched SKILL.mds → `release.py --bump patch`
+   (0.17.2) → push → **org refresh (plugin names unchanged from 0.17.0)**.
+2. Matteo reviews REVIEW-2026-08-24.md: are the QUESTIONS right? Adjust skills accordingly.
+3. Cowork sweep on 0.17.2, from a WIPED workspace, user-provided data only
+   (~/Desktop/ARGO-test-data is the kit): (a) fresh setup incl. the Analysis-tools line;
+   (b) widget correctness per question; (c) wire weekly-check as a Cowork scheduled task
+   (template: weekly-check/references/scheduled-weekly-check.md); (d) study-17 step-marking
+   writes when the project exists.
+4. Windows probe (friend's machine; ARGO-test-data/WINDOWS-PROBE.md) → fixes → SETUP.md
+   Windows section.
+5. Matteo: OAU batch key request (send first — longest lead time).
+6. Fri/Sat: one-page handout; demo = onboarding + analyst rounds.
 
 ## Honest stocktake
 

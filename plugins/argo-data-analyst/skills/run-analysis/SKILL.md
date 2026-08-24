@@ -171,6 +171,9 @@ should stand alone: someone with only this directory can rerun every script and 
 - **Missing-data codes:** convert `-666/-777/-888/-999` (and `666` N/A) to missing before
   computing stats; report missingness explicitly. Never average a column that still contains
   sentinels. See [[mdc-rules]].
+- **Level order:** categorical levels appear in **codebook order** (the order of the choice
+  list in the data dictionary), never alphabetical — "Single, Married, Widowed, Divorced" as
+  the form lists them, not "Divorced, Married, …".
 - **Coded vs labeled:** compute on raw codes, but label categories in human-facing tables/figures
   using the dictionary's choice map.
 - **Checkbox fields:** exported as `field___N` 0/1 columns; expand/label from the dictionary.

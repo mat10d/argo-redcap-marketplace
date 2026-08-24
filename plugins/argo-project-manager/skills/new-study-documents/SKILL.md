@@ -85,9 +85,11 @@ Repository**, not in this skill — the toolkit's repository is public and the t
 internal contact details, so they are fetched or downloaded, never bundled. Precedence:
 
 1. **Already in the workspace?** Look before fetching:
-   `find /mnt ~ -maxdepth 4 -iname "ARGO*Template*" -name "*.docx" 2>/dev/null | head`
-   (the canonical home is `project-manager/templates-official/`; a downloaded
-   `FileRepository_*/ARGO Templates/` also counts)
+   `find "<workspace>/project-manager/templates-official" -name "*.docx" 2>/dev/null | head`
+   — search the connected ARGO folder only, recursively (the fetch step writes a nested
+   tree). Never search the whole home folder: a copy from an unrelated folder may be stale
+   and carries staff contact details. A `FileRepository_*/ARGO Templates/` folder the user
+   downloaded by hand and dropped into the workspace also counts.
 2. **Not there, and the Study Tracker key is configured?** Fetch once into the workspace:
    `python3 fetch_templates.py --to <workspace>/project-manager/templates-official`
 3. **Neither?** Use the markdown skeletons below and render via the docx skill — the content is

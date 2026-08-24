@@ -72,9 +72,10 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--task", required=True, choices=sorted(TASKS))
     ap.add_argument("--keys", action="store_true", help="copy ~/.argo/.env into the workspace")
+    ap.add_argument("--name", help="run folder name (default: the task name)")
     a = ap.parse_args()
     spec = TASKS[a.task]
-    run = RUNS / a.task
+    run = RUNS / (a.name or a.task)
     if run.exists():
         shutil.rmtree(run)
     ws, up = run / "workspace", run / "uploads"

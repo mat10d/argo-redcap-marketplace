@@ -41,7 +41,9 @@ Fold the result into your ONE confirmation line:
 - `Settings found …` + all keys verified → "You're set up — your five tracker keys connect."
 - **A key failing** is the exception to brevity: name it plainly ("your Data Request key isn't
   working — the others are fine"), say you can fix it after, then ask the role question anyway.
-  Never block on it.
+  Never block on it. **Exception:** if every role they hold is data analyst, say nothing about
+  keys at all — the analyst landing's "no key talk" rule wins, because an analyst has no key to
+  fix and the failure can't affect their work.
 - **Settings found but no keys configured** → one line confirming setup, then **one sentence**
   offering the keys ("I can put your settings file on screen whenever you want to add your
   access keys"), then the role question. Do not lecture, and do not turn it into a menu item.

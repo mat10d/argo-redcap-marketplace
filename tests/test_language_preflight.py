@@ -15,6 +15,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import platform
+import re
 import subprocess
 import sys
 import tempfile
@@ -271,3 +272,57 @@ class TestTheSkillTellsAgentsToUseIt(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestExploreScriptReadsBothDictionaryStyles(unittest.TestCase):
+    """The scaffolded 00_explore.py must label coded fields whether the data dictionary came
+    from the website download ("Field Type" headers) or the API export (field_type headers).
+    A walkthrough on the API-style fixture printed "Coded fields w/ map: 0" with no warning."""
+
+    FIXTURE = REPO / "testing" / "fixtures" / "synthetic-study"
+
+    def _run(self, dd_path):
+        tmp = Path(tempfile.mkdtemp())
+        root = tmp / "study"
+        proc = subprocess.run(
+            [sys.executable, str(SCAFFOLD), str(root),
+             "--export", str(self.FIXTURE / "records.csv"),
+             "--dictionary", str(dd_path)],
+            capture_output=True, text=True, timeout=180)
+        self.assertEqual(proc.returncode, 0, proc.stderr[-800:])
+        run = subprocess.run([sys.executable, "scripts/00_explore.py"], cwd=root,
+                             capture_output=True, text=True, timeout=180)
+        self.assertEqual(run.returncode, 0, run.stderr[-800:])
+        return run.stdout
+
+    def test_api_style_headers_yield_choice_maps(self):
+        try:
+            import pandas  # noqa: F401
+        except ImportError:
+            self.skipTest("pandas not installed")
+        out = self._run(self.FIXTURE / "datadictionary.csv")
+        m = re.search(r"Coded fields w/ map:\s*(\d+)", out)
+        self.assertIsNotNone(m, out[-600:])
+        self.assertGreater(int(m.group(1)), 0, "API-style dictionary yielded no choice maps")
+        self.assertNotIn("WARNING", out)
+
+    def test_website_style_headers_yield_choice_maps(self):
+        try:
+            import pandas  # noqa: F401
+        except ImportError:
+            self.skipTest("pandas not installed")
+        import csv
+        src = list(csv.reader(open(self.FIXTURE / "datadictionary.csv")))
+        website = ["Variable / Field Name", "Form Name", "Section Header", "Field Type",
+                   "Field Label", "Choices, Calculations, OR Slider Labels", "Field Note",
+                   "Text Validation Type OR Show Slider Number", "Text Validation Min",
+                   "Text Validation Max", "Identifier?", "Branching Logic (Show field only if...)",
+                   "Required Field?", "Custom Alignment", "Question Number (surveys only)",
+                   "Matrix Group Name", "Matrix Ranking?", "Field Annotation"]
+        tmp = Path(tempfile.mkdtemp()) / "dd_web.csv"
+        with open(tmp, "w", newline="") as fh:
+            w = csv.writer(fh); w.writerow(website[:len(src[0])]); w.writerows(src[1:])
+        out = self._run(tmp)
+        m = re.search(r"Coded fields w/ map:\s*(\d+)", out)
+        self.assertIsNotNone(m, out[-600:])
+        self.assertGreater(int(m.group(1)), 0)
