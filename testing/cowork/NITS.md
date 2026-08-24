@@ -66,3 +66,39 @@ Ranked. The top two are silent-data-loss class.
 - **API close-out for 222/223 needs import rights** those keys don't have (rights matrix grants
   import only to 224/221). Until the OAU batch key request includes that, marking a data/linking
   request complete is a REDCap-UI step — the skills say so. Revisit after keys are issued.
+11. **setup_brief.py derives File Repository site names from stale/hardcoded data** (real
+    build round, study 17, 2026-08-20): brief said "SiteUch"/"SiteUniosun" (a previous
+    Nigerian study's sites) for an MSKCC study sited in Ghana/South Africa/Tanzania. The
+    session caught and hand-fixed it. Find where site names come from and derive them from
+    the SIR record's institutions.
+12. **build-study: QUESTIONNAIRE_CHANGELOG.md is now doctrine** (Matteo, 2026-08-21): the DD
+    mirrors the printed IRB-approved form exactly (typos, numbering, no-option columns → free
+    text, as-is); substantive defects go in a changelog marked "needs IRB amendment: yes/no".
+    SKILL.md updated (uncommitted, rides in 0.17.2); setup_brief/BUILD_NOTES templates should
+    reference the changelog deliverable.
+13. **Ask about the data, don't hunt for it** (Matteo, 2026-08-21): sessions scan the connected
+    folder and assume a found file is "the study" (QA session nearly used the analyst's
+    synthetic export as the CRC export). Rule for every file-consuming skill (qa-worklists,
+    run-analysis, link-data, export-data): if the user hasn't named/attached the files, ASK
+    where the data is — or name what you found and confirm with ONE question — never assume.
+14. **export-data: use export.py, never hand-rolled client calls** (export round, 2026-08-21):
+    the agent improvised a python snippet with a malformed `fields` param; the client raised a
+    plain error but a raw traceback reached the chat. SKILL.md must say: the script is the
+    only path. Also: with no study key, export-data should SOLICIT the key (file card, wait,
+    verify) rather than default to website instructions — an export to disk is the whole point.
+15. **Settings search order: `~/.argo/.env` before the connected folder** made a dev-machine key
+    look like a workspace key (Claude Code found CRC_TOKEN in ~/.argo/.env; Cowork sessions
+    never could). Users have no ~/.argo, so harmless for them, but --check should say WHICH
+    file each key came from when more than one settings file is in play.
+16. **qa-worklists: fields.yaml must not be a user-facing input** (Matteo, 2026-08-21): "the
+    idea that you show up with a fields yaml is just confusing." The skill authors the config
+    from the data dictionary (as the live session did unprompted), proposes the workbooks
+    (which forms/fields, per site) and asks ONE confirming question; the yaml is an internal
+    artifact saved beside the worklists for reruns, never something the user is asked for.
+17. **`summarize_for_ra.py` hard-requires a study key** (audit round, 2026-08-21): no
+    file-based mode, so the audit's last step isn't token-optional; the session hand-wrote the
+    RA summaries. Give it --records-csv/--metadata-csv like the builder.
+18. **Test kit: generate RA returns FROM the session's own worklists**, not from the fixture's
+    two-workbook config — the layout mismatch made the session invent "the RAs merged the
+    workbooks". Either ship qa-returns generated from a three-workbook build matching what the
+    DD-driven config produces, or have generate_returns.py accept an arbitrary worklists dir.

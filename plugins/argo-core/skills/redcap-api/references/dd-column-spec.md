@@ -25,7 +25,7 @@ description: REDCap data dictionary CSV column reference — 18 columns, field t
 | 14 | Custom Alignment | Field alignment | `LH`, `RH`, `LV`, `RV` |
 | 15 | Question Number | Survey question # | `1`, `2a` |
 | 16 | Matrix Group Name | Groups matrix questions | `satisfaction_matrix` |
-| 17 | Matrix Ranking? | Enable ranking | `y` or blank |
+| 17 | Matrix Ranking? | Enable ranking | blank in ARGO builds (`dd_builder.py` always writes it blank; set by hand if a study ever needs ranking) |
 | 18 | Field Annotation | Internal notes/tags | `@HIDDEN`, `@READONLY` |
 
 ## Field types
@@ -125,7 +125,9 @@ no_insurance_reason,form,,notes,"Reason for no insurance",,,,,,,"[has_insurance]
 ```
 
 ### Date fields
-**Always use `date_dmy`** (DD-MM-YYYY) for ARGO dates.
+**Always use `date_dmy`** (DD-MM-YYYY) for ARGO dates. Whichever date/datetime validation a field
+carries, its Field Note takes the **date-format** MDC codes, never the text-format ones
+([[mdc-rules]]).
 ```
 start_date,form,,text,"Start Date",,,date_dmy,,,,,,,,,,
 ```
@@ -169,3 +171,4 @@ swift_code,form,,text,"SWIFT Code",,,,,,y,,,,,,,
 | `@USERNAME` | Auto-fill username |
 | `@CALCTEXT` | Display calculated text |
 | `@HIDECHOICE='x,y'` | Hide specific choice codes (data preserved, not selectable). Useful for legacy/pending values |
+| `@MDC-EXEMPT` | **ARGO marker, not a REDCap tag.** Declares that this field is exempt from Missing Data Codes — `validate_dd.py` skips every MDC check on it, and on the whole matrix group if the field is in one. For validated psychometric / Likert scales. See [[mdc-rules]] |

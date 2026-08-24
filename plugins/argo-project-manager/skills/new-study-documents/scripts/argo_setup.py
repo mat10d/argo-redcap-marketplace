@@ -28,9 +28,9 @@ from pathlib import Path
 # The folders every ARGO workspace gets — one per ARGO role, so each person's work lands in
 # their own folder. ONE list, used by scaffold, the README, and every message about it.
 WORKSPACE_SUBDIRS = (
-    ("project-manager",  "Portfolio snapshots, and documents for new studies"),
+    ("project-manager",  "New-study documents, and the official templates fetched to build them"),
     ("qa-specialist",    "QA worklists sent to sites, and the ones they send back"),
-    ("database-manager", "Builds, exports, user-rights files, linkage output"),
+    ("database-manager", "Weekly-check snapshots, builds, exports, linkage output"),
     ("data-analyst",     "Analysis scripts and their outputs, and the exports they read"),
 )
 WORKSPACE_DIR_NAMES = tuple(name for name, _ in WORKSPACE_SUBDIRS)
@@ -89,9 +89,9 @@ folder shared with a colleague still makes sense, and so nothing lands in a surp
 |---|---|
 | `.env` | Your role, your REDCap web address, and your access keys. **Private — never share or commit this.** |
 | `Add keys here.command` | Double-click it: your settings file opens in a text editor. |
-| `project-manager/` | Portfolio snapshots, and documents for new studies |
+| `project-manager/` | New-study documents, and the official templates fetched to build them |
 | `qa-specialist/` | QA worklists sent to sites, and the ones they send back |
-| `database-manager/` | Builds, exports, user-rights files, linkage output |
+| `database-manager/` | Weekly-check snapshots, builds, exports, linkage output |
 | `data-analyst/` | Analysis scripts and their outputs, and the exports they read |
 
 ## Using it
@@ -170,6 +170,16 @@ def run_check(work_dir: Path) -> int:
         print("These open patient data — keep this folder private. The connection check\n"
               "(argo_redcap_client.py --check) verifies these too.")
 
+    # Which analysis languages this computer can run. Analysts need Python; R and Stata are
+    # optional. Reported here because a session's PATH hides installed programs (see
+    # argo_tools.py) and "R is not installed" was said once on a machine that had R.
+    print("\nAnalysis tools:")
+    try:
+        from argo_tools import report as report_tools
+        report_tools()
+    except Exception as e:                                   # a check must never fail on this
+        print(f"  I couldn't check which analysis languages are installed ({e}).")
+
     if "REDCAP_URL" in blank or "REDCAP_URL" not in filled:
         print(
             "\nThe REDCap web address is still blank, and nothing can talk to REDCap without it.\n"
@@ -205,7 +215,9 @@ def scaffold(work_dir: Path, creds_dir: "Path | None" = None, say=print) -> "Pat
     if not env_path.exists():
         tracker_lines = "\n".join(f"{var}=" for var, _desc in TIER1)
         write_private(env_path, ENV_TEMPLATE.format(
-            env_path=env_path, pm_root=work_dir / "project-manager",
+            # Weekly-check snapshots belong to the database manager (0.17.2); the variable
+            # keeps its old name so existing settings files still work.
+            env_path=env_path, pm_root=work_dir / "database-manager",
             tracker_lines=tracker_lines, redcap_url=ARGO_REDCAP_URL))
 
     # A double-clickable way in for people who will never type a path: Finder -> double-click

@@ -34,7 +34,20 @@ FIXTURE = REPO / "testing" / "fixtures" / "synthetic-study"
 ANALYSIS = FIXTURE / "analysis"
 GOLDEN = ANALYSIS / "expected_table1.csv"
 
-RSCRIPT = shutil.which("Rscript")
+def _find_rscript():
+    """R via the toolkit's own preflight (probes known locations, not just PATH)."""
+    import importlib.util
+    tools = REPO / "plugins/argo-core/skills/redcap-api/scripts/argo_tools.py"
+    try:
+        spec = importlib.util.spec_from_file_location("argo_tools", tools)
+        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        info = mod.detect(probe_versions=False).get("r") or {}
+        return info.get("path") or shutil.which("Rscript")
+    except Exception:
+        return shutil.which("Rscript")
+
+
+RSCRIPT = _find_rscript()
 
 # R and Python both round through C's printf, so in practice they agree to the
 # last printed digit. The tolerance exists so a future platform whose printf

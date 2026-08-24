@@ -17,7 +17,7 @@ so that the two consumers of that shape can be driven with no network and no key
                                                                         _form_fields,
                                                                         _summarise,
                                                                         _sir_progress)
-    plugins/argo-project-manager/skills/monitor-studies/portfolio.py    (sir_progress,
+    plugins/argo-database-manager/skills/weekly-check/portfolio.py      (sir_progress,
                                                                         summarize, collect
                                                                         bucketing)
 

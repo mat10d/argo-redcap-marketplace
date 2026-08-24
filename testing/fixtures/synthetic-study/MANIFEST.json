@@ -396,26 +396,26 @@
   "returned": {
     "expected_review_responses": {
       "clinical_core_site_alpha": {
-        "amber_cells_detected": 0,
+        "amber_cells_detected": 3,
         "changed_cells": 13,
         "note_only_records": 3,
-        "out_of_scope_edits_detected": 0,
-        "records_with_proposed_updates": 12,
+        "out_of_scope_edits_detected": 3,
+        "records_with_proposed_updates": 15,
         "response_column_present": true
       },
       "clinical_core_site_beta": {
-        "amber_cells_detected": 0,
+        "amber_cells_detected": 2,
         "changed_cells": 8,
         "note_only_records": 2,
-        "out_of_scope_edits_detected": 0,
-        "records_with_proposed_updates": 7,
+        "out_of_scope_edits_detected": 2,
+        "records_with_proposed_updates": 9,
         "response_column_present": true
       },
       "demo_followup_site_alpha": {
         "amber_cells_detected": 0,
         "changed_cells": 6,
         "note_only_records": 2,
-        "out_of_scope_edits_detected": 0,
+        "out_of_scope_edits_detected": 2,
         "records_with_proposed_updates": 6,
         "response_column_present": true
       },
@@ -423,7 +423,7 @@
         "amber_cells_detected": 0,
         "changed_cells": 4,
         "note_only_records": 1,
-        "out_of_scope_edits_detected": 0,
+        "out_of_scope_edits_detected": 2,
         "records_with_proposed_updates": 4,
         "response_column_present": true
       }
@@ -472,6 +472,7 @@
           }
         ],
         "out_of_scope_edits": 3,
+        "records_with_answers": 15,
         "records_with_changed_cells": 12,
         "returned_file": "clinical_core_site_alpha_RETURNED.xlsx",
         "source_worklist": "clinical_core_site_alpha.xlsx",
@@ -510,6 +511,7 @@
           }
         ],
         "out_of_scope_edits": 2,
+        "records_with_answers": 9,
         "records_with_changed_cells": 7,
         "returned_file": "clinical_core_site_beta_RETURNED.xlsx",
         "source_worklist": "clinical_core_site_beta.xlsx",
@@ -545,6 +547,7 @@
           }
         ],
         "out_of_scope_edits": 2,
+        "records_with_answers": 6,
         "records_with_changed_cells": 6,
         "returned_file": "demo_followup_site_alpha_RETURNED.xlsx",
         "source_worklist": "demo_followup_site_alpha.xlsx",
@@ -579,6 +582,7 @@
           }
         ],
         "out_of_scope_edits": 2,
+        "records_with_answers": 4,
         "records_with_changed_cells": 4,
         "returned_file": "demo_followup_site_beta_RETURNED.xlsx",
         "source_worklist": "demo_followup_site_beta.xlsx",
@@ -599,6 +603,7 @@
       "notes_on_changed_rows": 11,
       "notes_only_rows": 8,
       "out_of_scope_edits": 9,
+      "records_with_answers": 34,
       "records_with_changed_cells": 29,
       "yellow_cells_total": 66
     }

@@ -18,6 +18,16 @@ your settings file. See [[access-tiers]].
 REDCap. If it isn't, I use the two files you download from REDCap (Data Export + Designer →
 Download Data Dictionary) — I'll tell you which one I used. See [[token-optional]].
 
+**Where the data is — I ask, I don't hunt.** If you haven't attached or named the export, I ask
+you where it is. If there are plausible files already in the folder, I *name what I found* and
+ask one question to confirm; I never pick a file because it looked like the right one. (A QA
+session once came within a step of auditing the analyst's synthetic export as though it were
+the study.)
+
+**If a tool can't run, I say so.** No hand-written stand-in for a script's output, no invented
+counts, no "here is roughly what it would have said". If a step fails or a library is missing
+you get the plain reason and what to do about it, and the round stops there until it's fixed.
+
 **Shared references**
 - [[mdc-rules]] — how MDC sentinels (-666/-777/-888/-999, 666=N/A) are interpreted
 - [[redcap-api-gotchas]] — read-side OK; a QA round never writes back
@@ -32,29 +42,42 @@ pre-lock QA before a data freeze, or to re-check after RAs have updated REDCap.
 ### What you need
 
 1. **The data** — either the study's access key in your settings file, or a record-export CSV
-   plus a Data Dictionary CSV downloaded from REDCap.
-2. **Fields YAML** — names the workbooks and lists the fields each one covers. Order fields so
-   gate fields come *before* their dependents.
-
-   ```yaml
-   workbooks:
-     - name: clinical
-       title: Clinical
-       fields:
-         - biopsy
-         - biopsy_site         # gated by [biopsy]="1"
-         - treatment_received  # checkbox
-         - surgery_intent      # gated by [treatment_received(1)]="1"
-     - name: followup
-       title: Follow-up
-       fields:
-         - last_followup_status
-         - death_date1
-         - recur1
-   ```
-
-3. (Optional) **Scope CSV** — one column of record IDs to restrict to. Use when the project has
+   plus a Data Dictionary CSV downloaded from REDCap. I ask you where these are; I don't go
+   looking (see *Where the data is* above).
+2. (Optional) **Scope CSV** — one column of record IDs to restrict to. Use when the project has
    rows the RA cohort doesn't own (e.g. linkage to a parent study).
+
+That is the whole list. Which workbooks, and which fields go in each, is my job — next section.
+
+### The workbook plan — I write it, you confirm it
+
+`build_worklists.py` is driven by a small YAML file naming the workbooks and the fields each
+one covers. **You are never asked to produce it, or to have one already.** I read the data
+dictionary, group the QA-relevant fields into workbooks (normally one per form), order each
+list so gate fields come *before* the fields they gate, then show you the proposal — the
+workbooks, the fields in each, the sites they'll be split across — and ask **one** question:
+is this the right set? Adjust or confirm, and I build.
+
+It is saved as `qa_fields.yaml` beside the worklists (path below) so the next round reruns
+identically, and so you can hand-edit it if you ever want to. It is a working file the tool
+needs, not homework.
+
+```yaml
+workbooks:
+  - name: clinical
+    title: Clinical
+    fields:
+      - biopsy
+      - biopsy_site         # gated by [biopsy]="1"
+      - treatment_received  # checkbox
+      - surgery_intent      # gated by [treatment_received(1)]="1"
+  - name: followup
+    title: Follow-up
+    fields:
+      - last_followup_status
+      - death_date1
+      - recur1
+```
 
 ### Run it
 
@@ -63,7 +86,7 @@ set -a; source ~/.argo/.env; set +a   # makes REDCAP_URL and your access keys av
 python3 .../argo-qa-specialist/skills/qa-worklists/build_worklists.py \
     --url "$REDCAP_URL" \
     --token-env CRC_TOKEN \
-    --fields fields.yaml \
+    --fields qa_fields.yaml \
     --out qa-specialist/<study>/worklists \
     --id-field research_number \
     --extra-id-cols collaboration_identifier \
@@ -71,6 +94,7 @@ python3 .../argo-qa-specialist/skills/qa-worklists/build_worklists.py \
 ```
 
 `--token-env` takes the *name* of the setting that holds your access key, never the key itself.
+`--fields` points at the `qa_fields.yaml` I wrote and you confirmed.
 
 *No key?* Replace `--url`/`--token-env` with `--records-csv export.csv --metadata-csv
 data_dictionary.csv` — everything else is the same, and the Data Dictionary's human column
@@ -87,6 +111,9 @@ qa-specialist/<study>/worklists/<round>/
     followup_<DAG>.xlsx
 ```
 
+Write the config to `qa-specialist/<study>/worklists/qa_fields.yaml` — one level above the
+round folders, so every round shares it and a change to the plan shows up as a diff.
+
 ### What the RA sees
 
 - One row per patient, one column per field.
@@ -99,18 +126,23 @@ qa-specialist/<study>/worklists/<round>/
   there were none — but it exists so a field is never silently omitted.
 - A second header row (`only if ...`) shows each field's prerequisite in plain English ("only if treatment_received includes Surgery").
 - "Gate context" columns are surfaced automatically: if `surgery_intent` is flagged because `treatment_received` includes Surgery, the workbook also shows `treatment_received` so the RA can see *why*.
-- Workbook is filtered — only patients and fields that have at least one yellow cell appear.
+- Workbook is filtered — only patients and fields with at least one highlighted cell appear.
 
 ### Hand it to the RAs
 
 Send each site its own workbook, and tell them:
 
 1. Open the workbook for your site.
-2. For each yellow cell: open the patient in REDCap, check source notes, fill in REDCap.
-3. In the spreadsheet, type either the actual value, `filled`, or an MDC code into the yellow
-   cell to mark it resolved. RAs often add a `RESPONSE` column with per-row context (why they
-   couldn't fill, "RESOLVED" marker, patient died, etc.) — `review_responses.py` picks this up.
-4. Send the workbook back.
+2. For each highlighted cell — yellow, or amber if the column asks you to check whether the
+   field applies — open the patient in REDCap, check source notes, fill in REDCap.
+3. In the spreadsheet, type either the actual value, `filled`, or an MDC code into that cell to
+   mark it resolved. The last column, `RESPONSE`, is for per-row context (why you couldn't
+   fill it, a "RESOLVED" marker, patient died, etc.) — `review_responses.py` reads it, and
+   picks up a differently-named comment column if a site adds their own.
+4. Change only the highlighted cells and `RESPONSE`. Anything else you edit is reported back to
+   us as an unrequested change — if something elsewhere in the row is wrong, say so in
+   `RESPONSE` instead.
+5. Send the workbook back.
 
 RAs enter changes in REDCap directly so REDCap's branching, validation, and audit trail apply.
 The spreadsheet is a worklist, not a data-entry form.
@@ -131,9 +163,16 @@ python3 .../argo-qa-specialist/skills/qa-worklists/review_responses.py \
 ```
 
 `review_responses.py` reports, grouped by record:
-- **Cells the RA changed** (was-yellow + now-non-blank) with the RA's RESPONSE note next to them
+- **Cells the RA answered** — a cell the worklist flagged that now holds a different, non-blank
+  value — with the RA's RESPONSE note next to them. Yellow *and* amber cells count: an answer
+  in an amber cell is still an answer. Amber ones are tagged `[AMBER …]` in the output, because
+  amber meant "we couldn't read this field's condition" — confirm the field applies at all
+  before you act on the value.
 - **Records with RA notes but no cell changes** (often "RESOLVED" without filling — verify
   directly in REDCap, or "patient died/care elsewhere" — no action)
+- **Cells changed that were NOT on the worklist** — a gate-context column, an ID column, any
+  field nobody flagged. Listed separately, at the end, because they are not answers to anything
+  we asked.
 
 Sort each answer into one of four buckets:
 
@@ -143,6 +182,11 @@ Sort each answer into one of four buckets:
 | **QUESTION_FOR_RA** | Ambiguous (e.g. RA wrote "NO SURGERY" into a select field, or a value that doesn't exist in the DD's choice list) | Append to `RA_questions.md` |
 | **NO_ACTION** | RA explained why blank (patient died with no chart, care happened off-site) and no recode is warranted | Nothing |
 | **VERIFY** | RA marked RESOLVED but didn't fill the cell — likely fixed directly in REDCap | Re-pull and confirm; if filled, drop. If still blank, ask. |
+
+Out-of-scope edits are **not** one of the four buckets — nobody asked for them, so none of the
+four applies. Each one becomes its own question to the RA: what did you change here, and why?
+And if a *gate* field changed, rebuild that site's worklist afterwards — different fields may
+apply now.
 
 ### Ask the open questions
 
@@ -178,14 +222,19 @@ a clean "did this round do what we expected" check.
 
 ```bash
 python3 .../argo-qa-specialist/skills/qa-worklists/summarize_for_ra.py \
-    --url "$REDCAP_URL" --token-env CRC_TOKEN \
+    --metadata-csv data_dictionary.csv \
     --questions qa-specialist/<study>/RA_questions.md \
     --out qa-specialist/<study>/RA_summaries/ --round-label "<today>"
 ```
 
+*Have the study's key?* Replace `--metadata-csv data_dictionary.csv` with `--url "$REDCAP_URL"
+--token-env CRC_TOKEN`. Either way the dictionary is only used to turn field codes back into
+the wording the RA will recognise — no key is required for this step.
+
 Outputs `RA_summaries/<round>/<site>.md` per site, each with the questions still open for that
 RA, pulled from the `RA_questions.md` sections matching the site name. (`--push-drafts` is a
-migration-only input — see [[migration-push]]; in a QA round point it at an empty folder.)
+migration-only input — see [[migration-push]]; a normal QA round stages nothing, so leave it
+out entirely.)
 
 ## When a field is "applicable"
 

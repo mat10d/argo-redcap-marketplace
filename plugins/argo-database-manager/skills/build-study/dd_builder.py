@@ -12,11 +12,24 @@ MDC is applied automatically unless the field is exempt:
   - the first field (record identifier) — exempt
   - field types descriptive / calc / file — exempt
   - radio/dropdown/checkbox  -> the four MDC values appended to the choices
-  - text/notes               -> text-format MDC in the Field Note
-  - date_dmy/datetime_dmy    -> date-format MDC in the Field Note
-Pass mdc=False on a field to opt out (e.g. admin fields like hospital_site);
-note that validate_dd.py still requires MDC on radio/dropdown/checkbox, so an
-opt-out there will be flagged — keep opt-outs to genuinely exempt fields.
+  - text/notes with any date/datetime validation -> date-format MDC in the Field Note
+  - every other text/notes field -> text-format MDC in the Field Note
+
+A field that already has its own Field Note keeps it: the MDC note is APPENDED to
+what you wrote, never substituted for it.
+
+`mdc=False` is the only opt-out, and it is visible in the dictionary — dd_builder
+writes `@MDC-EXEMPT` into the Field Annotation column, and validate_dd.py honours
+that annotation (on a single field, or on any field of a matrix group, which exempts
+the whole group). Use it for validated psychometric / Likert scales, which ARGO
+policy exempts; not to dodge MDC on ordinary clinical fields. See [[mdc-rules]].
+
+`yesno` is refused at build time — it cannot hold MDC codes. Use `radio` with
+"1, Yes | 0, No" and dd_builder adds the MDC choices for you.
+
+The `Matrix Ranking?` column is always written blank: ARGO does not use REDCap's
+ranking matrices and dd_builder has no option to switch one on. A study that needs
+ranking has to set that column by hand after the build.
 
 Two ways to use it:
 
@@ -53,6 +66,10 @@ HEADER = ["Variable / Field Name", "Form Name", "Section Header", "Field Type", 
           "Custom Alignment", "Question Number (surveys only)", "Matrix Group Name",
           "Matrix Ranking?", "Field Annotation"]
 
+# Written into Field Annotation when a field opts out of MDC (mdc=False).
+# validate_dd.py honours it — keep the two spellings identical.
+MDC_EXEMPT_ANNOTATION = "@MDC-EXEMPT"
+
 EXEMPT_TYPES = {"descriptive", "calc", "file"}
 EXEMPT_VARS = {"hospital_number", "hospital_site"}  # identifiers set by study team, not MDC-coded
 CHOICE_TYPES = {"radio", "dropdown", "checkbox"}
@@ -66,15 +83,29 @@ class DD:
     def field(self, var, type, label, choices="", note="", valid="", min="", max="",
               identifier="", branching="", required="", section="", align="",
               qnum="", matrix="", annotation="", form=None, mdc=True):
+        if type == "yesno":
+            raise ValueError(
+                f"field '{var}': the REDCap field type 'yesno' can't be used in an ARGO study. "
+                "A yes/no field has no room for the missing-data codes ARGO puts on every "
+                "clinical field. Use type 'radio' with choices \"1, Yes | 0, No\" instead — "
+                "this builder adds the missing-data codes to it for you.")
         is_first = not self.rows  # first field is the record identifier — never gets MDC
-        if mdc and not is_first and type not in EXEMPT_TYPES and var not in EXEMPT_VARS:
-            if type in CHOICE_TYPES:
-                choices = (choices + " | " + MDC_CHOICES) if choices else MDC_CHOICES
-            elif type in ("text", "notes") and not note:
-                note = DATE_MDC if valid in ("date_dmy", "datetime_dmy") else TEXT_MDC
+        if not is_first and type not in EXEMPT_TYPES and var not in EXEMPT_VARS:
+            if mdc:
+                if type in CHOICE_TYPES:
+                    choices = (choices + " | " + MDC_CHOICES) if choices else MDC_CHOICES
+                elif type in ("text", "notes"):
+                    # date/datetime validations all take the date-format codes; a custom
+                    # Field Note is kept and the MDC note appended to it.
+                    mdc_note = DATE_MDC if str(valid).startswith("date") else TEXT_MDC
+                    if mdc_note not in note:
+                        note = (note + " " + mdc_note) if note else mdc_note
+            elif MDC_EXEMPT_ANNOTATION not in annotation.upper():
+                # opting out has to be visible in the dictionary itself
+                annotation = (annotation + " " + MDC_EXEMPT_ANNOTATION).strip()
         self.rows.append([var, form or self.form, section, type, label, choices, note, valid,
                           min, max, identifier, branching, required, align, qnum, matrix,
-                          "y" if matrix and False else "", annotation])
+                          "", annotation])
 
     def write(self, path):
         with open(path, "w", newline="") as f:
@@ -94,8 +125,11 @@ def main():
     )
     spec = json.load(open(sys.argv[1]))
     dd = DD(form=spec[0].get("form", "data") if spec else "data")
-    for fld in spec:
-        dd.field(**{k: v for k, v in fld.items()})
+    for n, fld in enumerate(spec, 1):
+        try:
+            dd.field(**{k: v for k, v in fld.items()})
+        except (TypeError, ValueError) as e:
+            sys.exit(f"I can't build entry {n} of {sys.argv[1]}: {e}")
     out = dd.write(sys.argv[2])
     print(f"wrote {out} ({len(dd.rows)} fields). Now run validate_dd.py on it.")
 

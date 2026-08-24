@@ -62,17 +62,17 @@ it, or `source` and `echo "$ARGO_ROLES"` in the same one-line command).
 ### ARGO_ROLES is set → greet by role and go
 
 Name their role(s) in the confirmation line and offer **that role's** entry points only — never
-the full nine-skill list. One question, phrased in their role's words:
+the full skill list. One question, phrased in their role's words:
 
 | ARGO_ROLES contains | Say |
 |---|---|
-| `project-manager` | "Want the portfolio — what's pending across all studies — or are you starting a new study?" |
+| `project-manager` | "Starting a new study? I can draft the document package from the concept note." |
 | `qa-specialist` | "Which study are we QAing today?" |
-| `database-manager` | "Shall I pull the outstanding requests — new builds, personnel, data, linking?" |
+| `database-manager` | "Shall I run your weekly check — where the studies stand and what's waiting for you?" |
 | `data-analyst` | "Point me at your export and tell me what you want out of it." |
 
 Holds several roles → one question naming their roles, not a menu of tasks: "You're down as
-project manager and QA — portfolio, or a study's worklists?"
+database manager and QA — your weekly check, or a study's worklists?"
 
 ### ARGO_ROLES is not set → ask, once
 
@@ -112,11 +112,17 @@ infer the role, do the task, and save the role once it's clear.
 Once you know the role, go there and **keep going**. Don't summarise the skill back at them,
 don't make them re-ask. This skill's job ends at the hand-off.
 
-### Project manager → the portfolio
+### Project manager → the new-study document package
 
-Front door is **what studies exist and what's pending**. Invoke [[monitor-studies]] and show
-them the picture. Their other task is the new-study document package — [[new-study-documents]] — which
-needs no key at all. Keys: the five trackers, which the portfolio runs on.
+One task lives here: [[new-study-documents]] — mine the concept note, draft the protocol, SOP,
+questionnaire and the rest of the package; the PM then submits the study request in REDCap
+themselves. **No key is required**;
+where the Study Tracker key is configured it fetches the official Word templates, and without it
+the same documents come from the built-in skeletons. Ask which study is starting and go.
+
+If they ask where things stand across the programme instead, say plainly that the weekly check
+lives with the database manager now, and run [[weekly-check]] for them — it reads the same five
+trackers.
 
 ### QA specialist → key check, then worklists
 
@@ -129,23 +135,19 @@ perfectly from a record export and data dictionary downloaded off the REDCap web
 Then run the worklist flow — per-site (per-DAG) Excel files the RAs fill in — and, when they
 come back, the audit side.
 
-### Database manager → the outstanding requests
+### Database manager → run the weekly check
 
-Front door is **the request queues**, not a tool list. Pull what's outstanding across the
-trackers — new study builds (SIR), personnel requests (SPR), data requests, linking requests —
-present them as a short queue, and route into the one they pick:
-
-```bash
-Q=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name open_requests.py 2>/dev/null | head -1)
-python3 "$Q"
-```
+Front door is **the weekly check**, not a tool list. Invoke [[weekly-check]] and let it do both
+halves in one run: where every study stands (and what changed since last time), then the open
+queues — new study builds (SIR), personnel requests (SPR), data requests, linking requests.
+Present the picture in a few lines, then ask **one** question: which one to take.
 
 | Request | Goes to |
 |---|---|
 | A submitted SIR / "build the database for study X" | [[build-study]] |
-| Personnel request / "add someone to a project" | [[manage-redcaps]] |
 | Data request / "they need an export" | [[export-data]] |
 | Linking request / "match these two studies" | [[link-data]] |
+| Personnel request / "add someone to a project" | the REDCap UI — the study's **User Rights** page. There is no add-users skill; [[weekly-check]] says what to do. |
 
 Keys: the five trackers, plus a study key where one exists — but every one of these has a
 files-and-UI path that needs no key, and that path is the mainline, not the fallback.
@@ -156,6 +158,8 @@ files-and-UI path that needs no key, and that path is the mainline, not the fall
 data dictionary they downloaded from REDCap), then go to [[run-analysis]] — it interviews them
 about the study, proposes a plan, and every analysis lands as a saved, commented script with
 organised outputs. Merging more than one study for an analysis is [[link-data]]'s read side.
+The setup check (`argo_setup.py --check`) also reports which of Python, R and Stata this
+computer can actually run, and [[run-analysis]] checks again before it writes any script.
 
 ### Not one of the four: a research assistant
 
@@ -170,10 +174,10 @@ you, never to be shown to the user.
 
 | They say something like… | Role | Route to |
 |---|---|---|
-| "status of our studies" / "weekly update" / "what's pending" | project manager | [[monitor-studies]] |
+| "status of our studies" / "weekly update" / "what's pending" / "what's waiting for me" | database manager | [[weekly-check]] |
 | "we're starting a new study" / "draft the protocol / questionnaire" | project manager | [[new-study-documents]] |
 | "build the REDCap for study X" / "the SIR was submitted" | database manager | [[build-study]] |
-| "add someone to a project" / "set up roles / user rights" | database manager | [[manage-redcaps]] |
+| "add someone to a project" / "set up roles / user rights" | database manager | the REDCap UI (User Rights); the roles CSV comes from [[build-study]] step 4 |
 | "get the data out" / "I need an export" | database manager | [[export-data]] |
 | "match records between studies / with this spreadsheet" | database manager | [[link-data]] |
 | "check the data / find missing fields" / "make the RA worklists" | QA specialist | [[qa-worklists]] |
@@ -183,10 +187,11 @@ you, never to be shown to the user.
 
 No key is ever required — everything works from files downloaded off the REDCap website
 ([[getting-files-from-redcap]]). The standing setup for **everyone on the team is the five
-tracker keys** (they power the shared portfolio). Beyond that, **add a study key for each study
-you're QAing** — pulls and exports for it then happen right in the session. Analysts need none.
-The REDCap administrator creates keys (ideally tied to accounts that can only do what's needed —
-export-only is often enough); there is nothing anyone can do in this chat to make one.
+tracker keys** (they power the weekly check and the shared study dashboard). Beyond that,
+**add a study key for each study you're QAing** — pulls and exports for it then happen right in
+the session. Analysts need none. The REDCap administrator creates keys (ideally tied to accounts
+that can only do what's needed — export-only is often enough); there is nothing anyone can do in
+this chat to make one.
 
 Full decision record for who holds which key: [[access-tiers]].
 

@@ -63,6 +63,14 @@ class TestTwoStudyLinkage(unittest.TestCase):
             cls.updates = read_csv(cls.out / "merge_update.csv")
             cls.conflicts = read_csv(cls.out / "merge_conflicts.csv")
             cls.overwrites = read_csv(cls.out / "merge_overwrite.csv")
+            cls.orphans = read_csv(cls.out / "merge_orphans.csv")
+            cls.missing_link = read_csv(cls.out / "merge_missing_link.csv")
+        # The MANIFEST was written when orphans were (wrongly) counted as fills, so its
+        # top-level fill_cells/update_csv_rows are fills PLUS orphans. The engineered
+        # sub-counts it also records — fill_cells_shared_ids_only,
+        # orphan_cells_classified_fill — are the fixed behaviour's numbers, and are what
+        # the assertions below use. Both are checked against each other in
+        # test_every_cell_is_accounted_for, so the fixture stays honest either way.
 
     @classmethod
     def tearDownClass(cls):
@@ -75,28 +83,53 @@ class TestTwoStudyLinkage(unittest.TestCase):
                          f"diff_payload crashed:\n{self.proc.stderr[-1500:]}")
         self.assertNotIn("Traceback", self.proc.stdout + self.proc.stderr)
 
-    def test_all_three_payload_files_written(self):
-        for name in ("merge_update.csv", "merge_conflicts.csv", "merge_overwrite.csv"):
+    def test_all_five_output_files_written(self):
+        """Three payload files, plus the two halves of the gap report link-data promises."""
+        for name in ("merge_update.csv", "merge_conflicts.csv", "merge_overwrite.csv",
+                     "merge_orphans.csv", "merge_missing_link.csv"):
             self.assertTrue((self.out / name).exists(), f"{name} not produced")
 
     # -- the headline numbers ----------------------------------------------
 
     def test_reported_cell_counts_match_the_manifest(self):
-        """The three counts printed by the tool are the ones the fixture engineered."""
+        """The counts printed by the tool are the ones the fixture engineered.
+
+        Safe-fills are the SHARED-id fills only: an id with no record on the current side
+        has nothing to fill, so it is reported as an orphan instead of inflating this number.
+        """
         out = self.proc.stdout
-        self.assertIn(f"safe-fills : {self.expected['fill_cells']} ", out)
+        self.assertIn(f"safe-fills : {self.expected['fill_cells_shared_ids_only']} ", out)
         self.assertIn(f"conflicts  : {self.expected['conflict_cells']} ", out)
         self.assertIn(f"no-ops     : {self.expected['noop_cells']}", out)
 
+    def test_reported_gap_counts_match_the_manifest(self):
+        """Both gaps are named out loud, with counts, not just written to a file."""
+        out = self.proc.stdout
+        self.assertIn(f"orphans    : {self.overlap['n_only_in_study_b']} records", out)
+        self.assertIn(f"no link    : {self.overlap['n_only_in_primary']} records", out)
+
     def test_payload_row_counts_match_the_manifest(self):
-        self.assertEqual(len(self.updates), self.expected["update_csv_rows"])
+        # One filled field per filled record (the two fill classes are disjoint), so the
+        # update file has exactly one row per shared fill id — and none for the orphans.
+        shared_fill_rows = (self.overlap["n_shared_fill_histology_grade"]
+                            + self.overlap["n_shared_fill_margin_status"])
+        self.assertEqual(len(self.updates), shared_fill_rows)
         self.assertEqual(len(self.conflicts), self.expected["conflicts_csv_rows"])
         self.assertEqual(len(self.overwrites), self.expected["overwrite_csv_rows"])
+        self.assertEqual(len(self.updates) + self.overlap["n_only_in_study_b"],
+                         self.expected["update_csv_rows"],
+                         "the MANIFEST's update_csv_rows counts the orphan rows that used to "
+                         "be smuggled into the payload — fills + orphans should equal it")
 
     def test_every_cell_is_accounted_for(self):
+        """Four classes now, and they still add up to every cell on the study-B side."""
         e = self.expected
-        self.assertEqual(e["fill_cells"] + e["conflict_cells"] + e["noop_cells"],
+        self.assertEqual(e["fill_cells_shared_ids_only"] + e["conflict_cells"]
+                         + e["noop_cells"] + e["orphan_cells_classified_fill"],
                          e["cells_compared"])
+        self.assertEqual(e["fill_cells_shared_ids_only"] + e["orphan_cells_classified_fill"],
+                         e["fill_cells"],
+                         "the MANIFEST's fill_cells is the pre-fix total (fills + orphans)")
         self.assertEqual(e["cells_compared"],
                          self.overlap["n_records_study_b"] * len(FIELDS.split(",")))
 
@@ -108,9 +141,8 @@ class TestTwoStudyLinkage(unittest.TestCase):
         shared_m = set(self.overlap["ids_by_class"]["fill_margin"])
         got_g = {r["syn_id"] for r in self.updates if r.get("histology_grade")}
         got_m = {r["syn_id"] for r in self.updates if r.get("margin_status")}
-        b_only = set(self.overlap["ids_by_class"]["b_only"])
-        self.assertEqual(got_g - b_only, shared)
-        self.assertEqual(got_m - b_only, shared_m)
+        self.assertEqual(got_g, shared)
+        self.assertEqual(got_m, shared_m)
         self.assertEqual(len(shared) + len(shared_m),
                          self.expected["fill_cells_shared_ids_only"])
 
@@ -119,8 +151,8 @@ class TestTwoStudyLinkage(unittest.TestCase):
         primary = {r["syn_id"]: r for r in read_csv(PRIMARY / "records.csv")}
         for row in self.updates:
             cur = primary.get(row["syn_id"])
-            if cur is None:
-                continue                     # orphan — covered by its own test
+            self.assertIsNotNone(cur, f"{row['syn_id']} has no record in the current file — "
+                                      f"an orphan must never reach the update payload")
             for field in FIELDS.split(","):
                 if row.get(field, ""):
                     self.assertEqual(cur[field], "",
@@ -159,66 +191,99 @@ class TestTwoStudyLinkage(unittest.TestCase):
             self.assertFalse(agree & {r["syn_id"] for r in rows},
                              f"agreeing records leaked into {name}")
 
-    # -- orphans (KNOWN DEFECT, pinned) -------------------------------------
+    # -- orphans (was a pinned defect; now the guarantee) --------------------
 
-    def test_study_b_only_ids_are_classified_as_fills_KNOWN_DEFECT(self):
-        """DEFECT PIN — not an endorsement.
+    def test_study_b_only_ids_are_orphans_never_fills(self):
+        """The fix for NITS #2.
 
-        diff_records() iterates the COMPUTED side and reads a missing current
-        record as all-blank, so all 15 study-B-only ids become safe-fill rows.
-        Importing merge_update.csv would CREATE those records in REDCap.
-        diff_payload.py emits no orphan report, although link-data's SKILL.md
-        advertises gap/orphan reports as an output of the skill.
-
-        When that is fixed, this test should FLIP to asserting orphans are
-        excluded from *_update.csv and reported separately.
+        diff_records() used to iterate the computed side and read an id missing
+        from the current side as an all-blank record, so all 15 study-B-only ids
+        became safe-fill rows: importing merge_update.csv would have CREATED
+        those records in REDCap. They are now ORPHANS — reported, never payload.
         """
         b_only = set(self.overlap["ids_by_class"]["b_only"])
-        filled = {r["syn_id"] for r in self.updates}
-        self.assertTrue(b_only <= filled,
-                        "behaviour changed — see this test's docstring, flip it")
+        self.assertEqual(len(b_only), 15)
+
+        self.assertEqual({r["syn_id"] for r in self.orphans}, b_only,
+                         "the orphan report must be exactly the study-B-only ids")
         self.assertEqual(self.expected["orphan_cells_classified_fill"],
                          len(b_only) * len(FIELDS.split(",")))
-        self.assertEqual(len(list(self.out.glob("*orphan*"))), 0,
-                         "an orphan report now exists — flip this test")
 
-    def test_no_report_of_primary_ids_absent_from_study_b(self):
-        """The other side of the same gap: 155 primary records have no study-B
-        counterpart and are never mentioned anywhere in the output."""
+        for name, rows in (("update", self.updates), ("conflicts", self.conflicts),
+                           ("overwrite", self.overwrites)):
+            self.assertFalse(b_only & {r["syn_id"] for r in rows},
+                             f"an orphan reached {name}.csv — importing it would create records")
+
+    def test_no_fill_cell_anywhere_comes_from_an_orphan(self):
+        """Zero cells, not just zero rows: nothing of an orphan's data is pushable."""
+        b_only = set(self.overlap["ids_by_class"]["b_only"])
+        cells = sum(1 for row in self.updates if row["syn_id"] in b_only
+                    for f in FIELDS.split(",") if row.get(f, ""))
+        self.assertEqual(cells, 0)
+
+    def test_orphan_rows_carry_the_study_b_values(self):
+        """A gap report nobody can act on is not a report — the values come with it."""
+        study_b = {r["syn_id"]: r for r in read_csv(STUDY_B / "records.csv")}
+        for row in self.orphans:
+            for field in FIELDS.split(","):
+                self.assertEqual(row[field], study_b[row["syn_id"]][field])
+
+    def test_primary_ids_absent_from_study_b_are_reported(self):
+        """The other half of the gap: the 155 primary records the linkage found nothing for."""
         self.assertEqual(self.overlap["n_only_in_primary"], 155)
+        self.assertEqual(len(self.missing_link), 155)
+        primary_ids = {r["syn_id"] for r in read_csv(PRIMARY / "records.csv")}
+        b_ids = {r["syn_id"] for r in read_csv(STUDY_B / "records.csv")}
+        self.assertEqual({r["syn_id"] for r in self.missing_link}, primary_ids - b_ids)
+
+    def test_nothing_outside_the_engineered_classes_reaches_any_payload_file(self):
         for row in self.updates + self.conflicts + self.overwrites:
             self.assertIn(row["syn_id"],
                           set(self.overlap["ids_by_class"]["fill_grade"])
                           | set(self.overlap["ids_by_class"]["fill_margin"])
-                          | set(self.overlap["ids_by_class"]["conflict"])
-                          | set(self.overlap["ids_by_class"]["b_only"]))
+                          | set(self.overlap["ids_by_class"]["conflict"]))
 
 
 class TestDefaultFieldSelection(unittest.TestCase):
-    """Without --fields, diff_payload compares every shared column.
+    """Without --fields, diff_payload compares every shared column EXCEPT REDCap's own.
 
-    Two REDCap exports share `redcap_data_access_group`, so the default run
-    quietly treats the data access group as a linkable data field. Recorded
-    here as a documented sharp edge for the merge-two-studies path.
+    Two REDCap exports share `redcap_data_access_group`, and the default run used to treat
+    the data access group as a linkable data field — a proposal to move records between
+    sites, filed as a safe fill. Structural columns (`redcap_*`) and the per-form
+    `*_complete` status columns are excluded by default, and the tool says which it skipped.
     """
 
-    def test_default_intersection_picks_up_the_dag_column(self):
-        out = Path(tempfile.mkdtemp())
-        try:
-            proc = subprocess.run(
-                [sys.executable, str(DIFF_PAYLOAD),
-                 "--computed", str(STUDY_B / "records.csv"),
-                 "--current", str(PRIMARY / "records.csv"),
-                 "--id-field", "syn_id", "--out-dir", str(out), "--prefix", "auto"],
-                capture_output=True, text=True, timeout=300)
-            self.assertEqual(proc.returncode, 0, proc.stderr[-800:])
-            header = read_csv(out / "auto_update.csv")
-            cols = list(header[0].keys()) if header else []
-            self.assertIn("redcap_data_access_group", cols,
-                          "default field intersection no longer includes the DAG "
-                          "column — good; update this test and the fixture note")
-        finally:
-            shutil.rmtree(out, ignore_errors=True)
+    @classmethod
+    def setUpClass(cls):
+        cls.out = Path(tempfile.mkdtemp())
+        cls.proc = subprocess.run(
+            [sys.executable, str(DIFF_PAYLOAD),
+             "--computed", str(STUDY_B / "records.csv"),
+             "--current", str(PRIMARY / "records.csv"),
+             "--id-field", "syn_id", "--out-dir", str(cls.out), "--prefix", "auto"],
+            capture_output=True, text=True, timeout=300)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.out, ignore_errors=True)
+
+    def test_the_dag_column_is_not_compared_by_default(self):
+        self.assertEqual(self.proc.returncode, 0, self.proc.stderr[-800:])
+        rows = read_csv(self.out / "auto_update.csv")
+        cols = list(rows[0].keys()) if rows else []
+        self.assertNotIn("redcap_data_access_group", cols,
+                         "the data access group is REDCap bookkeeping, not linkage data")
+        self.assertIn("histology_grade", cols, "real data fields must still be compared")
+
+    def test_the_skipped_columns_are_named_in_the_output(self):
+        """Excluding silently would be its own bug — say what was left out."""
+        self.assertIn("not compared", self.proc.stdout)
+        self.assertIn("redcap_data_access_group", self.proc.stdout)
+
+    def test_the_default_run_agrees_with_the_explicit_field_run(self):
+        """The two comparable fields are the whole of the default comparison."""
+        self.assertIn(f"safe-fills : {json.loads((STUDY_B / 'MANIFEST.json').read_text())['expected_diff']['fill_cells_shared_ids_only']} ",
+                      self.proc.stdout)
 
 
 class TestManifestIsSelfConsistent(unittest.TestCase):

@@ -7,7 +7,7 @@ file this script writes is fabricated. No real people, sites, patients, or data.
 Regenerates byte-identically on every run (stdlib only, deterministic by
 construction — there is no RNG here, so SEED is recorded for provenance only):
 
-    fields.json                dd_builder.py CLI input (28 fields, 2 forms)
+    fields.json                dd_builder.py CLI input (32 fields, 2 forms)
     dirty_datadictionary.csv   18-column REDCap DD with engineered violations
     MANIFEST.json              exact violation list + fields.json inventory
 
@@ -25,13 +25,17 @@ MDC policy in fields.json (per argo-core mdc-rules + ARGO practice)
 ------------------------------------------------------------------
 MDC is left to dd_builder.py, which applies it by construction: choices for
 radio/dropdown/checkbox, text-format field note for text/notes, date-format
-field note for date_dmy/datetime_dmy. Exemptions used here: the record-ID field
-(first row), descriptive/calc/file types, and hospital_number/hospital_site.
-The `sev_*` matrix group is a STUDY-AUTHORED severity grid, not a validated
-psychometric instrument, so it takes MDC normally. No validated Likert scale is
-included in this fixture: validated scales are MDC-exempt by ARGO practice but
-validate_dd.py has no waiver mechanism for them, so any such scale would make
-the clean DD un-clean by design. See MANIFEST.notes.
+field note for any date*/datetime* validation. Exemptions used here: the
+record-ID field (first row), descriptive/calc/file types, and
+hospital_number/hospital_site.
+
+Two matrix groups, deliberately contrasting:
+  sev_grid    a STUDY-AUTHORED severity grid — not a validated instrument, so it
+              takes MDC normally.
+  mood_scale  a (fabricated) VALIDATED psychometric scale — MDC-exempt by ARGO
+              practice, declared with "mdc": false, which makes dd_builder write
+              @MDC-EXEMPT into Field Annotation. validate_dd.py honours that
+              annotation, so the clean DD stays clean with the scale in it.
 
 dirty_datadictionary.csv
 ------------------------
@@ -40,6 +44,11 @@ each row perturbed in exactly one intended way — every other column on that ro
 is deliberately clean so the row's violations are the manifest's violations and
 nothing else. Checks that cannot be engineered alongside the others are recorded
 in MANIFEST.not_engineerable with the reason.
+
+The last four rows are the MDC waiver and its control: two Likert rows waived with
+@MDC-EXEMPT (one annotated, one waived by matrix-group membership) that must raise
+nothing, and two rows of the same shape without the annotation that must still be
+flagged. See MANIFEST.dirty_dd.mdc_waiver.
 """
 
 from __future__ import annotations
@@ -74,6 +83,9 @@ HEADER = ["Variable / Field Name", "Form Name", "Section Header", "Field Type", 
 # ===========================================================================
 
 SEV_CHOICES = "0, None | 1, Mild | 2, Moderate | 3, Severe"
+# Fabricated four-point Likert scale for the fabricated "validated" instrument below.
+MOOD_CHOICES = ("0, Not at all | 1, Several days | 2, More than half the days | "
+                "3, Nearly every day")
 
 FIELDS = [
     # ---- screening form ---------------------------------------------------
@@ -131,6 +143,21 @@ FIELDS = [
      "matrix": "sev_grid", "align": "RH", "form": "assessment"},
     {"var": "sev_sleep", "type": "radio", "label": "Poor sleep", "choices": SEV_CHOICES,
      "matrix": "sev_grid", "align": "RH", "form": "assessment"},
+    # validated psychometric scale (fabricated) — MDC-exempt by ARGO policy, declared
+    # with "mdc": false so dd_builder writes @MDC-EXEMPT into the Field Annotation column
+    {"var": "mood_q1", "type": "radio", "label": "Felt low in mood (synthetic item 1)",
+     "choices": MOOD_CHOICES, "matrix": "mood_scale", "align": "RH", "mdc": False,
+     "form": "assessment",
+     "section": "SYNMOOD-4 — synthetic validated mood scale, scored as published (MDC-exempt)"},
+    {"var": "mood_q2", "type": "radio", "label": "Lost interest in usual activities (synthetic item 2)",
+     "choices": MOOD_CHOICES, "matrix": "mood_scale", "align": "RH", "mdc": False,
+     "form": "assessment"},
+    {"var": "mood_q3", "type": "radio", "label": "Slept poorly (synthetic item 3)",
+     "choices": MOOD_CHOICES, "matrix": "mood_scale", "align": "RH", "mdc": False,
+     "form": "assessment"},
+    {"var": "mood_q4", "type": "radio", "label": "Felt anxious or on edge (synthetic item 4)",
+     "choices": MOOD_CHOICES, "matrix": "mood_scale", "align": "RH", "mdc": False,
+     "form": "assessment"},
     {"var": "tumor_stage", "type": "dropdown", "label": "Stage at assessment",
      "choices": "1, Stage I | 2, Stage II | 3, Stage III | 4, Stage IV", "form": "assessment"},
     {"var": "referral_source", "type": "text", "label": "Referred from (free text)",
@@ -152,7 +179,13 @@ def fields_inventory():
     mdc_exempt = [f["var"] for f in FIELDS
                   if f is FIELDS[0]
                   or f["type"] in ("descriptive", "calc", "file")
-                  or f["var"] in ("hospital_number", "hospital_site")]
+                  or f["var"] in ("hospital_number", "hospital_site")
+                  or f.get("mdc") is False]
+    annotated = [f["var"] for f in FIELDS if f.get("mdc") is False]
+    groups = {}
+    for f in FIELDS:
+        if f.get("matrix"):
+            groups.setdefault(f["matrix"], []).append(f["var"])
     return {
         "file": "fields.json",
         "consumer": "dd_builder.py (CLI: python3 dd_builder.py fields.json out.csv)",
@@ -163,9 +196,13 @@ def fields_inventory():
         "identifier_fields": [f["var"] for f in FIELDS if f.get("identifier") == "y"],
         "validation_types": sorted({f["valid"] for f in FIELDS if f.get("valid")}),
         "branching_fields": {f["var"]: f["branching"] for f in FIELDS if f.get("branching")},
-        "matrix_groups": {"sev_grid": [f["var"] for f in FIELDS if f.get("matrix") == "sev_grid"]},
+        "matrix_groups": dict(sorted(groups.items())),
         "mdc_exempt_fields": mdc_exempt,
         "mdc_applied_fields": [f["var"] for f in FIELDS if f["var"] not in mdc_exempt],
+        "mdc_exempt_annotated_fields": annotated,
+        "mdc_exempt_annotation": "@MDC-EXEMPT",
+        "mdc_exempt_matrix_groups": sorted({f["matrix"] for f in FIELDS
+                                            if f.get("mdc") is False and f.get("matrix")}),
         "expected_validate_dd": {"errors": 0, "warnings": 0,
                                  "patient_level_flag_safe": True},
     }
@@ -231,6 +268,8 @@ def dirty(checks, var, form="clinical", section="", ftype="text", label="Label",
 
 
 LONG_MATRIX = "a_matrix_group_name_that_is_deliberately_longer_than_sixty_chars"  # 64 chars
+# Must match validate_dd.MDC_EXEMPT_ANNOTATION / dd_builder.MDC_EXEMPT_ANNOTATION.
+MDC_EXEMPT_ANNOTATION = "@MDC-EXEMPT"
 
 # Row 2 — first field must be 'text'; everything else on the row is clean.
 dirty(["first_field_not_text"], "reg_id", ftype="radio",
@@ -333,6 +372,30 @@ dirty(["mdc_text_field_missing"], "clinical_summary", ftype="notes", label="Clin
 dirty(["wrong_column_count"], "short_row_var",
       raw=["short_row_var", "clinical", "", "text", "Row with a missing column",
            "", TEXT_MDC, "", "", "", "", "", "", "", "", "", ""])
+# Rows 35-38 — the MDC waiver, both scopes, against its own control.
+# 35/36: a Likert matrix waived with @MDC-EXEMPT (35 carries the annotation; 36 is waived by
+# belonging to the same matrix group) — neither may raise anything.
+# 37/38: the SAME Likert shape with no annotation — each must still be flagged, as before.
+LIKERT_CHOICES = ("0, Not at all | 1, Several days | 2, More than half the days | "
+                  "3, Nearly every day")
+dirty([], "likert_exempt_1", ftype="radio", label="Waived scale item 1 (annotated)",
+      choices=LIKERT_CHOICES, matrix="syn_likert_exempt", align="RH",
+      annotation=MDC_EXEMPT_ANNOTATION,
+      section="Validated scale (fabricated) — MDC waived by annotation")
+dirty([], "likert_exempt_2", ftype="radio", label="Waived scale item 2 (waived by its group)",
+      choices=LIKERT_CHOICES, matrix="syn_likert_exempt", align="RH")
+dirty(["mdc_missing_in_choices"], "likert_plain_1", ftype="radio",
+      label="Un-waived scale item 1", choices=LIKERT_CHOICES,
+      matrix="syn_likert_plain", align="RH",
+      section="Same shape, no annotation — still flagged")
+dirty(["mdc_missing_in_choices"], "likert_plain_2", ftype="radio",
+      label="Un-waived scale item 2", choices=LIKERT_CHOICES,
+      matrix="syn_likert_plain", align="RH")
+
+
+def row_of(var):
+    """The row number validate_dd will report for a dirty-DD variable."""
+    return next(i + 2 for i, (cells, _) in enumerate(ENTRIES) if cells[0] == var)
 
 
 NOT_ENGINEERABLE = [
@@ -416,6 +479,19 @@ def main():
                 "note": "With --patient-level these fire IN ADDITION to every check above.",
             },
             "not_engineerable": NOT_ENGINEERABLE,
+            "mdc_waiver": {
+                "annotation": MDC_EXEMPT_ANNOTATION,
+                "waived_rows": {"likert_exempt_1": row_of("likert_exempt_1"),
+                                "likert_exempt_2": row_of("likert_exempt_2")},
+                "waived_expectation": "No violation of any kind. likert_exempt_1 carries the "
+                                      "annotation itself; likert_exempt_2 is waived by belonging "
+                                      "to the same matrix group (syn_likert_exempt).",
+                "flagged_rows": {"likert_plain_1": row_of("likert_plain_1"),
+                                 "likert_plain_2": row_of("likert_plain_2")},
+                "flagged_expectation": "The same Likert shape with no annotation: each still "
+                                       "raises mdc_missing_in_choices, exactly as before the "
+                                       "waiver existed.",
+            },
         },
         "notes": [
             "Every row in dirty_datadictionary.csv is otherwise clean: it carries only the "
@@ -423,10 +499,14 @@ def main():
             "Two rows unavoidably raise two violations each: a select with no choices and a "
             "select with a single choice both also fail the MDC-in-choices check, because MDC "
             "choices cannot exist without pipe-separated options.",
-            "fields.json contains no validated Likert/psychometric scale. ARGO practice exempts "
-            "those from MDC, but validate_dd.py implements no waiver, so including one would "
-            "make the clean fixture fail by design. The sev_grid matrix is a study-authored "
-            "severity grid and takes MDC normally.",
+            "fields.json contains two matrix groups on purpose: sev_grid is a study-authored "
+            "severity grid and takes MDC normally, while mood_scale is a (fabricated) validated "
+            "psychometric scale built with \"mdc\": false, so dd_builder writes @MDC-EXEMPT into "
+            "its Field Annotation and validate_dd waives it. The clean DD stays clean WITH a "
+            "validated scale in it — that is the point of the waiver.",
+            "dirty_dd.mdc_waiver pins both halves of the waiver: annotated rows raise nothing "
+            "(field-level and matrix-group-level), un-annotated rows of the same shape are still "
+            "flagged.",
             "match_regex values are lowercase, wording-tolerant patterns; tests lowercase the "
             "validator's messages before matching.",
         ],

@@ -13,5 +13,5 @@ __pycache__/
 
 # Stale / generated
 *.legacy
-portfolio-snapshots/
 *.snapshot.json
+testing/walkthroughs/runs/

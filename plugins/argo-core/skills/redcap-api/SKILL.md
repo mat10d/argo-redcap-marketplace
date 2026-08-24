@@ -5,7 +5,7 @@ description: Base conventions for talking to REDCap APIs across ARGO projects �
 
 # redcap-api
 
-Shared API conventions used by every other ARGO plugin. If you are reading this directly you probably want a more specific skill (`build-study`, `export-data`, `monitor-studies`, etc.), or [[start-here]] if you don't know which — but the rules below apply universally.
+Shared API conventions used by every other ARGO plugin. If you are reading this directly you probably want a more specific skill (`build-study`, `export-data`, `weekly-check`, etc.), or [[start-here]] if you don't know which — but the rules below apply universally.
 
 ## Tokens are optional — never block on one
 

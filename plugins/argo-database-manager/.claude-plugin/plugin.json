@@ -1,7 +1,7 @@
 {
   "name": "argo-database-manager",
   "version": "0.17.1",
-  "description": "For the ARGO database manager. See what requests are outstanding across the core tracking REDCaps, then fulfil them: build a study's REDCap from a submitted request (build-study), add people and manage access (manage-redcaps), get data out as files (export-data), and match records across studies with safe fill-blanks-only write-back (link-data). Works with or without an access key.",
+  "description": "For the ARGO database manager. Start with the weekly check: where every study stands and what's waiting for you (weekly-check). Then fulfil it: build a study's REDCap from a submitted request (build-study), get data out as files (export-data), and match records across studies with safe fill-blanks-only write-back (link-data). Works with or without an access key.",
   "author": {
     "name": "ARGO"
   }

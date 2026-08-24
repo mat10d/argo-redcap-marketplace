@@ -17,12 +17,12 @@
     {
       "name": "argo-project-manager",
       "source": "./plugins/argo-project-manager",
-      "description": "For the ARGO project manager. See where every study stands and what requests are open (monitor-studies), and draft the document package for a new study (new-study-documents)."
+      "description": "For the ARGO project manager. Draft the document package for a new study (protocol, SOP, questionnaire and the rest) from a concept note, and submit the study request: new-study-documents."
     },
     {
       "name": "argo-database-manager",
       "source": "./plugins/argo-database-manager",
-      "description": "For the ARGO database manager. See what requests are outstanding across the core tracking REDCaps, then fulfil them: build a study's REDCap from a submitted request (build-study), add people and manage access (manage-redcaps), get data out as files (export-data), and match records across studies with safe fill-blanks-only write-back (link-data). Works with or without an access key."
+      "description": "For the ARGO database manager. Start with the weekly check: where every study stands and what's waiting for you (weekly-check). Then fulfil it: build a study's REDCap from a submitted request (build-study), get data out as files (export-data), and match records across studies with safe fill-blanks-only write-back (link-data). Works with or without an access key."
     },
     {
       "name": "argo-qa-specialist",

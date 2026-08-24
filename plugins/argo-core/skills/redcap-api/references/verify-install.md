@@ -128,18 +128,8 @@ except subprocess.TimeoutExpired:
 prints the proposed change then refuses and tells you to re-run with `--yes`. Either is correct —
 what matters is that it **terminates** and writes nothing. **Fail:** `RESULT: FAIL`.
 
-Same guard, second script:
-
-```bash
-SR=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name set_roles.py 2>/dev/null | head -1); python3 -c "
-import subprocess,sys
-try:
-    p=subprocess.run([sys.executable,'$SR','SOME_TOKEN'],stdin=subprocess.DEVNULL,
-                     capture_output=True,text=True,timeout=45)
-    print((p.stdout+p.stderr)[-400:]); print('RESULT:','PASS' if 'Traceback' not in p.stdout+p.stderr else 'FAIL')
-except subprocess.TimeoutExpired: print('RESULT: FAIL — hung')
-"
-```
+`sir_update.py` is the only script in the suite that prompts, so this one check covers the
+guard. (The suite's `test_every_input_call_is_guarded_by_a_tty_check` fails on any new one.)
 
 ## 5. Marker-file glob — the Cowork-specific fix
 

@@ -46,6 +46,20 @@ SIR_BUILD_STEPS = [
     "review_internal", "review_pi", "study_production",
 ]
 
+# A step counts as DONE when its field holds any settled answer that isn't "no".
+# Some of these fields are yes/no boxes and some are radios — `data_imported` answers
+# "Prospective study, not required", which settles the step just as firmly as "Yes".
+# Counting only the literal "Yes" made the same record read 3/7 in one place and 4/7 in
+# another; this is the one rule, and both the weekly check and the queue import it.
+PROGRESS_NOT_DONE = {"", "no", "0"}
+
+
+def sir_progress(record: dict) -> tuple:
+    """(steps done, steps total) for one Study Tracker record. The lenient rule above."""
+    done = sum(1 for step in SIR_BUILD_STEPS
+               if str(record.get(step) or "").strip().lower() not in PROGRESS_NOT_DONE)
+    return done, len(SIR_BUILD_STEPS)
+
 
 def env_vars() -> list:
     return [t[0] for t in ADMIN_TRACKERS]
@@ -64,3 +78,5 @@ def as_portfolio_rows() -> list:
 if __name__ == "__main__":
     for env, title, pid, marker in ADMIN_TRACKERS:
         print(f"{env:28} {title:28} pid={pid or '(none issued)':<14} done={marker}")
+    print(f"\nBuild steps counted per study: {len(SIR_BUILD_STEPS)} "
+          f"({', '.join(SIR_BUILD_STEPS)})")

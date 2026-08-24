@@ -187,6 +187,47 @@
     "form": "assessment"
   },
   {
+    "var": "mood_q1",
+    "type": "radio",
+    "label": "Felt low in mood (synthetic item 1)",
+    "choices": "0, Not at all | 1, Several days | 2, More than half the days | 3, Nearly every day",
+    "matrix": "mood_scale",
+    "align": "RH",
+    "mdc": false,
+    "form": "assessment",
+    "section": "SYNMOOD-4 \u2014 synthetic validated mood scale, scored as published (MDC-exempt)"
+  },
+  {
+    "var": "mood_q2",
+    "type": "radio",
+    "label": "Lost interest in usual activities (synthetic item 2)",
+    "choices": "0, Not at all | 1, Several days | 2, More than half the days | 3, Nearly every day",
+    "matrix": "mood_scale",
+    "align": "RH",
+    "mdc": false,
+    "form": "assessment"
+  },
+  {
+    "var": "mood_q3",
+    "type": "radio",
+    "label": "Slept poorly (synthetic item 3)",
+    "choices": "0, Not at all | 1, Several days | 2, More than half the days | 3, Nearly every day",
+    "matrix": "mood_scale",
+    "align": "RH",
+    "mdc": false,
+    "form": "assessment"
+  },
+  {
+    "var": "mood_q4",
+    "type": "radio",
+    "label": "Felt anxious or on edge (synthetic item 4)",
+    "choices": "0, Not at all | 1, Several days | 2, More than half the days | 3, Nearly every day",
+    "matrix": "mood_scale",
+    "align": "RH",
+    "mdc": false,
+    "form": "assessment"
+  },
+  {
     "var": "tumor_stage",
     "type": "dropdown",
     "label": "Stage at assessment",

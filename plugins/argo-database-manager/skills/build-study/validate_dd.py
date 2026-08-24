@@ -5,6 +5,11 @@ REDCap Data Dictionary Validator
 Checks a REDCap data dictionary CSV for common errors that would cause
 upload failures. Run before importing into REDCap.
 
+Missing Data Codes are required on every non-exempt field ([[mdc-rules]]). A field
+can be waived explicitly by putting `@MDC-EXEMPT` in its Field Annotation column
+(on any field of a matrix group, that waives the whole group) — the mechanism for
+validated psychometric / Likert scales, which ARGO policy exempts.
+
 Usage: python3 validate_dd.py <path_to_csv>
 """
 import csv
@@ -47,6 +52,12 @@ MDC_EXEMPT_FORMS = {
 }
 # Administrative/system variable names exempt from MDC (not patient-reported clinical data)
 MDC_EXEMPT_VARS = {"hospital_site", "hospital_number"}  # identifiers set by study team, not MDC-coded
+# Explicit per-field MDC waiver, written in the Field Annotation column (dd_builder.py
+# writes it when a field is built with mdc=False). ARGO policy exempts validated
+# psychometric / Likert instruments from MDC — this is how that exemption is declared,
+# visibly, in the dictionary itself. Put it on any field of a matrix group and the whole
+# group is exempt. See [[mdc-rules]].
+MDC_EXEMPT_ANNOTATION = "@MDC-EXEMPT"
 
 EXPECTED_HEADER = [
     "Variable / Field Name", "Form Name", "Section Header", "Field Type",
@@ -96,6 +107,13 @@ def validate(filepath, patient_level=False):
                 errors.append("hospital_number must be type 'text'")
             if hosp_row[COL["Identifier?"]] != "y":
                 errors.append("hospital_number must have Identifier? = y (PII)")
+
+    # Matrix groups with the MDC waiver on any of their fields — the whole group is exempt.
+    mdc_exempt_groups = {
+        row[COL["Matrix Group Name"]] for row in rows
+        if len(row) == 18 and row[COL["Matrix Group Name"]]
+        and MDC_EXEMPT_ANNOTATION in row[COL["Field Annotation"]].upper()
+    }
 
     for i, row in enumerate(rows, 2):
         if len(row) != 18:
@@ -203,8 +221,14 @@ def validate(filepath, patient_level=False):
         # --- Missing Data Code (MDC) checks ---
         # Skip the first field (record identifier) and exempt types
         field_note = row[COL["Field Note"]]
+        annotation = row[COL["Field Annotation"]]
         is_first_field = (i == 2)
+        # An explicit waiver (on the field, or on its matrix group) exempts it from every
+        # MDC check below — that is how validated Likert/psychometric scales stay clean.
+        mdc_waived = (MDC_EXEMPT_ANNOTATION in annotation.upper()
+                      or (matrix_group and matrix_group in mdc_exempt_groups))
         if (not is_first_field
+                and not mdc_waived
                 and field_type not in MDC_EXEMPT_TYPES
                 and var_name not in MDC_EXEMPT_VARS
                 and form_name not in MDC_EXEMPT_FORMS):

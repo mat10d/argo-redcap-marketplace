@@ -135,7 +135,7 @@ def main():
             f"There's no record numbered {args.rid} in the Study Tracker.\n"
             "\n"
             "Check the number — you can see the full list by running the portfolio tool\n"
-            "(monitor-studies), which prints each study's record number in square brackets."
+            "(the weekly check), which prints each study's record number in square brackets."
         )
         json.dump(rec[0], sys.stdout, indent=2)
         sys.stdout.write("\n")

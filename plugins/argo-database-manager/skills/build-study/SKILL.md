@@ -33,7 +33,7 @@ why. That's a fallback for a broken setup, not an equal option to present each t
 | 1 | **Triage** | Pull the SIR; is there enough to build? | `sir_update.py --pull` | *(gate — no flag)* |
 | 2 | **Create project** | Paste sheet → create in UI | `fill_new_project.py` | `project_created` (+ `--pid`) |
 | 3 | **Build DD** | Construct (Path A) or audit (Path B) → upload | `dd_builder.py`, `validate_dd.py` | `dd_uploaded` |
-| 4 | **Roles & users** | Roles CSV + assign users | `make_roles_csv.py` (manage-redcaps) | `user_rights_complete` |
+| 4 | **Roles & users** | Roles CSV + assign users | `make_roles_csv.py` | `user_rights_complete` |
 | 5 | **Data import** | Map + import, or mark prospective | `validate_import.py` | `data_imported` (1 / 2) |
 | 6 | **Setup** | File Repository, weekly reports, DAGs | *(MANUAL_SETUP_BRIEF)* | *(part of setup)* |
 | 7 | **Review** | Internal QA, then PI sign-off | — | `review_internal`, `review_pi` |
@@ -105,9 +105,17 @@ questionnaire across all → flag possible resubmission before building N copies
 
 > ### MDC goes on EVERY non-exempt field — not just clinical Yes/No
 > Per [[mdc-rules]]: every radio/dropdown/checkbox gets the four MDC **choices**; every
-> text/notes field gets the text-format MDC **field-note**; date fields the date-format note. Only
-> the **record-ID field** and **descriptive/calc/file** types are exempt. `dd_builder.py` applies
-> this automatically — hand-write a DD and the validator will flag dozens of fields.
+> text/notes field gets the text-format MDC **field-note**; any date/datetime validation gets the
+> date-format note. Exempt without asking: the **record-ID field**, **descriptive/calc/file**
+> types, and the study-team admin fields (`hospital_number`, `hospital_site`).
+> `dd_builder.py` applies this automatically (and keeps a Field Note you wrote, appending the MDC
+> note to it) — hand-write a DD and the validator will flag dozens of fields. `yesno` is refused at
+> build time: use `radio` with `1, Yes | 0, No`.
+>
+> **The one waiver:** a validated psychometric / Likert instrument is MDC-exempt by ARGO policy.
+> Build those fields with `mdc=False`, which writes `@MDC-EXEMPT` into the Field Annotation column;
+> `validate_dd.py` honours that annotation (put it on any field of a matrix group and the whole
+> group is waived). Never use it to dodge MDC on ordinary clinical fields.
 
 > ### Build the instruments the questionnaire defines — don't over-materialize
 > Build exactly what the questionnaire in front of you contains. A multi-section questionnaire
@@ -117,6 +125,16 @@ questionnaire across all → flag possible resubmission before building N copies
 > are typically a **separate instrument from a separate source**, built separately. Read the
 > proposal to understand administration mode (form vs survey, Step 6) and design, but materialize
 > only the instrument(s) the questionnaire actually defines.
+
+> ### The questionnaire is IRB-approved — mirror it, don't improve it
+> Only critically essential changes to a questionnaire are allowed (IRB amendments). So the
+> data dictionary matches the **printed form exactly**: spelling errors, numbering quirks, and
+> answer wordings are reproduced as-is, never fixed and never flagged. A column printed with
+> **no answer options** becomes free text as printed — not a proposed coded list. What you DO
+> surface: substantive defects — skip instructions pointing at sections that don't exist,
+> questions the SIR commits the study to that the form lacks, structural contradictions — as a
+> **QUESTIONNAIRE_CHANGELOG.md** in the build folder, each item marked "needs IRB amendment:
+> yes/no", for the database manager and PI to decide. Surfaced, never applied.
 
 **Path A workflow:**
 1. `Glob *.docx`; extract: `textutil -convert txt -stdout "file.docx"`.
@@ -148,9 +166,24 @@ User uploads the clean CSV via Designer → Upload Data Dictionary. Then mark `d
 column reference: [[dd-column-spec]]. Read [[build-pitfalls]] first.**
 
 ## Step 4 — Roles & users → `user_rights_complete`
-Use **[[manage-redcaps]]**: `make_roles_csv.py <dd.csv>` builds the 4 standard ARGO roles
-([[standard-roles]]) as a CSV (no access key needed) → user uploads via User Rights → User Roles. Then assign
-PM / RA / PI / additional users to roles. Mark `user_rights_complete`.
+Build the roles file — no access key needed, this is the normal path:
+
+```bash
+M=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name make_roles_csv.py 2>/dev/null | head -1)
+python3 "$M" <path-to-DD-CSV> [--clinical form1,form2,...] [--out path]
+```
+
+It writes `<study>_roles.csv` — the 4 standard ARGO roles ([[standard-roles]], which also
+carries REDCap's exact column order and the access-level codes) — next to the data dictionary,
+i.e. in `database-manager/<study>/`. The user uploads it at **User Rights → User Roles → Upload
+user roles (CSV)**; REDCap generates the `unique_role_name` values on upload.
+
+Then people are added to those roles **in the REDCap UI**, on the same User Rights page. We
+don't know anyone's real REDCap username, so present who→role as a table for the user to work
+from — never generate an assignment file. Someone with no REDCap account at all needs an
+administrator to create one: record that in the Study Personnel Request tracker (PID 221).
+
+Mark `user_rights_complete` as soon as the roles are uploaded and users assigned.
 
 ## Step 5 — Data import → `data_imported`
 Prospective study (`data_collection` = prospective) → no historical data: `--set data_imported=2`.
@@ -169,6 +202,8 @@ copy-paste-and-click. (Works without an access key too: add `--from-json rec.jso
 `sir_update.py --pull` dump.) Review/augment the generated brief, which covers:
 - **File Repository:** the `irb_file_*` / `consent_file_*` / `sop` / `eligibility_checklist` /
   questionnaire docs, each **renamed with the study moniker**, into Study Documents vs IRB/Ethics.
+  Site-numbered documents take their site tag from this study's own `inst_name_*` institutions —
+  a blank institution becomes a `[TODO]` in the rename table, never a site name from elsewhere.
 - **Data Access Groups:** one per institution (`inst_name_*`) for multi-site studies; assign users.
 - **Weekly reports:** from `weekly_stat` / `category` (skip/confirm with PM if blank).
 - **Form vs survey:** default to **data-entry forms** — ARGO's standard model is paper
@@ -180,7 +215,8 @@ Flag anything the SIR leaves blank (PM not named, roles for co-investigators, et
 
 The study's folder under `database-manager/` should end up self-contained for handoff: the DD CSV,
 the roles CSV, the `CREATE_NEW_PROJECT_<RID>.txt` paste sheet, the renamed File Repository docs,
-and the `MANUAL_SETUP_BRIEF.md`.
+the `QUESTIONNAIRE_CHANGELOG.md` (Step 3 — "none found" if there was nothing to raise), and the
+`MANUAL_SETUP_BRIEF.md`.
 
 ## Steps 7–8 — Review → Production
 These are **human sign-off / go-live gates** (see the flag note above) — confirm with the
@@ -235,15 +271,17 @@ Study Tracker and say so — see the access note at the top of this skill.
 
 ## Scripts in this skill
 `fill_new_project.py` (Step 2 paste sheet) · `dd_builder.py` + `validate_dd.py` (Step 3 build) ·
+`make_roles_csv.py` (Step 4 roles CSV) ·
 `validate_import.py` (Step 5) · `setup_brief.py` (Step 6 MANUAL_SETUP_BRIEF generator) ·
 `sir_update.py` (the tracker tool) ·
 `backfill_sir_from_csv.py` (bulk SIR loads from a spreadsheet — not part of the per-study loop;
 requires an explicit `--record-id-range` before it will write anything).
 
 ## Not here
-- **User-rights / role mechanics and SPR (personnel) requests** → [[manage-redcaps]].
-- **Seeing what's waiting to be built** → your request queue (say "show my outstanding requests").
-  The PM's `monitor-studies` is the whole-programme view, not your queue.
+- **Adding people to a live project** → the REDCap UI, on the study's User Rights page. There
+  is no add-users skill; the people queue in [[weekly-check]] says what to do.
+- **Seeing what's waiting to be built** → [[weekly-check]] (say "what's waiting for me"), which
+  shows programme status and your open queues in one run.
 
 ## References
 [[build-pitfalls]] (READ FIRST) · [[mdc-rules]] · [[dd-column-spec]] · [[token-optional]] ·

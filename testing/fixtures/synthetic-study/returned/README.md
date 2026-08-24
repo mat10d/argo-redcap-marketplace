@@ -23,3 +23,13 @@ python3 testing/fixtures/synthetic-study/generate_returns.py --out /tmp/syn-retu
 
 Add `--update-manifest` after changing the edit plan (or after rerunning `generate.py`, which
 rewrites `MANIFEST.json` from scratch and drops the `returned` block).
+
+To make returns for worklists that are NOT the fixture's — the ones a live session actually
+built from its own DD-driven config — point the generator at that build instead. The edit
+budget is then derived from each workbook it finds, and `--update-manifest` is refused (the
+`returned` block describes the committed fixture only):
+
+```bash
+python3 testing/fixtures/synthetic-study/generate_returns.py --out /tmp/live-returns \
+    --from-worklists qa-specialist/<study>/worklists/<round>
+```

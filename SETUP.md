@@ -20,9 +20,9 @@ subfolder per role you hold, and everything you produce lands in your role's fol
 
 ```
 ARGO/
-  project-manager/     study documents, portfolio reports
+  project-manager/     new-study documents, and the templates fetched to build them
   qa-specialist/       RA worklists, audit results
-  database-manager/    builds, exports, linkage outputs
+  database-manager/    weekly-check snapshots, builds, exports, linkage outputs
   data-analyst/        scripts, tables, figures
   Settings (ARGO).env  your access keys (see below)
 ```
@@ -35,8 +35,9 @@ An access key is a personal password that lets Claude read a REDCap project on y
 Keys are secrets: **they go into the settings file, never into the chat.**
 
 - **Everyone on the core team** adds the **5 tracker keys** (Study Tracker and the four
-  request trackers). Request them from the OAU REDCap administrator; setup walks you through
-  where each one goes.
+  request trackers). They power the weekly check — where every study stands and what's
+  waiting. Request them from the OAU REDCap administrator; setup walks you through where
+  each one goes.
 - **QA specialists** also add one key **for the study they are assigned to QA** — just that
   study, requested when the assignment starts.
 - **Data analysts need no key at all.** You work from files downloaded from the REDCap
@@ -51,6 +52,21 @@ it verifies every key and tells you in plain words which ones work.
 Say **"help me with ARGO"** in a fresh conversation. You should see one line confirming your
 keys connect (with a version number like `ARGO toolkit 0.17.0`), then a question about what
 you'd like to do. If a key fails, say "fix my key" and Claude walks you through it.
+
+## Analysis tools (R and Stata)
+
+Only for **data analysts** — everyone else can skip this.
+
+- **Python** is required, and it is already on your computer: it is what the ARGO tools
+  themselves run on. Nothing to install.
+- **R** is optional and free. If you want your analyses written in R, install it from
+  <https://cran.r-project.org> (pick the download for your computer).
+- **Stata** is optional and **licensed software**, so it can't just be downloaded — ask whoever
+  manages your computer to install it.
+
+Ask **"which analysis tools do I have?"** — or just start an analysis — and Claude reports which
+of the three it found, and where. It runs your scripts by the full path it found, so an analysis
+never fails with "R is not installed" on a computer that has R.
 
 ## If something goes wrong
 

@@ -379,14 +379,25 @@ def build_workbook(labeled: pd.DataFrame, raw_by_id: dict, meta_by: dict,
     if not rows_with_work:
         return None
 
-    # Gate context — surface fields that *gate* something flagged.
+    # Gate context — surface fields that *gate* something flagged. Gate columns come first so
+    # the RA reads "why is this flagged?" left to right, and they are ordered by the DATA
+    # DICTIONARY's own field order: `meta_by` is built from the metadata export in file order,
+    # so its key order IS DD order.
+    #
+    # This used to iterate `context_set` directly and insert each gate at the front. Set order
+    # over strings depends on PYTHONHASHSEED, so a workbook with two or more gate columns laid
+    # them out differently on different runs of the same command against the same data:
+    # round-to-round worklists weren't diffable, RAs saw columns move, and nothing built
+    # through here could be byte-reproducible.
     context_set = {g for f in fields_with_work for g in prereq_map.get(f, [])
                    if g not in fields_with_work}
+    dd_order = {name: i for i, name in enumerate(meta_by)}
+    gates = sorted(context_set, key=lambda g: (dd_order.get(g, len(dd_order)), g))
     display_set = fields_with_work | context_set
-    display_fields = [f for f in fields if f in display_set]
-    for gate in context_set:
-        if gate not in display_fields:
-            display_fields.insert(0, gate)
+    display_fields = []
+    for f in gates + [f for f in fields if f in display_set]:
+        if f not in display_fields:
+            display_fields.append(f)
 
     wb = Workbook()
     ws = wb.active

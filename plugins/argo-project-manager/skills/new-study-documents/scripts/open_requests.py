@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from argo_trackers import ADMIN_TRACKERS, SOURCE_FORMS, SIR_BUILD_STEPS  # noqa: E402
+from argo_trackers import ADMIN_TRACKERS, SOURCE_FORMS, sir_progress  # noqa: E402
 from argo_redcap_client import RedcapClient, RedcapError  # noqa: E402
 
 # The queues a database manager fulfils. Support tickets (225) are PM triage, so they are
@@ -31,11 +31,13 @@ QUEUES = {
     "linking": ("DATA_LINKING_REQUEST",     "Linking requests"),
     "data":    ("DATA_REQUEST",             "Data requests"),
 }
+# Where each queue is fulfilled. People requests have no skill: access is granted by hand on
+# the study project's User Rights page in REDCap, so the line says the page, not a skill.
 ROUTE = {
-    "builds":  "build-study",
-    "people":  "manage-redcaps",
-    "linking": "link-data",
-    "data":    "export-data",
+    "builds":  "the build-study skill",
+    "people":  "REDCap itself — the study project's User Rights page (Users & Roles)",
+    "linking": "the link-data skill",
+    "data":    "the export-data skill",
 }
 # Triage/bookkeeping fields that say nothing about what the request IS.
 BORING = {"assigned_to", "assignment_date", "completed", "resolution_date", "notes"}
@@ -79,8 +81,10 @@ def _open_records(client: RedcapClient, done_marker: str) -> "tuple[list, str]":
 
 
 def _sir_progress(rec: dict) -> str:
-    done = sum(1 for f in SIR_BUILD_STEPS if str(rec.get(f, "")).strip() == "Yes")
-    return f"{done}/{len(SIR_BUILD_STEPS)}"
+    """'N/M' build steps done. The counting rule lives in argo_trackers.sir_progress, which
+    the weekly check reads too — one rule, so a study never shows 3/7 here and 4/7 there."""
+    done, total = sir_progress(rec)
+    return f"{done}/{total}"
 
 
 def show_queue(key: str, expand: bool = True) -> "int | None":
@@ -104,7 +108,7 @@ def show_queue(key: str, expand: bool = True) -> "int | None":
             rid = rec.get(id_field, "?")
             extra = f"  [{_sir_progress(rec)} build steps done]" if key == "builds" else ""
             print(f"  {rid}: {_summarise(rec, fields, id_field)}{extra}")
-        print(f"  -> fulfilled with the {ROUTE[key]} skill; when done, mark the record's"
+        print(f"  -> fulfilled in {ROUTE[key]}; when done, mark the record's"
               f" '{done_marker}' box in the {title} project on the REDCap website.")
     return len(open_recs)
 
@@ -153,7 +157,8 @@ def main() -> int:
         if support is not None:
             try:
                 open_tix, _ = _open_records(support, "completed")
-                print(f"Support tickets: {len(open_tix)} open (PM triage — not a build queue)")
+                print(f"Support tickets: {len(open_tix)} open "
+                      f"(triaged by hand in that project — not a build queue)")
             except RedcapError:
                 pass
     if all(c is None for c in counts):

@@ -14,7 +14,7 @@ Usage:
     python3 setup_brief.py <RID> --out database-manager/<study> [--moniker HPV_SelfSampling]
     python3 setup_brief.py <RID> --from-json rec.json --out database-manager/<study> --moniker HPV_SelfSampling
 """
-import argparse, json, os, sys, datetime, urllib.parse, urllib.request
+import argparse, json, os, re, sys, datetime, urllib.parse, urllib.request
 
 def pull(rid):
     url=os.environ.get("REDCAP_URL"); tok=os.environ.get("STUDY_INITIATION_REQUEST")
@@ -29,9 +29,55 @@ def pull(rid):
 # doc field -> File Repository folder
 def repo_folder(field):
     return "IRB and Ethics" if ("irb_file" in field or "consent" in field) else "Study Documents"
-def repo_label(field):
-    return {"sop":"SOP","eligibility_checklist":"ECL","quest_univ_file":"Questionnaire"}.get(field) or \
-           field.replace("_file","").replace("_1","_UCH").replace("_2","_UNIOSUN").replace("quest_site","Questionnaire_site").title().replace("_","")
+
+# Stems for the document fields the SIR carries. Site-numbered fields (`_1`.. `_10`) take
+# their site tag from the SIR's own institution list — never from a hardcoded site name.
+DOC_STEMS = {"quest_univ_file": "Questionnaire", "quest_site": "Questionnaire",
+             "sop": "SOP", "eligibility_checklist": "ECL",
+             "irb_file": "IRB", "consent_file": "Consent",
+             "consent_prof": "ConsentProfessional"}
+SITE_STOPWORDS = {"of", "and", "the", "for", "de", "du", "des", "la", "le", "el"}
+
+
+def site_names(rec):
+    """{'1': 'Korle Bu Teaching Hospital', ...} from the SIR's inst_name_1..10 fields."""
+    out = {}
+    for f, v in rec.items():
+        m = re.fullmatch(r"inst_name_(\d+)", f)
+        if m and str(v).strip():
+            out[m.group(1)] = str(v).strip()
+    return out
+
+
+def site_token(name):
+    """Short filename-safe tag for an institution, derived from that institution's own name:
+    'University College Hospital (UCH)' -> UCH; 'Korle Bu Teaching Hospital' -> KBTH."""
+    m = re.search(r"\(([A-Za-z][A-Za-z0-9\-]{1,15})\)", name)
+    if m:
+        return re.sub(r"[^A-Za-z0-9]", "", m.group(1)).upper()
+    words = [w for w in re.split(r"[^A-Za-z0-9]+", name) if w and w.lower() not in SITE_STOPWORDS]
+    if not words:
+        return ""
+    if len(words) == 1:
+        return words[0][:16]
+    return "".join(w[0] for w in words).upper()[:10]
+
+
+def repo_label(field, sites):
+    """(filename stem, site column) for one document field. Returns a [TODO] instead of a
+    site tag when the SIR names no institution for that number — never a guessed site."""
+    m = re.search(r"_(\d+)$", field)
+    stem_key = field[:m.start()] if m else field
+    stem = DOC_STEMS.get(field) or DOC_STEMS.get(stem_key) or \
+        stem_key.replace("_file", "").title().replace("_", "")
+    if not m:
+        return stem, "—"
+    n = m.group(1)
+    name = sites.get(n)
+    if not name:
+        return f"{stem}_[TODO site {n}]", f"[TODO] `inst_name_{n}` is blank in the SIR"
+    tag = site_token(name)
+    return (f"{stem}_{tag}" if tag else f"{stem}_[TODO site {n}]"), name
 
 def main():
     ap=argparse.ArgumentParser()
@@ -51,8 +97,9 @@ def main():
         if any(s in f for s in ["quest_univ_file","quest_site_","sop","eligibility_checklist","irb_file_","consent_file_","consent_prof_"]) \
            and str(v).strip() and str(v).strip() not in ("0","1","2"):
             docs.append((f,v))
-    # DAGs
-    dags=[g(f) for f in sorted(r) if f.startswith("inst_name_") and g(f)]
+    # DAGs / sites — the SIR's institution list is the only source of site names
+    sites=site_names(r)
+    dags=[sites[k] for k in sorted(sites,key=int)]
     # IRB expiry check
     exp=g("irb_approval_expires"); exp_flag=""
     if exp:
@@ -75,6 +122,9 @@ def main():
              "else tick the same fields in the Study Tracker UI.\n")
     L.append("## 1. Create project → `project_created`\nUse the paste sheet (`CREATE_NEW_PROJECT_%s.txt` / `fill_new_project.py %s`). Mark with `--pid <PID>`." % (a.rid,a.rid))
     L.append("\n## 2. Upload the data dictionary → `dd_uploaded`\nDesigner → Data Dictionary → Upload the validated DD CSV.")
+    L.append("Deliverable alongside the DD: `QUESTIONNAIRE_CHANGELOG.md` — the DD mirrors the printed "
+             "IRB-approved questionnaire exactly, so any substantive defect goes in the changelog "
+             "instead, each marked \"needs IRB amendment: yes/no\". Write \"none found\" if there are none.")
     L.append("\n## 3. Form vs survey\nDefault to data-entry forms unless the proposal says respondents self-complete.")
     if dags:
         L.append("\n## 4. Data Access Groups\nUser Rights → DAGs — create and assign users for: "+", ".join(dags)+".")
@@ -85,11 +135,14 @@ def main():
         if addl: L.append(f"| *(additional, confirm roles)* | | {addl[:80]} |")
     else:
         L.append("\n*(no personnel named in the SIR — confirm with the PM)*")
-    L.append("\nUsers without REDCap accounts → log them in the SPR (PID 221) via `manage-redcaps`.")
+    L.append("\nUsers without REDCap accounts → log them in the Study Personnel Request "
+             "tracker (PID 221); an administrator creates the account.")
     L.append("\n## 6. File Repository (rename with moniker `%s`)" % mon)
     if docs:
-        L.append("\n| SIR field / file | Upload as | Folder |\n|---|---|---|")
-        for f,v in docs: L.append(f"| `{f}` = {v[:40]} | `{mon}_{repo_label(f)}` (keep ext) | {repo_folder(f)} |")
+        L.append("\n| SIR field / file | Rename to | Folder | Site |\n|---|---|---|---|")
+        for f,v in docs:
+            label,site=repo_label(f,sites)
+            L.append(f"| `{f}` = {v[:40]} | `{mon}_{label}` (keep ext) | {repo_folder(f)} | {site} |")
     else:
         L.append("\n*(no documents attached to the SIR)*")
     dc=g("data_collection")

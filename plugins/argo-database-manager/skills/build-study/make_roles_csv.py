@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """Generate a REDCap-ready roles CSV from a data dictionary.
 
-This is the **CSV-upload** path — the file is uploaded via the REDCap UI:
+Step 4 of the build. The file is uploaded via the REDCap UI:
   User Rights → User Roles → Upload user roles (CSV)
 
-Use this when you don't have / don't want to use the project's API token. The
-API-driven sibling is set_roles.py.
+This is the only path — no access key needed, and a new study's own project almost never
+has one. People are then assigned to the roles by hand on the same page.
 
 Usage:
     python3 make_roles_csv.py <DD_CSV_PATH> [--clinical FORM1,FORM2,...]
                                             [--out OUTPUT_PATH]
 
-If --clinical is omitted, the script applies the same heuristic as set_roles.py:
-non-clinical = forms whose names match qa_*, internal_tracking, or admin_*.
-Everything else is clinical (gets View+Edit for the Data Entry role).
+If --clinical is omitted, the script splits the forms itself: non-clinical = forms
+whose names match qa_*, internal_tracking, or admin_*. Everything else is clinical
+(gets View+Edit for the Data Entry role).
 
 For single-form studies this is unambiguous and no flag is needed.
 """

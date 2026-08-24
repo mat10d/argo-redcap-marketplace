@@ -20,8 +20,20 @@ The list to Monday, in order:
 4. **DB-manager round** — "show my outstanding requests", first live open_requests.py run.
 5. **Repeat 1+2** once each → they become the Monday demo script.
 6. **0.17.2 fix batch (tomorrow)** — the ranked defect queue at the top of
-   testing/cowork/NITS.md. Needs Matteo's call: SIR progress rule, lenient vs strict
-   (recommendation: lenient, applied to both portfolio and open_requests).
+   testing/cowork/NITS.md. Two calls settled and implemented in the batch:
+   - **SIR progress rule = LENIENT everywhere.** A step counts as done when its field holds any
+     settled answer that isn't "No"/"0"/"" (radios like `data_imported` = "Prospective study,
+     not required" count). One helper, `argo_trackers.sir_progress(record) -> (done, total)`,
+     imported by both `portfolio.py` and `open_requests.py`; the divergence-pinning test now
+     asserts they agree.
+   - **The database manager owns monitoring.** `monitor-studies` moved from
+     argo-project-manager to argo-database-manager as **`weekly-check`**, and absorbed the
+     open-request queue: one run = programme status (`portfolio.py --diff`) + the queues
+     (`open_requests.py`), routed to build-study / export-data / link-data. **`manage-redcaps`
+     retired entirely** — `make_roles_csv.py` moved into build-study step 4, `set_roles.py`
+     deleted, the roles-CSV reference folded into `standard-roles.md`, and adding people is
+     now plainly a REDCap-UI job (there is no add-users skill). The PM plugin keeps only
+     `new-study-documents`. Snapshots land in `database-manager/weekly-check/`.
 7. **Matteo, admin**: batch tracker-key request to the OAU admin (rights matrix in
    access-tiers; longest lead time — send first); org refresh after 0.17.2.
 8. **Fri/Sat**: one-page team handout (Claude drafts, Matteo reviews); demo = rounds 1+2.
@@ -64,9 +76,9 @@ is created and they land in their role.
 
 | Role | Does | Keys | Skills |
 |---|---|---|---|
-| **Project manager** | Monitors what studies exist; builds study documents for new studies; submits new study requests | 5 tracker keys | monitor-studies, new-study-documents |
+| **Project manager** | Builds study documents for new studies; submits new study requests | Study Tracker key (templates) | new-study-documents |
 | **QA specialist** | Builds and audits RA worklists for their assigned study | 5 trackers + THEIR study's key | qa-worklists |
-| **Database manager** | Builds REDCaps, adds users, exports data, **links data (the big one)**. Entry = what requests are outstanding → routed to the steps to fulfil them | 5 trackers + study keys as needed | build-study, manage-redcaps, export-data, link-data |
+| **Database manager** | Owns monitoring: the weekly check (programme status + outstanding requests) → routed to the steps to fulfil them. Builds REDCaps, exports data, **links data (the big one)**. Adding people is a REDCap-UI job | 5 trackers + study keys as needed | weekly-check, build-study, export-data, link-data |
 | **Data analyst** | Standard REDCap outputs (downloaded, NO API key); cleaning, analysis, QA; linkage when merging >1 database for analysis; Stata/R/Python; figures | none | run-analysis (+link-data read-side) |
 
 **Decided:** workspace uses ROLE-NAMED folders — `project-manager/ qa-specialist/
@@ -113,6 +125,8 @@ plugins renamed to the roles in full — `argo-core`, `argo-project-manager`,
 task-shaped: `monitor-studies`, `new-study-documents`, `qa-worklists`, `build-study`,
 `manage-redcaps` (widened: task 1 = monitor the core tracking REDCaps / outstanding requests
 via open_requests.py, task 2 = access management), `export-data`, `link-data`, `run-analysis`.
+*(History: 0.17.2 renamed `monitor-studies` to `weekly-check` and moved it to the database
+manager, and retired `manage-redcaps` — see the TODO block above.)*
 ORG ACTION REQUIRED with the refresh: the managed-settings enabledPlugins list changed —
 five plugins now, new names (JSON in SETUP.md).
 

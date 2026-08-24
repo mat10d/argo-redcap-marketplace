@@ -243,18 +243,22 @@
         "severity": "error"
       },
       "mdc_missing_in_choices": {
-        "count": 3,
+        "count": 5,
         "field_named_in_message": true,
         "fields": [
           "tumor_grade",
           "single_choice",
-          "smoking_status"
+          "smoking_status",
+          "likert_plain_1",
+          "likert_plain_2"
         ],
         "match_regex": "missing mdc in choices",
         "rows": [
           15,
           16,
-          28
+          28,
+          37,
+          38
         ],
         "severity": "error"
       },
@@ -379,10 +383,23 @@
         "severity": "error"
       }
     },
-    "expected_errors_total": 28,
+    "expected_errors_total": 30,
     "expected_warnings_total": 5,
     "file": "dirty_datadictionary.csv",
-    "n_data_rows": 33,
+    "mdc_waiver": {
+      "annotation": "@MDC-EXEMPT",
+      "flagged_expectation": "The same Likert shape with no annotation: each still raises mdc_missing_in_choices, exactly as before the waiver existed.",
+      "flagged_rows": {
+        "likert_plain_1": 37,
+        "likert_plain_2": 38
+      },
+      "waived_expectation": "No violation of any kind. likert_exempt_1 carries the annotation itself; likert_exempt_2 is waived by belonging to the same matrix group (syn_likert_exempt).",
+      "waived_rows": {
+        "likert_exempt_1": 35,
+        "likert_exempt_2": 36
+      }
+    },
+    "n_data_rows": 37,
     "not_engineerable": [
       {
         "check": "header_column_count",
@@ -445,18 +462,24 @@
       "dropdown": 2,
       "file": 1,
       "notes": 1,
-      "radio": 11,
+      "radio": 15,
       "text": 10
     },
     "file": "fields.json",
     "forms": {
-      "assessment": 16,
+      "assessment": 20,
       "screening": 12
     },
     "identifier_fields": [
       "hospital_number"
     ],
     "matrix_groups": {
+      "mood_scale": [
+        "mood_q1",
+        "mood_q2",
+        "mood_q3",
+        "mood_q4"
+      ],
       "sev_grid": [
         "sev_pain",
         "sev_nausea",
@@ -489,15 +512,29 @@
       "referral_source",
       "followup_plan"
     ],
+    "mdc_exempt_annotated_fields": [
+      "mood_q1",
+      "mood_q2",
+      "mood_q3",
+      "mood_q4"
+    ],
+    "mdc_exempt_annotation": "@MDC-EXEMPT",
     "mdc_exempt_fields": [
       "synb_id",
       "hospital_number",
       "hospital_site",
       "assess_intro",
       "bmi_calc",
+      "mood_q1",
+      "mood_q2",
+      "mood_q3",
+      "mood_q4",
       "path_report_file"
     ],
-    "n_fields": 28,
+    "mdc_exempt_matrix_groups": [
+      "mood_scale"
+    ],
+    "n_fields": 32,
     "record_id_field": "synb_id",
     "validation_types": [
       "date_dmy",
@@ -508,7 +545,8 @@
   "notes": [
     "Every row in dirty_datadictionary.csv is otherwise clean: it carries only the violations listed for it, so the manifest is an exact expectation, not a floor.",
     "Two rows unavoidably raise two violations each: a select with no choices and a select with a single choice both also fail the MDC-in-choices check, because MDC choices cannot exist without pipe-separated options.",
-    "fields.json contains no validated Likert/psychometric scale. ARGO practice exempts those from MDC, but validate_dd.py implements no waiver, so including one would make the clean fixture fail by design. The sev_grid matrix is a study-authored severity grid and takes MDC normally.",
+    "fields.json contains two matrix groups on purpose: sev_grid is a study-authored severity grid and takes MDC normally, while mood_scale is a (fabricated) validated psychometric scale built with \"mdc\": false, so dd_builder writes @MDC-EXEMPT into its Field Annotation and validate_dd waives it. The clean DD stays clean WITH a validated scale in it \u2014 that is the point of the waiver.",
+    "dirty_dd.mdc_waiver pins both halves of the waiver: annotated rows raise nothing (field-level and matrix-group-level), un-annotated rows of the same shape are still flagged.",
     "match_regex values are lowercase, wording-tolerant patterns; tests lowercase the validator's messages before matching."
   ],
   "seed": 20260820,

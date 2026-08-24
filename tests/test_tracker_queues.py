@@ -30,7 +30,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 FIXTURE = REPO / "testing" / "fixtures" / "synthetic-trackers"
 CORE_SCRIPTS = REPO / "plugins" / "argo-core" / "skills" / "redcap-api" / "scripts"
-PORTFOLIO_PY = (REPO / "plugins" / "argo-project-manager" / "skills" / "monitor-studies"
+PORTFOLIO_PY = (REPO / "plugins" / "argo-database-manager" / "skills" / "weekly-check"
                 / "portfolio.py")
 GENERATOR = FIXTURE / "generate.py"
 
@@ -245,47 +245,80 @@ class TestSummarise(unittest.TestCase):
 
 
 class TestSirProgress(unittest.TestCase):
+    """One counting rule, shared.
+
+    Until 0.17.2 there were two: the queue counted the literal "Yes", the weekly check counted
+    any settled answer, and the same study read 3/7 to one and 4/7 to the other. The rule now
+    lives once, in `argo_trackers.sir_progress`, and both sides import it — so these tests
+    assert AGREEMENT where they used to pin the divergence.
+    """
+
     def setUp(self):
         self.entry = entry("STUDY_INITIATION_REQUEST")
         self.records = json.loads((FIXTURE / self.entry["records_file"]).read_text())
 
-    def test_strict_progress_buckets_match_the_manifest(self):
-        buckets = {}
-        for rec in self.records:
-            p = OR._sir_progress(rec)
-            buckets[p] = buckets.get(p, 0) + 1
-        self.assertEqual(buckets, self.entry["sir_progress_strict"])
+    @staticmethod
+    def _retired_strict_rule(rec: dict) -> str:
+        """The rule open_requests used to apply: only the literal 'Yes' counts.
+
+        Kept here, and nowhere in the shipped code, so the fixture's engineered radio records
+        still assert something — they are exactly where the lenient rule counts one more.
+        """
+        done = sum(1 for f in TRACKERS.SIR_BUILD_STEPS if str(rec.get(f, "")).strip() == "Yes")
+        return f"{done}/{len(TRACKERS.SIR_BUILD_STEPS)}"
+
+    def test_both_progress_functions_bucket_to_the_lenient_manifest(self):
+        for name, fn in (("open_requests", OR._sir_progress),
+                         ("portfolio", PORTFOLIO.sir_progress)):
+            buckets = {}
+            for rec in self.records:
+                p = fn(rec)
+                buckets[p] = buckets.get(p, 0) + 1
+            self.assertEqual(buckets, self.entry["sir_progress_lenient"], name)
 
     def test_every_bucket_from_zero_to_seven_is_represented(self):
-        self.assertEqual(sorted(self.entry["sir_progress_strict"]),
+        self.assertEqual(sorted(self.entry["sir_progress_lenient"]),
                          [f"{i}/7" for i in range(8)])
 
     def test_per_record_progress_matches_the_manifest(self):
         for rec in self.records:
-            expected = self.entry["sir_progress_per_record"][rec["record_id"]]
-            self.assertEqual(OR._sir_progress(rec), expected["strict"], rec["record_id"])
-            self.assertEqual(PORTFOLIO.sir_progress(rec), expected["lenient"],
-                             rec["record_id"])
+            expected = self.entry["sir_progress_per_record"][rec["record_id"]]["lenient"]
+            self.assertEqual(OR._sir_progress(rec), expected, rec["record_id"])
+            self.assertEqual(PORTFOLIO.sir_progress(rec), expected, rec["record_id"])
 
-    def test_portfolio_lenient_buckets_match_the_manifest(self):
-        buckets = {}
-        for rec in self.records:
-            p = PORTFOLIO.sir_progress(rec)
-            buckets[p] = buckets.get(p, 0) + 1
-        self.assertEqual(buckets, self.entry["sir_progress_lenient"])
-
-    def test_the_two_progress_functions_diverge_only_where_engineered(self):
-        """A radio label like 'Prospective study, not required' settles a step for the
-        portfolio but is not the literal 'Yes' open_requests counts. That difference is
-        real and deliberate — pin it, so a change to either side is noticed."""
+    def test_the_two_progress_functions_agree_on_every_record(self):
+        """The flipped pin: they used to diverge by design. One shared helper, so they can't."""
         diverging = sorted(r["record_id"] for r in self.records
                            if OR._sir_progress(r) != PORTFOLIO.sir_progress(r))
-        self.assertEqual(diverging, self.entry["progress_divergence_record_ids"])
+        self.assertEqual(diverging, [],
+                         "open_requests and the weekly check disagree about build progress — "
+                         "both must go through argo_trackers.sir_progress")
+
+    def test_both_sides_delegate_to_the_shared_helper(self):
+        """Not just equal outputs: the same function is doing the counting on both sides."""
+        for rec in self.records:
+            done, total = TRACKERS.sir_progress(rec)
+            self.assertEqual(f"{done}/{total}", OR._sir_progress(rec), rec["record_id"])
+            self.assertEqual((done, total), PORTFOLIO._sir_progress_counts(rec),
+                             rec["record_id"])
+
+    def test_the_lenient_rule_counts_the_engineered_radio_answers(self):
+        """Regression for the fix: exactly the records the manifest calls out as divergent
+        count one step MORE than the retired 'Yes'-only rule would have."""
+        gained = sorted(r["record_id"] for r in self.records
+                        if self._retired_strict_rule(r) != OR._sir_progress(r))
+        self.assertEqual(gained, self.entry["progress_divergence_record_ids"])
+        for rid in gained:
+            rec = next(r for r in self.records if r["record_id"] == rid)
+            strict_done = int(self._retired_strict_rule(rec).split("/")[0])
+            lenient_done = int(OR._sir_progress(rec).split("/")[0])
+            self.assertGreater(lenient_done, strict_done, rid)
 
     def test_every_record_in_production_is_seven_of_seven(self):
         for rec in self.records:
             if rec["study_production"] == "Yes":
                 self.assertEqual(OR._sir_progress(rec), "7/7", rec["record_id"])
+                self.assertEqual(PORTFOLIO.sir_progress(rec), "7/7", rec["record_id"])
 
 
 class TestPortfolioSummarize(unittest.TestCase):

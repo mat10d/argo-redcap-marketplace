@@ -15,9 +15,9 @@ routes into that role's skills. The workspace gets one folder per role the perso
 
 | Role | What they do | Keys | Skills |
 |---|---|---|---|
-| **Project manager** | Monitor what studies exist; draft the new-study document package; submit new study requests | 5 tracker keys | `argo-project-manager`: `monitor-studies`, `new-study-documents` |
+| **Project manager** | Draft the new-study document package; submit new study requests | none required (the Study Tracker key fetches the official templates) | `argo-project-manager`: `new-study-documents` |
 | **QA specialist** | Build and audit RA worklists for their assigned study | 5 trackers + their study's key | `argo-qa-specialist`: `qa-worklists` |
-| **Database manager** | Fulfil outstanding requests: build REDCaps, add users, export data, **link data**. Their landing view is the request queues from the trackers | 5 trackers + study keys as needed | `argo-database-manager`: `build-study`, `manage-redcaps`, `export-data`, `link-data` |
+| **Database manager** | The weekly check — where every study stands and what's waiting — then fulfil it: build REDCaps, export data, **link data**. Adding people is done by hand in REDCap | 5 trackers + study keys as needed | `argo-database-manager`: `weekly-check`, `build-study`, `export-data`, `link-data` |
 | **Data analyst** | Cleaning, analysis, QA, figures (Stata/R/Python) on downloaded REDCap exports; linkage read-side when merging databases | **none** | `argo-data-analyst`: `run-analysis` |
 
 `argo-core` is plumbing, not a destination: the shared client, setup, references, and the
@@ -28,9 +28,8 @@ with them for triggers except the door itself.
 
 ```
 project manager      new-study-documents  → draft the document package, submit the request
-                     monitor-studies      → monitor: what exists, what's still unbuilt
         ↓  (request lands in the trackers)
-database manager     manage-redcaps       → see outstanding requests; add users, manage rights
+database manager     weekly-check         → where studies stand + what's waiting for you
                      build-study          → build the REDCap from the request
                      export-data          → export a cohort to disk
                      link-data            → link records across studies (diff-only write-back)

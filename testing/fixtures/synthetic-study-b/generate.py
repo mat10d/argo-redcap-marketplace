@@ -417,15 +417,6 @@ def main():
             },
         },
         "expected_diff": expected_diff(primary, records),
-        "known_defects": {
-            "orphans_classified_as_fills":
-                "diff_payload.py / argo_diff.diff_records iterate the computed side and "
-                "treat an id absent from the current side as an all-blank record, so every "
-                "study-B-only id becomes a safe-fill row in *_update.csv. Importing that "
-                "file would CREATE those records in REDCap. Neither script emits an orphan "
-                "report, though link-data's SKILL.md promises gap/orphan reports. "
-                "tests/test_linkage_merge.py pins the current behaviour and marks it.",
-        },
     }
     with open(os.path.join(HERE, "MANIFEST.json"), "w") as fh:
         json.dump(manifest, fh, indent=2, sort_keys=True)

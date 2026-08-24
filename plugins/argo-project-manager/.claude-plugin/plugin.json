@@ -1,7 +1,7 @@
 {
   "name": "argo-project-manager",
   "version": "0.17.1",
-  "description": "For the ARGO project manager. See where every study stands and what requests are open (monitor-studies), and draft the document package for a new study (new-study-documents).",
+  "description": "For the ARGO project manager. Draft the document package for a new study (protocol, SOP, questionnaire and the rest) from a concept note, and submit the study request: new-study-documents.",
   "author": {
     "name": "ARGO"
   }

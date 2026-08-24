@@ -32,7 +32,7 @@ For any operation a skill performs:
 | **Read records / metadata** | `content=record` / `content=metadata` export | Work from an export/download the user provides on disk (CSV + data dictionary). This is the [[run-analysis]] model. |
 | **Create a project** | (needs a Super Token — ARGO has none) | Generate the paste-ready "Create New Project" sheet; the user creates it in the UI ([[build-study]]). |
 | **Upload a data dictionary** | API import | Save the validated DD CSV; the user uploads it via Designer ([[build-study]]). |
-| **Set roles / user rights** | `content=userRole` API | Generate the roles CSV; the user uploads it (User Rights → Upload). `manage-redcaps` already supports this CSV path. |
+| **Set roles / user rights** | `content=userRole` API | Generate the roles CSV; the user uploads it (User Rights → Upload). `make_roles_csv.py` in [[build-study]] is that path, and it is the default. |
 | **Write/back-fill records** | diff-only API import | Emit the update/conflict CSVs for the user to import via the UI ([[link-data]] diff_payload). |
 | **QA worklists** | pull via `--token-env` | Run against a local record export + Data Dictionary the user downloaded: `build_worklists.py --records-csv --metadata-csv`. |
 

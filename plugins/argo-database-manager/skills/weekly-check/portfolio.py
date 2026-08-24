@@ -31,22 +31,27 @@ REDCAP_URL = os.environ.get("REDCAP_URL")
 def state_dir() -> Path:
     """Where snapshots are saved. Resolved when needed, not at import.
 
+    The weekly check belongs to the database manager, so snapshots land in
+    `database-manager/weekly-check/` inside the ARGO folder. `ARGO_PM_ROOT` names that folder
+    (the variable keeps its old name so nobody's existing settings file breaks; setup writes
+    the database-manager path into it). An explicit value is always honoured as-is.
+
     Nothing is required just to *import* this file or to run --check — that way a broken or
     unconfigured setup can still be diagnosed. Falls back to a sensible location so the tool
     works out of the box in any environment, and says where it put things.
     """
-    pm_root = os.environ.get("ARGO_PM_ROOT")
-    if pm_root:
-        root = Path(pm_root).expanduser()
+    snap_root = os.environ.get("ARGO_PM_ROOT")
+    if snap_root:
+        root = Path(snap_root).expanduser()
     else:
-        root = Path.home() / ".argo" / "project-manager"
+        root = Path.home() / ".argo" / "database-manager"
         print(
             f"I saved the snapshot to {root}. If your ARGO folder is somewhere else, add\n"
             "ARGO_PM_ROOT to your settings file so it lands next to the rest of your work:\n"
-            "    ARGO_PM_ROOT=/path/to/your/ARGO-folder/project-manager\n",
+            "    ARGO_PM_ROOT=/path/to/your/ARGO-folder/database-manager\n",
             file=sys.stderr,
         )
-    directory = root / "portfolio-snapshots"
+    directory = root / "weekly-check"
     directory.mkdir(parents=True, exist_ok=True)
     return directory
 
@@ -65,23 +70,32 @@ def _load_trackers():
     if core:
         sys.path.insert(0, core)
         try:
-            from argo_trackers import as_portfolio_rows, SIR_BUILD_STEPS as steps
-            return as_portfolio_rows(), steps
+            from argo_trackers import (as_portfolio_rows, SIR_BUILD_STEPS as steps,
+                                       sir_progress as progress)
+            return as_portfolio_rows(), steps, progress
         except ImportError:
             pass
     print("Note: couldn't load the shared tracker list from argo-core; using a local copy. "
           "Re-install the ARGO plugins together if this persists.", file=sys.stderr)
+    fallback_steps = ["project_created", "dd_uploaded", "user_rights_complete", "data_imported",
+                      "review_internal", "review_pi", "study_production"]
+
+    def fallback_progress(record: dict) -> tuple:
+        not_done = {"", "no", "0"}
+        done = sum(1 for s in fallback_steps
+                   if str(record.get(s) or "").strip().lower() not in not_done)
+        return done, len(fallback_steps)
+
     return ([
         ("STUDY_INITIATION_REQUEST", "Study Tracker", "study_initiation_request", "study_production", "Yes"),
         ("STUDY_PERSONELL_REQUEST",  "Study Personnel Request",  "study_personnel_request",  "completed", "Yes"),
         ("DATA_LINKING_REQUEST",     "Data Linking Request",     "data_linking_request",     "completed", "Yes"),
         ("DATA_REQUEST",             "Data Request",             "data_request",             "completed", "Yes"),
         ("SUPPORT_TICKET_REQUEST",   "Support Ticket Request",   "support_ticket",           "completed", "Yes"),
-    ], ["project_created", "dd_uploaded", "user_rights_complete", "data_imported",
-        "review_internal", "review_pi", "study_production"])
+    ], fallback_steps, fallback_progress)
 
 
-ADMIN_REDCAPS, SIR_BUILD_STEPS = _load_trackers()
+ADMIN_REDCAPS, SIR_BUILD_STEPS, _sir_progress_counts = _load_trackers()
 
 
 def api_post(token: str, **params) -> "list | dict":
@@ -160,15 +174,14 @@ def collect(csv_dir: Path) -> dict:
 
 def sir_progress(rec: dict) -> str:
     """Render build progress as 'N/M' completed steps.
-    Counts a step done if the value is yesno=Yes OR any non-empty radio label (data_imported is radio:
-    either 'Yes. data was...' or 'Prospective study, not required' both count as settled)."""
-    NOT_DONE = {"", "no", "0"}
-    done = 0
-    for s in SIR_BUILD_STEPS:
-        v = (rec.get(s) or "").strip()
-        if v and v.lower() not in NOT_DONE:
-            done += 1
-    return f"{done}/{len(SIR_BUILD_STEPS)}"
+
+    The counting rule itself lives in argo-core's `argo_trackers.sir_progress` and is shared
+    with the open-requests queue, so the same study can never read 3/7 in one view and 4/7 in
+    the other. A step is done when its field holds any settled answer that isn't "no" —
+    `data_imported` is a radio whose "Prospective study, not required" settles it.
+    """
+    done, total = _sir_progress_counts(rec)
+    return f"{done}/{total}"
 
 
 def summarize(env_var: str, rec: dict) -> str:
@@ -277,8 +290,9 @@ def run_setup_check() -> int:
             "I couldn't find the shared ARGO REDCap code, which this check needs.\n"
             "\n"
             "It lives in the argo-core plugin. This usually means argo-core isn't installed\n"
-            "alongside argo-project-manager. Ask whoever set up your ARGO tools to reinstall the plugins, or\n"
-            "set ARGO_CORE_SCRIPTS to the folder containing argo_redcap_client.py."
+            "alongside argo-database-manager. Ask whoever set up your ARGO tools to reinstall\n"
+            "the plugins, or set ARGO_CORE_SCRIPTS to the folder containing\n"
+            "argo_redcap_client.py."
         )
         return 1
     sys.path.insert(0, core)

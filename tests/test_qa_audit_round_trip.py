@@ -11,19 +11,25 @@ The round trip:
         -> build_worklists.py                     (the worklists we'd send the sites)
         -> generate_returns.py                    (seeded, engineered RA edits)
         -> review_responses.py                    (the audit)
+        -> summarize_for_ra.py                    (what goes back to each RA)
         -> counts asserted against MANIFEST.json's `returned` block
 
 Nothing binary is committed: the workbooks are generated into a temp directory on every run
 from the seeded generator, and thrown away afterwards.
 
-Four of the assertions below record KNOWN DEFECTS rather than correct behaviour — three in
-`review_responses.py`, one in `build_worklists.py`. They are named `test_known_defect_*` and
-each docstring says what is wrong, what the consequence is, and what to do when it is fixed.
-They exist so the gaps are visible in the suite instead of being discovered by an RA whose
-answers were silently dropped.
+Four of the assertions here used to PIN KNOWN DEFECTS — three in `review_responses.py`, one in
+`build_worklists.py` — and asserted the broken behaviour so the gaps stayed visible in the
+suite instead of being discovered by an RA whose answers were silently dropped. All four were
+fixed in 0.17.2 and the assertions were flipped to the correct behaviour:
+
+    amber answers are reported (and tagged amber)      test_amber_cell_answers_*
+    out-of-scope edits are reported separately         test_out_of_scope_edits_*
+    a single-ID workbook loses nothing                 test_single_id_column_workbook_*
+    gate-context column order is stable                test_gate_context_column_order_*
 """
 from __future__ import annotations
 
+import csv
 import importlib.util
 import json
 import os
@@ -40,6 +46,7 @@ GENERATOR = FIXTURE / "generate_returns.py"
 QA_SKILL = REPO / "plugins" / "argo-qa-specialist" / "skills" / "qa-worklists"
 REVIEWER = QA_SKILL / "review_responses.py"
 BUILDER = QA_SKILL / "build_worklists.py"
+SUMMARIZER = QA_SKILL / "summarize_for_ra.py"
 
 try:
     import openpyxl  # noqa: F401
@@ -88,6 +95,10 @@ class TestQAAuditRoundTrip(unittest.TestCase):
                              "--out /tmp/x --update-manifest")
         return exp
 
+    def audit(self, name):
+        orig, resp = self.pair(name)
+        return self.rr.diff(str(orig), str(resp))
+
     # -- the generator ----------------------------------------------------
 
     def test_generator_completes_without_crashing(self):
@@ -127,33 +138,36 @@ class TestQAAuditRoundTrip(unittest.TestCase):
     def test_triage_counts_match_the_manifest(self):
         """The four-bucket triage inputs, per returned workbook, as exact numbers.
 
-        READY / QUESTION_FOR_RA are both sourced from the changed-cell list (the specialist
+        READY / QUESTION_FOR_RA are both sourced from the answered-cell list (the specialist
         splits them by whether the value maps to the DD); NO_ACTION / VERIFY are both sourced
-        from the note-only list. Those two lists are what review_responses.py produces, and
-        they are what is asserted here.
+        from the note-only list. Out-of-scope edits are a fifth thing entirely — nobody asked
+        for them — and are asserted separately below.
         """
         for name, spec in self.expectations().items():
-            orig, resp = self.pair(name)
             with self.subTest(name):
-                by_record, notes, id_field, had_resp = self.rr.diff(str(orig), str(resp))
-                changed_cells = sum(len(v) for v in by_record.values())
-                note_only = [rid for rid, n in notes.items() if n and rid not in by_record]
-                self.assertEqual(had_resp, spec["response_column_present"])
-                self.assertEqual(id_field, "syn_id")
-                self.assertEqual(len(by_record), spec["records_with_proposed_updates"],
+                a = self.audit(name)
+                yellow = sum(1 for cells in a.by_record.values()
+                             for ans in cells if ans.kind == "yellow")
+                amber = sum(1 for cells in a.by_record.values()
+                            for ans in cells if ans.kind == "amber")
+                note_only = [rid for rid, n in a.notes.items() if n and rid not in a.by_record]
+                self.assertEqual(a.has_response_col, spec["response_column_present"])
+                self.assertEqual(a.id_field, "syn_id")
+                self.assertEqual(len(a.by_record), spec["records_with_proposed_updates"],
                                  f"{name}: records with proposed updates")
-                self.assertEqual(changed_cells, spec["changed_cells"],
-                                 f"{name}: changed cells")
+                self.assertEqual(yellow, spec["changed_cells"], f"{name}: yellow cells answered")
+                self.assertEqual(amber, spec["amber_cells_detected"],
+                                 f"{name}: amber cells answered")
                 self.assertEqual(len(note_only), spec["note_only_records"],
                                  f"{name}: records with a note but no cell change")
 
     def test_note_only_records_are_the_engineered_ones(self):
         """The VERIFY/NO_ACTION bucket must name the right patients, not just the right count."""
         for name, counts in self.block["per_file"].items():
-            orig, resp = self.pair(name)
             with self.subTest(name):
-                by_record, notes, _id, _had = self.rr.diff(str(orig), str(resp))
-                note_only = sorted(rid for rid, n in notes.items() if n and rid not in by_record)
+                a = self.audit(name)
+                note_only = sorted(rid for rid, n in a.notes.items()
+                                   if n and rid not in a.by_record)
                 self.assertEqual(note_only, counts["note_only_record_ids"])
 
     def test_mdc_answers_survive_the_audit_as_changed_cells(self):
@@ -161,80 +175,82 @@ class TestQAAuditRoundTrip(unittest.TestCase):
         for name, counts in self.block["per_file"].items():
             if not counts["filled_with_mdc"]:
                 continue
-            orig, resp = self.pair(name)
             with self.subTest(name):
-                by_record, _n, _i, _h = self.rr.diff(str(orig), str(resp))
-                seen = [nv for cells in by_record.values() for _f, _ov, nv in cells]
+                a = self.audit(name)
+                seen = [ans.now for cells in a.by_record.values() for ans in cells]
                 mdc_seen = sum(1 for v in seen if v in self.manifest["qa"]["sentinel_codes"])
                 self.assertEqual(mdc_seen, counts["filled_with_mdc"],
                                  f"{name}: MDC answers reported")
 
-    # -- known defects ----------------------------------------------------
+    # -- the four formerly-pinned defects ---------------------------------
 
-    def test_known_defect_out_of_scope_edits_are_not_reported(self):
-        """DEFECT: review_responses.py cannot see an RA edit to a cell that wasn't flagged.
+    def test_out_of_scope_edits_are_reported_separately(self):
+        """An RA edit to a cell nobody flagged must be reported — as its own thing.
 
-        `_yellow_keys` only records yellow cells, and `diff` only looks up response values for
-        those keys, so a value the RA overwrote in a gate-context column (e.g. changing
-        'Sex' from Female to Male) passes the audit completely silently. The fixture engineers
-        9 such edits across the four workbooks; the audit reports 0 of them.
+        Was a silent hole: `_yellow_keys` only recorded yellow cells and `diff` only looked up
+        response values for those keys, so a value the RA overwrote in a gate-context column
+        (e.g. changing 'Sex' from Female to Male) passed the audit completely silently, while
+        SKILL.md claimed the audit shows every changed cell. The fixture engineers 9 such edits
+        across the four workbooks.
 
-        Asserted as 0 because that is today's behaviour. If this test starts failing because
-        the script now reports them, that is the fix landing — update MANIFEST's
-        `out_of_scope_edits_detected` and this test together.
+        They must NOT be folded into the answers: an unrequested edit is not an answer to a
+        question we asked, and can change which other fields even apply.
         """
         total_engineered = total_detected = 0
         for name, counts in self.block["per_file"].items():
-            orig, resp = self.pair(name)
-            by_record, _n, _i, _h = self.rr.diff(str(orig), str(resp))
+            a = self.audit(name)
+            detected = {(e.record, e.field) for e in a.out_of_scope}
             for edit in counts["out_of_scope_detail"]:
                 total_engineered += 1
-                reported = [f for f, _ov, _nv in by_record.get(edit["record"], [])]
-                if edit["column"] in reported:
-                    total_detected += 1
+                key = (edit["record"], edit["column"])
+                with self.subTest(name=name, edit=key):
+                    self.assertIn(key, detected, f"{name}: out-of-scope edit not reported")
+                    answered = [ans.field for ans in a.by_record.get(edit["record"], [])]
+                    self.assertNotIn(edit["column"], answered,
+                                     "an unrequested edit must not be reported as an answer")
+                total_detected += 1
+            # and nothing invented: exactly the engineered edits, no more
+            with self.subTest(name):
+                self.assertEqual(len(a.out_of_scope), counts["out_of_scope_edits"],
+                                 f"{name}: out-of-scope edits reported")
         self.assertEqual(total_engineered, 9, "fixture should engineer 9 out-of-scope edits")
-        self.assertEqual(total_detected, 0,
-                         "out-of-scope edits are now detected — the defect is fixed, "
-                         "update MANIFEST and this test")
+        self.assertEqual(total_detected, 9, "all 9 out-of-scope edits must be reported")
 
-    def test_known_defect_amber_cell_answers_are_not_reported(self):
-        """DEFECT: answers in AMBER cells are dropped by the audit.
+    def test_amber_cell_answers_are_reported_and_tagged(self):
+        """An answer in an AMBER cell is an answer, and is labelled as amber.
 
         Amber means 'we could not read this field's condition — please check'. It is a genuine
-        RA task, documented as such in SKILL.md. But `review_responses.YELLOW_HEX` matches only
-        the yellow fill, so when the RA answers an amber cell the audit never mentions it. The
-        fixture fills 5 amber cells; 0 are reported.
+        RA task, documented as such in SKILL.md, but the audit used to match only the yellow
+        fill so every amber answer was dropped. The fixture fills 5 amber cells.
+
+        Tagging matters as much as counting: an amber answer needs the extra check that the
+        field applies at all, so the specialist must be able to tell the two apart.
         """
         engineered = detected = 0
         for name, counts in self.block["per_file"].items():
             if not counts["amber_cells_filled"]:
                 continue
-            orig, resp = self.pair(name)
-            by_record, _n, _i, _h = self.rr.diff(str(orig), str(resp))
+            a = self.audit(name)
             for rid in counts["amber_filled_record_ids"]:
                 engineered += 1
-                if any(f == "Adjuvant therapy given" for f, _o, _n2 in by_record.get(rid, [])):
-                    detected += 1
+                hits = [ans for ans in a.by_record.get(rid, [])
+                        if ans.field == "Adjuvant therapy given"]
+                with self.subTest(name=name, record=rid):
+                    self.assertTrue(hits, f"{name}/{rid}: amber answer not reported")
+                    self.assertEqual(hits[0].kind, "amber",
+                                     "an amber answer must be tagged amber, not yellow")
+                detected += 1
         self.assertEqual(engineered, 5, "fixture should fill 5 amber cells")
-        self.assertEqual(detected, 0,
-                         "amber answers are now reported — the defect is fixed, "
-                         "update MANIFEST and this test")
+        self.assertEqual(detected, 5, "all 5 amber answers must be reported")
 
-    def test_known_defect_gate_context_column_order_is_not_stable(self):
-        """DEFECT (build_worklists.py): the gate-context columns come out in a random order.
+    def test_gate_context_column_order_is_stable_across_runs(self):
+        """The same command on the same data must lay the columns out the same way.
 
-        `build_workbook` collects them into a set and then inserts them at the front:
-
-            context_set = {g for f in fields_with_work for g in prereq_map.get(f, []) ...}
-            for gate in context_set: display_fields.insert(0, gate)
-
-        Set iteration order over strings depends on PYTHONHASHSEED, so a workbook with two or
-        more gate-context columns lays them out differently on different runs of the same
-        command against the same data. `demo_followup` (gates: Sex, Status at follow-up) is
-        such a workbook. Consequences: round-to-round worklists aren't diffable, RAs see the
-        columns move, and no fixture built through it can be byte-reproducible.
-
-        Pinning PYTHONHASHSEED to 0 and 2 makes the demonstration itself deterministic.
+        `build_workbook` used to collect gate-context columns into a SET and insert them at the
+        front, so their left-to-right order followed set iteration over strings — which depends
+        on PYTHONHASHSEED. Round-to-round worklists weren't diffable, RAs saw columns move, and
+        no fixture built through it could be byte-reproducible. `demo_followup` (gates: Sex,
+        Status at follow-up) is such a workbook. The order is now the data dictionary's own.
         """
         orders = {}
         for seed in ("0", "2"):
@@ -251,27 +267,28 @@ class TestQAAuditRoundTrip(unittest.TestCase):
             ws = openpyxl.load_workbook(
                 out / "with_MDC" / "demo_followup_site_alpha.xlsx").active
             orders[seed] = [c.value for c in ws[1]]
-        self.assertEqual(set(orders["0"]), set(orders["2"]),
-                         "the same columns should appear either way")
-        self.assertNotEqual(orders["0"], orders["2"],
-                            "column order is now stable — the defect is fixed, delete this test")
+        self.assertEqual(orders["0"], orders["2"],
+                         "gate-context column order must not depend on PYTHONHASHSEED")
+        # And the order is the DD's: sex precedes follow_status in datadictionary.csv.
+        self.assertEqual(orders["0"][:3], ["syn_id", "Sex", "Status at follow-up"],
+                         "gate-context columns come first, in data-dictionary order")
 
-    def test_known_defect_first_data_column_ignored_with_a_single_id_column(self):
-        """DEFECT: `_yellow_keys(orig_ws, id_col_count=2)` hardcodes TWO id columns.
+    def test_single_id_column_workbook_recovers_every_answer(self):
+        """A workbook with ONE id column must not lose its first data column.
 
-        `build_worklists.py` writes `--id-field` plus whatever `--extra-id-cols` says: one id
-        column by default. When there is one, the first DATA column is column 2 — and the
-        audit's scan starts at column 3, so every yellow cell in that column, and every RA
-        answer in it, is invisible.
+        `_yellow_keys(orig_ws, id_col_count=2)` hardcoded TWO id columns and scanned from
+        column 3. `build_worklists.py` writes `--id-field` plus whatever `--extra-id-cols`
+        says — one id column by default — so on a default workbook the first DATA column was
+        invisible and every RA answer in it was silently discarded.
 
-        The SYN fixture's two workbooks happen to dodge this: gate-context columns are inserted
-        at the front, so column 2 is never flagged in either. This test reproduces it directly
-        on a one-field workbook: 15 answered cells in, 0 records out.
+        The SYN fixture's two workbooks happen to dodge it (gate-context columns sit in front,
+        so column 2 is never flagged in either), so this reproduces it directly on a one-field
+        workbook: 15 answered cells in, 15 records out.
         """
         cfg = self.out / "one_field.yaml"
         cfg.write_text("workbooks:\n  - name: onefield\n    title: One Field\n"
                        "    fields: [histology_grade]\n")
-        build = self.out / "defect_build"
+        build = self.out / "single_id_build"
         proc = subprocess.run(
             [sys.executable, str(BUILDER),
              "--records-csv", str(FIXTURE / "records.csv"),
@@ -283,6 +300,8 @@ class TestQAAuditRoundTrip(unittest.TestCase):
         wb = openpyxl.load_workbook(src)
         ws = wb.active
         self.assertEqual([c.value for c in ws[1]], ["syn_id", "Histology grade", "RESPONSE"])
+        self.assertEqual(self.rr.id_column_count(ws), 1,
+                         "the workbook's frozen pane says where the ID block ends")
         answered = 0
         for r in range(3, ws.max_row + 1):
             cell = ws.cell(row=r, column=2)
@@ -292,9 +311,167 @@ class TestQAAuditRoundTrip(unittest.TestCase):
         dst = build / "onefield_site_alpha_RETURNED.xlsx"
         wb.save(dst)
         self.assertEqual(answered, 15, "fixture should give 15 yellow cells in this workbook")
-        by_record, _n, _i, _h = self.rr.diff(str(src), str(dst))
-        self.assertEqual(len(by_record), 0,
-                         "the first-data-column blind spot is fixed — delete this test")
+        a = self.rr.diff(str(src), str(dst))
+        self.assertEqual(len(a.by_record), 15, "every answer in the first data column recovered")
+        self.assertEqual(sum(len(v) for v in a.by_record.values()), 15)
+        self.assertEqual(a.out_of_scope, [], "nothing else was touched")
+
+
+@unittest.skipIf(not DEPS, "pandas/openpyxl/yaml not installed")
+class TestGenerateReturnsFromArbitraryWorklists(unittest.TestCase):
+    """`--from-worklists`: returns for whatever a live session actually built.
+
+    The fixture's own two-workbook config is not what the DD-driven skill produces in a real
+    session, and the layout mismatch made one Cowork round conclude "the RAs merged the
+    workbooks". The generator now takes a worklists directory and derives its edit budget from
+    each workbook it finds there.
+    """
+    @classmethod
+    def setUpClass(cls):
+        cls.out = Path(tempfile.mkdtemp())
+        cls.cfg = cls.out / "live_fields.yaml"
+        cls.cfg.write_text(
+            "workbooks:\n"
+            "  - name: demographics\n    title: Demographics\n"
+            "    fields: [sex, age, education, pregnancy_status]\n"
+            "  - name: pathology\n    title: Pathology\n"
+            "    fields: [histology_grade, margin_status, cea_level]\n")
+        cls.worklists = cls.out / "worklists"
+        cls.build = subprocess.run(
+            [sys.executable, str(BUILDER),
+             "--records-csv", str(FIXTURE / "records.csv"),
+             "--metadata-csv", str(FIXTURE / "datadictionary.csv"),
+             "--fields", str(cls.cfg), "--out", str(cls.worklists), "--id-field", "syn_id"],
+            capture_output=True, text=True, timeout=300)
+        cls.returns = cls.out / "returns"
+        cls.gen = subprocess.run(
+            [sys.executable, str(GENERATOR), "--out", str(cls.returns),
+             "--from-worklists", str(cls.worklists)],
+            capture_output=True, text=True, timeout=600)
+        cls.rr = _load_reviewer()
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.out, ignore_errors=True)
+
+    def test_both_steps_succeed(self):
+        self.assertEqual(self.build.returncode, 0, self.build.stderr[-1000:])
+        self.assertEqual(self.gen.returncode, 0,
+                         f"{self.gen.stdout[-1000:]}\n{self.gen.stderr[-1000:]}")
+        self.assertNotIn("Traceback", self.gen.stdout + self.gen.stderr)
+
+    def test_a_return_is_written_for_every_worklist(self):
+        """It must find the workbooks through the builder's per-round subdir, too."""
+        built = sorted(p.stem for p in self.worklists.rglob("with_MDC/*.xlsx"))
+        returned = sorted(p.stem[: -len("_RETURNED")]
+                          for p in (self.returns / "returned").glob("*_RETURNED.xlsx"))
+        self.assertTrue(built, "the live-style build produced no with_MDC worklists")
+        self.assertEqual(returned, built)
+
+    def test_the_audit_reports_exactly_what_was_engineered(self):
+        """The whole point: returns that match the layout the session built, and an audit that
+        reproduces the generator's own numbers on them."""
+        counts = json.loads((self.returns / "returned" / "returned_counts.json").read_text())
+        self.assertIn("source_dir", counts, "the block should record where it read from")
+        for name, spec in counts["expected_review_responses"].items():
+            orig = next(self.worklists.rglob(f"with_MDC/{name}.xlsx"))
+            resp = self.returns / "returned" / f"{name}_RETURNED.xlsx"
+            with self.subTest(name):
+                a = self.rr.diff(str(orig), str(resp))
+                yellow = sum(1 for cells in a.by_record.values()
+                             for ans in cells if ans.kind == "yellow")
+                amber = sum(1 for cells in a.by_record.values()
+                            for ans in cells if ans.kind == "amber")
+                note_only = [rid for rid, n in a.notes.items() if n and rid not in a.by_record]
+                self.assertEqual(len(a.by_record), spec["records_with_proposed_updates"])
+                self.assertEqual(yellow, spec["changed_cells"])
+                self.assertEqual(amber, spec["amber_cells_detected"])
+                self.assertEqual(len(note_only), spec["note_only_records"])
+                self.assertEqual(len(a.out_of_scope), spec["out_of_scope_edits_detected"])
+
+    def test_update_manifest_is_refused_for_an_arbitrary_directory(self):
+        """MANIFEST's `returned` block describes the committed fixture's own build. Letting a
+        one-off run overwrite it with counts nothing else can reproduce would poison the suite.
+        """
+        proc = subprocess.run(
+            [sys.executable, str(GENERATOR), "--out", str(self.out / "nope"),
+             "--from-worklists", str(self.worklists), "--update-manifest"],
+            capture_output=True, text=True, timeout=300)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("--update-manifest", proc.stdout + proc.stderr)
+
+
+@unittest.skipIf(not DEPS, "pandas/openpyxl/yaml not installed")
+class TestSummarizeForRAFileMode(unittest.TestCase):
+    """The audit's LAST step must be token-optional like every other step.
+
+    `summarize_for_ra.py` used to hard-require --url/--token-env, so a QA round done entirely
+    from downloaded files hit a wall at the point of writing the RAs their summaries, and one
+    live session hand-wrote them instead. It now takes --metadata-csv, the same Data Dictionary
+    file build_worklists.py accepts.
+    """
+    @classmethod
+    def setUpClass(cls):
+        cls.out = Path(tempfile.mkdtemp())
+        (cls.out / "RA_questions.md").write_text(
+            "# Open questions\n"
+            "\n## SITE_ALPHA\n"
+            '### SYN-0003 — could you clarify your "RESOLVED" note?\n'
+            "The cell is still blank in REDCap.\n"
+            "\n## SITE_BETA\n"
+            '### SYN-0125 — what does "transferred" mean here?\n')
+        drafts = cls.out / "push_drafts"
+        drafts.mkdir()
+        with open(drafts / "sitealpha_clinical.csv", "w", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(["syn_id", "histology_grade"])
+            w.writerow(["SYN-0003", "3"])
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.out, ignore_errors=True)
+
+    def run_summarizer(self, *extra):
+        return subprocess.run(
+            [sys.executable, str(SUMMARIZER),
+             "--questions", str(self.out / "RA_questions.md"),
+             "--id-field", "syn_id", "--round=", *extra],
+            capture_output=True, text=True, timeout=300)
+
+    def test_file_mode_writes_summaries_without_any_key(self):
+        out = self.out / "summaries"
+        proc = self.run_summarizer(
+            "--metadata-csv", str(FIXTURE / "datadictionary.csv"),
+            "--push-drafts", str(self.out / "push_drafts"), "--out", str(out))
+        self.assertEqual(proc.returncode, 0, f"{proc.stdout[-800:]}\n{proc.stderr[-800:]}")
+        self.assertNotIn("Traceback", proc.stdout + proc.stderr)
+        self.assertNotIn("access key", proc.stdout + proc.stderr)
+        # One file per site named in the questions, plus the push-draft site.
+        written = sorted(p.name for p in out.glob("*.md"))
+        self.assertIn("site_alpha.md", written)
+        self.assertIn("site_beta.md", written)
+        alpha = (out / "site_alpha.md").read_text()
+        self.assertIn("could you clarify", alpha, "the RA's open question must be copied over")
+        # The Data Dictionary was really read: the field code is rendered as its label.
+        sitealpha = (out / "sitealpha.md").read_text()
+        self.assertIn("Histology grade", sitealpha)
+
+    def test_a_missing_push_drafts_folder_is_fine(self):
+        """A normal QA round stages nothing — push_drafts is a migration-only input."""
+        out = self.out / "summaries_no_drafts"
+        proc = self.run_summarizer(
+            "--metadata-csv", str(FIXTURE / "datadictionary.csv"),
+            "--push-drafts", str(self.out / "there_is_no_such_folder"), "--out", str(out))
+        self.assertEqual(proc.returncode, 0, f"{proc.stdout[-800:]}\n{proc.stderr[-800:]}")
+        self.assertTrue((out / "site_alpha.md").exists())
+
+    def test_no_data_source_at_all_explains_both_ways_in_plain_words(self):
+        proc = self.run_summarizer("--out", str(self.out / "unused"))
+        self.assertNotEqual(proc.returncode, 0)
+        msg = proc.stdout + proc.stderr
+        self.assertIn("--metadata-csv", msg)
+        self.assertIn("--token-env", msg)
+        self.assertNotIn("Traceback", msg)
 
 
 if __name__ == "__main__":

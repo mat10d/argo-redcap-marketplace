@@ -17,10 +17,19 @@ Code translation:
   - checkbox: field___N=1 → "checked: <label>", field___N=0 → "unchecked: <label>"
   - Negative checkbox codes use 4 underscores (field____888 → option -888)
 
-Usage:
+Metadata comes from REDCap if you have the study's access key, or from the Data Dictionary
+CSV you downloaded from the website if you don't — the same two ways build_worklists.py takes
+its input. Nothing here needs a key.
+
+Usage (files you downloaded — no access key needed):
+  python3 summarize_for_ra.py --metadata-csv datadictionary.csv \\
+    --questions RA_questions.md --out RA_summaries/ [--round-label "2026-05-24"]
+
+Usage (with the study's access key):
   python3 summarize_for_ra.py --url $REDCAP_URL --token-env CRC_TOKEN \\
-    --push-drafts push_drafts/ --questions RA_questions.md \\
-    --out RA_summaries/ [--round-label "2026-05-24"]
+    --questions RA_questions.md --out RA_summaries/ [--round-label "2026-05-24"]
+
+`--push-drafts` is a migration-only input; a normal QA round has none and can leave it out.
 """
 
 from __future__ import annotations
@@ -33,14 +42,50 @@ import re
 import sys
 from io import StringIO
 
-import requests
-
 
 def load_metadata(url: str, token: str) -> dict:
+    """Metadata from the REDCap API. `requests` is imported here, not at the top of the file,
+    so the no-key path below works on a machine that has never installed it."""
+    import requests
+
     r = requests.post(url, data={"token": token, "content": "metadata",
                                   "format": "csv", "returnFormat": "json"}, timeout=120)
     r.raise_for_status()
     return {m["field_name"]: m for m in csv.DictReader(StringIO(r.text))}
+
+
+def load_metadata_file(path: str) -> dict:
+    """Metadata from a Data Dictionary CSV downloaded from REDCap — the no-key path.
+
+    build_worklists.py already reads both shapes REDCap hands out (an API metadata export,
+    which already has `field_name`, and the Designer's "Download Data Dictionary" CSV, which
+    has human column headers) and it lives in this same folder. Reuse it rather than keeping
+    a second copy of that header map here: two copies drifting apart is precisely the failure
+    this project forbids.
+    """
+    if not os.path.exists(path):
+        sys.exit(
+            f"I couldn't find the data dictionary:\n"
+            f"    {path}\n"
+            "\n"
+            "Download it from the REDCap project's Data Dictionary page (Designer → Download\n"
+            "Data Dictionary) and give me that file."
+        )
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    try:
+        from build_worklists import load_metadata_csv
+    except ImportError as e:
+        sys.exit(
+            "Reading a data dictionary from a file needs the same libraries the worklist\n"
+            f"builder uses, and one of them isn't installed here: {e}\n"
+            "\n"
+            "Install them with:\n"
+            "\n"
+            "    python3 -m pip install pandas openpyxl pyyaml\n"
+            "\n"
+            "I have not written any summaries."
+        )
+    return {m["field_name"]: m for m in load_metadata_csv(path)}
 
 
 def _choices(meta_row: dict) -> dict:
@@ -166,8 +211,13 @@ def parse_questions(qpath: str) -> dict:
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--url", required=True)
-    ap.add_argument("--token-env", required=True)
+    ap.add_argument("--url", help="REDCap API URL (access-key mode)")
+    ap.add_argument("--token-env", help="Name of the setting holding the access key (access-key mode)")
+    ap.add_argument("--metadata-csv",
+                    help="No-key mode: the Data Dictionary CSV you downloaded from REDCap")
+    ap.add_argument("--records-csv",
+                    help="No-key mode: the record export CSV. Accepted so the command matches "
+                         "build_worklists.py; only the data dictionary is actually read here.")
     ap.add_argument("--push-drafts", default="push_drafts")
     ap.add_argument("--questions", default="RA_questions.md")
     ap.add_argument("--out", default="RA_summaries")
@@ -189,9 +239,23 @@ def main():
             args.round_label = args.round_tag
         print(f"Round: {args.round_tag} → reading {args.push_drafts}/, writing {args.out}/")
 
-    tok = os.environ.get(args.token_env)
-    if not tok:
+    if args.metadata_csv:
+        print(f"No-key mode: reading the data dictionary from {args.metadata_csv} ...")
+        meta_by = load_metadata_file(args.metadata_csv)
+    elif args.records_csv:
         sys.exit(
+            "To write the RA summaries from files on your computer I need the DATA DICTIONARY,\n"
+            "not the record export — the summaries translate field codes back into the wording\n"
+            "the RA will recognise.\n"
+            "\n"
+            "Download it from the REDCap project's Data Dictionary page and pass it instead:\n"
+            "\n"
+            "    --metadata-csv datadictionary.csv"
+        )
+    elif args.url and args.token_env:
+        tok = os.environ.get(args.token_env)
+        if not tok:
+            sys.exit(
         f"No access key for {args.token_env} is set up on this computer, so I can't reach REDCap.\n"
         "\n"
         "An access key (REDCap calls it an API token) is a long password that lets a tool read\n"
@@ -201,10 +265,24 @@ def main():
         "If you already have one, add it to the file ~/.argo/.env, then load it into this\n"
         "terminal window and try again:\n"
         "\n"
-        "    set -a; source ~/.argo/.env; set +a"
+        "    set -a; source ~/.argo/.env; set +a\n"
+        "\n"
+        "Or work from the data dictionary you downloaded instead — no key needed:\n"
+        "\n"
+        "    --metadata-csv datadictionary.csv"
     )
-
-    meta_by = load_metadata(args.url, tok)
+        meta_by = load_metadata(args.url, tok)
+    else:
+        sys.exit(
+            "I need the study's field definitions to write the summaries, and you haven't told\n"
+            "me where to get them. There are two ways, and you only need one:\n"
+            "\n"
+            "  From the Data Dictionary you downloaded from REDCap (the usual way):\n"
+            "      --metadata-csv datadictionary.csv\n"
+            "\n"
+            "  Or, if you have an access key for this study set up:\n"
+            "      --url $REDCAP_URL --token-env YOUR_STUDY_TOKEN"
+        )
     changes = parse_push_drafts(args.push_drafts, meta_by, args.id_field)
     questions = parse_questions(args.questions)
 

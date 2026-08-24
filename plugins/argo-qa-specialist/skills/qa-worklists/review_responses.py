@@ -1,10 +1,17 @@
 """Diff an RA response workbook against the original highlighted worklist.
 
-Reports cells where:
-  - The original cell was yellow (RA was asked to resolve it)
-  - The response now has a non-blank value
+Reports, grouped by record:
+  - ANSWERS: a cell the worklist flagged (yellow "this applies and is blank", or amber
+    "we couldn't read this field's condition — please check") that now holds a different,
+    non-blank value. Amber answers are reported and tagged as such: an answer in an amber
+    cell is still an answer.
+  - The RA's per-row RESPONSE / comment note.
+  - OUT-OF-SCOPE EDITS: any other cell the RA changed — a gate-context column, an ID
+    column, a field that was never flagged. These are reported separately because they are
+    a different kind of event: nobody asked for them, and they may be corrections, may be
+    accidents, and are never safe to treat as an answer to a question we asked.
 
-Per-cell output: site, record id, field (human label), original value, new value.
+Per-cell output: record id, field (human label), original value, new value.
 
 Usage:
   python3 review_responses.py <original.xlsx> <response.xlsx>
@@ -12,14 +19,14 @@ Usage:
 
 from __future__ import annotations
 
+import re
 import sys
 import zipfile
 from pathlib import Path
+from typing import NamedTuple
 
 from openpyxl import load_workbook
-
-
-YELLOW_HEX = "FFC7CE"   # matches build_worklists.py
+from openpyxl.utils import column_index_from_string
 
 
 def open_worklist(path: str, role: str, **kwargs):
@@ -81,25 +88,11 @@ def _row_to_dict(ws, header_row=1, prereq_row=2):
     return rows, headers
 
 
-def _yellow_keys(orig_ws, id_col_count=2):
-    """Return {(record_id, field_label): original_value} for every yellow cell."""
-    headers = [c.value for c in orig_ws[1]]
-    id_field = headers[0]
-    out = {}
-    for r in range(3, orig_ws.max_row + 1):
-        rid = str(orig_ws.cell(row=r, column=1).value or "").strip()
-        if not rid:
-            continue
-        for c in range(id_col_count + 1, orig_ws.max_column + 1):
-            cell = orig_ws.cell(row=r, column=c)
-            fill = cell.fill
-            color = None
-            if fill and fill.fgColor:
-                color = fill.fgColor.rgb
-            if color and str(color).upper().endswith(YELLOW_HEX):
-                out[(rid, headers[c-1])] = ("" if cell.value is None else str(cell.value))
-    return id_field, headers, out
+YELLOW_HEX = "FFC7CE"   # build_worklists.YELLOW    — "this applies and is blank"
+AMBER_HEX  = "FFE9B8"   # build_worklists.UNCERTAIN — "we couldn't read this field's condition"
 
+# Fill colour -> what the worklist was asking the RA to do.
+FLAG_KINDS = {YELLOW_HEX: "yellow", AMBER_HEX: "amber"}
 
 # Substrings (lowercased) that mark a column as an RA-comment / response column.
 # Use substring match so variants like "RA COMMENT", "Comments", "Notes from RA",
@@ -107,48 +100,182 @@ def _yellow_keys(orig_ws, id_col_count=2):
 RESPONSE_HEADER_TOKENS = ("response", "comment", "note")
 
 
-def diff(orig_path: str, resp_path: str):
+class Answer(NamedTuple):
+    """One flagged cell the RA answered."""
+    field: str
+    was: str
+    now: str
+    kind: str          # "yellow" (confirmed gap) or "amber" (condition unreadable)
+
+
+class OutOfScopeEdit(NamedTuple):
+    """One cell the RA changed that the worklist never asked about."""
+    record: str
+    field: str
+    was: str
+    now: str
+    is_id_column: bool
+
+
+class Audit(NamedTuple):
+    by_record: dict            # rid -> [Answer, ...]
+    notes: dict                # rid -> RA's RESPONSE note
+    id_field: str              # header of column 1
+    has_response_col: bool
+    out_of_scope: list         # [OutOfScopeEdit, ...]
+
+
+def _fill_kind(cell) -> str:
+    """"yellow" / "amber" / "" for a cell, by its fill colour."""
+    fill = cell.fill
+    if not fill or not fill.fgColor:
+        return ""
+    color = str(fill.fgColor.rgb or "").upper()
+    for hexv, kind in FLAG_KINDS.items():
+        if color.endswith(hexv):
+            return kind
+    return ""
+
+
+def _cell_text(value) -> str:
+    return "" if value is None else str(value).strip()
+
+
+def id_column_count(ws) -> int:
+    """How many leading ID columns this worklist has — read off the workbook, not guessed.
+
+    `build_worklists.build_workbook` lays every worklist out the same way:
+
+        header row 1 : <id-field> [<extra id cols>...]  <one column per field>  RESPONSE
+        row 2        : blank for the ID block, "only if ..." for gated fields
+        freeze_panes : <letter of len(id_cols) + 1> + "3"
+
+    That frozen split is the workbook's own record of where the ID block ends and the data
+    begins, so we read it. This used to be hardcoded to 2, and the scan for flagged cells
+    started at column 3 — so on a single-ID workbook (the builder's default: `--id-field`
+    with no `--extra-id-cols`) the entire first data column was invisible and every RA answer
+    in it was silently discarded.
+
+    Verified before it is trusted: if any cell to the left of the split is highlighted, the
+    split is wrong for this file and we fall back to 1. Over-counting drops answers;
+    under-counting cannot, because the builder never highlights an ID cell.
+    """
+    fallback = 1
+    frozen = getattr(ws, "freeze_panes", None)
+    if not frozen:
+        return fallback
+    m = re.fullmatch(r"([A-Za-z]+)(\d+)", str(frozen).replace("$", ""))
+    if not m:
+        return fallback
+    try:
+        n = column_index_from_string(m.group(1).upper()) - 1
+    except ValueError:
+        return fallback
+    if not 1 <= n < ws.max_column:
+        return fallback
+    for r in range(3, ws.max_row + 1):
+        for c in range(2, n + 1):
+            if _fill_kind(ws.cell(row=r, column=c)):
+                return fallback
+    return n
+
+
+def flagged_cells(orig_ws) -> tuple:
+    """(id_field, headers, {(record_id, header): (original_value, kind)}) for every flagged cell.
+
+    A flagged cell is one the worklist highlighted: yellow (applies and is blank) or amber
+    (we could not read its condition — please check). Both are questions we asked the RA, so
+    both count as answered when a value comes back.
+    """
+    headers = [c.value for c in orig_ws[1]]
+    id_field = headers[0]
+    first_data_col = id_column_count(orig_ws) + 1
+    out = {}
+    for r in range(3, orig_ws.max_row + 1):
+        rid = _cell_text(orig_ws.cell(row=r, column=1).value)
+        if not rid:
+            continue
+        for c in range(first_data_col, orig_ws.max_column + 1):
+            cell = orig_ws.cell(row=r, column=c)
+            kind = _fill_kind(cell)
+            if kind:
+                out[(rid, headers[c - 1])] = (_cell_text(cell.value), kind)
+    return id_field, headers, out
+
+
+def _response_column(headers) -> "int | None":
+    for i, h in enumerate(headers, 1):
+        if h and any(t in str(h).lower() for t in RESPONSE_HEADER_TOKENS):
+            return i
+    return None
+
+
+def diff(orig_path: str, resp_path: str) -> Audit:
     orig_wb = open_worklist(orig_path, "original worklist")
     resp_wb = open_worklist(resp_path, "worklist the RA sent back", data_only=True)
     orig_ws = orig_wb.active
     resp_ws = resp_wb.active
 
-    id_field, orig_headers, yellow_map = _yellow_keys(orig_ws)
+    id_field, orig_headers, flagged = flagged_cells(orig_ws)
+    id_cols = id_column_count(orig_ws)
     resp_headers = [c.value for c in resp_ws[1]]
 
     # Find any RA-added RESPONSE/comment column (substring-match on header tokens)
-    response_col_idx = None
-    for i, h in enumerate(resp_headers, 1):
-        if h and any(t in str(h).lower() for t in RESPONSE_HEADER_TOKENS):
-            response_col_idx = i
-            break
+    response_col_idx = _response_column(resp_headers)
+
+    # Every value in the ORIGINAL, by (record, header) — the baseline an out-of-scope edit
+    # is measured against.
+    orig_lookup = {}
+    for r in range(3, orig_ws.max_row + 1):
+        rid = _cell_text(orig_ws.cell(row=r, column=1).value)
+        if not rid:
+            continue
+        for c in range(1, orig_ws.max_column + 1):
+            orig_lookup[(rid, orig_headers[c - 1])] = _cell_text(orig_ws.cell(row=r, column=c).value)
 
     # Build resp lookup by (rid, header) and a per-record RESPONSE note
     resp_lookup = {}
     response_notes = {}
     for r in range(3, resp_ws.max_row + 1):
-        rid = str(resp_ws.cell(row=r, column=1).value or "").strip()
+        rid = _cell_text(resp_ws.cell(row=r, column=1).value)
         if not rid:
             continue
         if response_col_idx:
-            v = resp_ws.cell(row=r, column=response_col_idx).value
-            response_notes[rid] = ("" if v is None else str(v).strip())
+            response_notes[rid] = _cell_text(resp_ws.cell(row=r, column=response_col_idx).value)
         for c in range(1, resp_ws.max_column + 1):
             if c == response_col_idx:
                 continue
-            h = resp_headers[c-1]
-            v = resp_ws.cell(row=r, column=c).value
-            resp_lookup[(rid, h)] = ("" if v is None else str(v).strip())
+            h = resp_headers[c - 1]
+            resp_lookup[(rid, h)] = _cell_text(resp_ws.cell(row=r, column=c).value)
 
-    # Group by record so the RESPONSE note + all changed cells appear together
+    # Group by record so the RESPONSE note + all answered cells appear together
     by_record = {}
-    for (rid, field), orig_val in yellow_map.items():
+    for (rid, field), (orig_val, kind) in flagged.items():
         new_val = resp_lookup.get((rid, field), "")
         if new_val == "" or new_val == orig_val:
             continue
-        by_record.setdefault(rid, []).append((field, orig_val, new_val))
+        by_record.setdefault(rid, []).append(Answer(field, orig_val, new_val, kind))
+    for rid in by_record:
+        by_record[rid].sort()
 
-    return by_record, response_notes, id_field, response_col_idx is not None
+    # Out-of-scope edits: any OTHER cell that changed. SKILL.md promises the audit shows every
+    # cell the RA changed; without this it showed only the ones we had asked about, so an RA
+    # who "corrected" a gate-context column — flipping Sex, or a status that other fields
+    # branch on — passed the audit in complete silence.
+    out_of_scope = []
+    for (rid, header), new_val in sorted(resp_lookup.items(), key=lambda kv: (kv[0][0], str(kv[0][1]))):
+        if (rid, header) in flagged:
+            continue
+        if (rid, header) not in orig_lookup:
+            continue        # a column the RA added, or a record not in the original
+        old_val = orig_lookup[(rid, header)]
+        if new_val == old_val:
+            continue
+        col = orig_headers.index(header) + 1 if header in orig_headers else 0
+        out_of_scope.append(OutOfScopeEdit(rid, header, old_val, new_val,
+                                           is_id_column=1 <= col <= id_cols))
+
+    return Audit(by_record, response_notes, id_field, response_col_idx is not None, out_of_scope)
 
 
 def main():
@@ -164,21 +291,28 @@ def main():
         )
         sys.exit(2)
     orig, resp = sys.argv[1], sys.argv[2]
-    by_record, notes, id_field, had_response_col = diff(orig, resp)
+    audit = diff(orig, resp)
+    by_record, notes, id_field = audit.by_record, audit.notes, audit.id_field
+    amber_total = sum(1 for cells in by_record.values() for a in cells if a.kind == "amber")
     print(f"Original: {orig}")
     print(f"Response: {resp}")
-    print(f"RESPONSE column present: {had_response_col}")
+    print(f"RESPONSE column present: {audit.has_response_col}")
     print(f"{len(by_record)} records with proposed updates")
+    if amber_total:
+        print(f"{amber_total} of the answers are in amber cells "
+              "(we could not read the field's condition — check the field really applies)")
     print("=" * 100)
     for rid in sorted(by_record):
         note = notes.get(rid, "")
         print(f"\n{id_field}: {rid}")
         if note:
             print(f"  RA note: {note}")
-        for field, ov, nv in by_record[rid]:
-            print(f"    {field}")
-            print(f"      was: {ov!r}")
-            print(f"      now: {nv!r}")
+        for ans in by_record[rid]:
+            tag = "   [AMBER — we could not read this field's condition; confirm it applies]" \
+                if ans.kind == "amber" else ""
+            print(f"    {ans.field}{tag}")
+            print(f"      was: {ans.was!r}")
+            print(f"      now: {ans.now!r}")
     # Records with only a RESPONSE note (no cell changes) — easy to overlook
     note_only = sorted(rid for rid, n in notes.items() if n and rid not in by_record)
     if note_only:
@@ -186,6 +320,17 @@ def main():
         print(f"{len(note_only)} record(s) with RA notes but no cell changes:")
         for rid in note_only:
             print(f"  {rid}: {notes[rid]}")
+    # Cells nobody asked about. Never treat these as answers — read them, then decide.
+    if audit.out_of_scope:
+        print("\n" + "=" * 100)
+        print(f"{len(audit.out_of_scope)} cell(s) changed that were NOT on the worklist:")
+        for e in audit.out_of_scope:
+            marker = "  (ID COLUMN)" if e.is_id_column else ""
+            print(f"  {e.record}  {e.field}{marker}")
+            print(f"      was: {e.was!r}")
+            print(f"      now: {e.now!r}")
+        print("\nThese were not questions we asked. Check each one against REDCap before acting")
+        print("on it — an edit here can change which other fields apply.")
 
 
 if __name__ == "__main__":

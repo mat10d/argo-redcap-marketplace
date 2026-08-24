@@ -6,6 +6,7 @@ dictionary that are already on disk. Stdlib only, so it always runs.
 
 Usage:
     python3 scaffold.py <analysis_dir> --export EXPORT.csv --dictionary DD.csv [--force]
+                        [--tools /path/to/argo_tools.py]
 
 Creates:
     <analysis_dir>/
@@ -16,8 +17,14 @@ Creates:
         scripts/00_explore.py    # commented starter that summarizes the data
         outputs/tables/          # CSV / XLSX results land here
         outputs/figures/         # PNG / PDF figures land here
+
+It also records which analysis languages this computer can run — Python, R, Stata —
+and the FULL PATH to each, into README.md and ANALYSIS_LOG.md, so every script is
+run by a path that works whatever the session's PATH happens to contain. That check
+lives in argo_tools.py (argo-core); point at it with --tools.
 """
 import argparse
+import datetime
 import shutil
 import sys
 from pathlib import Path
@@ -113,12 +120,15 @@ README_TEMPLATE = """# Analysis: <study name>
 - `data/export.csv` — REDCap record export (read-only)
 - `data/data_dictionary.csv` — codebook (read-only)
 
+## Analysis tools on this computer
+{TOOLS}
+
 ## Analysis plan
 <numbered list of planned analyses; each maps to a script in scripts/>
 1.
 
 ## How to reproduce
-Run scripts in order from this directory, e.g. `python3 scripts/00_explore.py`.
+Run scripts in order from this directory, e.g. `{PYTHON} scripts/00_explore.py`.
 Every output in `outputs/` is produced by exactly one script in `scripts/`.
 """
 
@@ -126,7 +136,87 @@ LOG_TEMPLATE = """# Analysis log
 
 Append one line per run: date — script — what it did — headline result/notes.
 
+{TOOLS}
 """
+
+# What goes in README.md when the language check couldn't be run at all.
+TOOLS_UNKNOWN = (
+    "- Not checked. Ask your assistant to run the ARGO setup check (\"help me with ARGO\")\n"
+    "  to see which of Python, R and Stata this computer can run, and always call them by\n"
+    "  their full path — a session's PATH often leaves installed programs out."
+)
+
+
+def load_tools(explicit: "str | None" = None):
+    """Load argo_tools.py — the one place language detection lives — or return None.
+
+    Order: the path handed to us (--tools, which the skill looks up), then a copy sitting
+    beside this script. This script never goes hunting through plugin folders for it:
+    that search is what broke script discovery four times over, and the skill that calls
+    us already knows where the file is.
+    """
+    here = Path(__file__).resolve().parent
+    candidates = []
+    if explicit:
+        candidates.append(Path(explicit).expanduser())
+    candidates += [here / "argo_tools.py", here / "scripts" / "argo_tools.py"]
+    for candidate in candidates:
+        try:
+            if not candidate.is_file():
+                continue
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("argo_tools", candidate)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module
+        except Exception:
+            continue
+    return None
+
+
+def detect_tools(module) -> "dict | None":
+    """Run the language check, or return None if it isn't available. Never raises."""
+    if module is None:
+        return None
+    try:
+        return module.detect()
+    except Exception:
+        return None
+
+
+def tools_python(found: "dict | None") -> str:
+    """The full path to Python, or the bare name when the check couldn't run."""
+    if not found:
+        return "python3"
+    return (found.get("python") or {}).get("path") or "python3"
+
+
+def describe_tools(module, found: "dict | None") -> "tuple[str, str]":
+    """(README block, one-line log entry) describing what this computer can run.
+
+    Full paths, always: a script started as `Rscript ...` fails in a session whose PATH
+    misses /usr/local/bin, and the same script started as `/usr/local/bin/Rscript ...`
+    works. Never says a language is missing without saying how to get it.
+    """
+    today = datetime.date.today().isoformat()
+    if module is None or found is None:
+        return TOOLS_UNKNOWN, f"{today} — scaffold — folder created (analysis tools not checked)."
+
+    lines, log_bits = [], []
+    for key, name, _names, advice in module.LANGUAGES:
+        entry = found.get(key, {})
+        if entry.get("found"):
+            version = f" {entry['version']}" if entry.get("version") else ""
+            lines.append(f"- **{name}**{version} — `{entry['path']}`")
+            log_bits.append(f"{name} {entry['path']}")
+        else:
+            lines.append(f"- **{name}** — not installed. {advice}")
+            log_bits.append(f"{name} not installed")
+    lines.append("")
+    lines.append(f"Checked {today}. **Run every script with the full path above** — for example "
+                 "`/usr/local/bin/Rscript scripts/02_name.R` — because a session's PATH often "
+                 "leaves installed programs out and they then look missing.")
+    return "\n".join(lines), f"{today} — scaffold — folder created. Tools: " + "; ".join(log_bits) + "."
 
 
 def main():
@@ -136,6 +226,10 @@ def main():
     ap.add_argument("--export", required=True, help="Path to the REDCap record export CSV")
     ap.add_argument("--dictionary", required=True, help="Path to the data dictionary CSV")
     ap.add_argument("--force", action="store_true", help="Overwrite existing README/log/starter")
+    ap.add_argument("--tools", default=None, metavar="ARGO_TOOLS.PY",
+                    help="Path to argo_tools.py (the Python/R/Stata check in argo-core). The "
+                         "skill finds it for you; the detected full paths are written into "
+                         "README.md so scripts are always run by a path that works.")
     args = ap.parse_args()
 
     export = Path(args.export).expanduser()
@@ -160,10 +254,17 @@ def main():
     shutil.copy2(export, data / "export.csv")
     shutil.copy2(dictionary, data / "data_dictionary.csv")
 
+    # Which languages this computer can run, and where they live. Recorded in the folder
+    # so every script that gets written here is invoked by a full path.
+    tools_module = load_tools(args.tools)
+    tools_found = detect_tools(tools_module)
+    tools_block, tools_log = describe_tools(tools_module, tools_found)
+
     # Write docs + starter, refusing to clobber unless --force.
     targets = {
-        root / "README.md": README_TEMPLATE,
-        root / "ANALYSIS_LOG.md": LOG_TEMPLATE,
+        root / "README.md": (README_TEMPLATE.replace("{TOOLS}", tools_block)
+                             .replace("{PYTHON}", tools_python(tools_found))),
+        root / "ANALYSIS_LOG.md": LOG_TEMPLATE.replace("{TOOLS}", tools_log),
         scripts / "00_explore.py": EXPLORE_TEMPLATE,
     }
     for path, content in targets.items():
@@ -174,7 +275,14 @@ def main():
         print(f"wrote: {path}")
 
     print(f"\nScaffolded: {root}")
-    print("Next: python3 scripts/00_explore.py   (from inside the analysis dir)")
+    print("\nAnalysis tools on this computer:")
+    if tools_found is None:
+        print("  Not checked — pass --tools /path/to/argo_tools.py to have this filled in.")
+        python = "python3"
+    else:
+        tools_module.report(tools_found)
+        python = tools_python(tools_found)
+    print(f"\nNext: {python} scripts/00_explore.py   (from inside the analysis dir)")
 
 
 if __name__ == "__main__":

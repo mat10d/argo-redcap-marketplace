@@ -36,8 +36,10 @@ def load(path: Path, name: str, env: dict | None = None):
 
 
 CLIENT = load(PLUGINS / "argo-core/skills/redcap-api/scripts/argo_redcap_client.py", "argo_redcap_client")
+TRACKERS = load(PLUGINS / "argo-core/skills/redcap-api/scripts/argo_trackers.py",
+                "argo_trackers_pure")
 PORTFOLIO = load(
-    PLUGINS / "argo-project-manager/skills/monitor-studies/portfolio.py",
+    PLUGINS / "argo-database-manager/skills/weekly-check/portfolio.py",
     "portfolio",
     {"ARGO_PM_ROOT": str(Path(os.environ.get("TMPDIR", "/tmp")) / "argo-test-pm")},
 )
@@ -106,6 +108,9 @@ class TestTitleNormalisation(unittest.TestCase):
 
 
 class TestSirProgress(unittest.TestCase):
+    """The rendered 'N/7' the weekly check shows. The counting itself is the shared helper
+    below — this class checks the rendering, and that it applies the same rule."""
+
     def test_counts_nothing_when_no_steps_set(self):
         self.assertEqual(PORTFOLIO.sir_progress({}), "0/7")
 
@@ -125,6 +130,40 @@ class TestSirProgress(unittest.TestCase):
     def test_all_seven(self):
         rec = {step: "Yes" for step in PORTFOLIO.SIR_BUILD_STEPS}
         self.assertEqual(PORTFOLIO.sir_progress(rec), "7/7")
+
+
+class TestSharedProgressRule(unittest.TestCase):
+    """One rule, in argo_trackers, imported by the weekly check AND the request queue.
+
+    Two functions counted build steps differently until 0.17.2 — the same study read 3/7 to
+    the database manager and 4/7 to the project manager. The helper returns counts, not a
+    rendered string, so callers can format it however they like without re-implementing it.
+    """
+
+    def test_returns_done_and_total(self):
+        self.assertEqual(TRACKERS.sir_progress({}), (0, 7))
+
+    def test_total_is_the_canonical_step_count(self):
+        _done, total = TRACKERS.sir_progress({})
+        self.assertEqual(total, len(TRACKERS.SIR_BUILD_STEPS))
+
+    def test_any_settled_answer_counts_not_just_yes(self):
+        self.assertEqual(
+            TRACKERS.sir_progress({"data_imported": "Prospective study, not required"}), (1, 7))
+        self.assertEqual(TRACKERS.sir_progress({"project_created": "Yes"}), (1, 7))
+
+    def test_no_blank_and_zero_never_count(self):
+        for value in ("No", "no", "NO", "", "   ", "0", None):
+            self.assertEqual(TRACKERS.sir_progress({"project_created": value})[0], 0,
+                             f"{value!r} counted as a completed step")
+
+    def test_fields_outside_the_seven_steps_are_ignored(self):
+        self.assertEqual(TRACKERS.sir_progress({"study_status": "Building"}), (0, 7))
+
+    def test_the_weekly_check_renders_the_shared_counts(self):
+        rec = {"project_created": "Yes", "data_imported": "Prospective study, not required"}
+        done, total = TRACKERS.sir_progress(rec)
+        self.assertEqual(PORTFOLIO.sir_progress(rec), f"{done}/{total}")
 
 
 class TestComputeDiff(unittest.TestCase):

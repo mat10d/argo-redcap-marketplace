@@ -98,9 +98,54 @@ class TestDiffRecords(unittest.TestCase):
         self.assertEqual(r["updates"], [], "nothing may be auto-pushed when everything conflicts")
         self.assertEqual(r["counts"][D.CONFLICT], 2)
 
-    def test_a_record_missing_from_current_is_all_fills(self):
+    def test_a_record_missing_from_current_is_an_orphan_not_a_row_of_fills(self):
+        """The second guardrail: a missing record is not a blank record.
+
+        Read as blanks, every value on an unmatched id became a "safe fill" — and importing
+        that payload would CREATE records in the project instead of filling gaps in it.
+        """
         r = D.diff_records({"9": {"a": "X", "b": "Y"}}, {}, self.fields, "record_id")
+        self.assertEqual(r["updates"], [], "an orphan must never reach the pushable file")
+        self.assertEqual(r["counts"][D.FILL], 0)
+        self.assertEqual(r["counts"][D.ORPHAN], 2, "both cells belong to the orphan class")
+        self.assertEqual(r["orphans"], [{"record_id": "9", "a": "X", "b": "Y"}],
+                         "the orphan is reported, with its values, so a human can act on it")
+
+    def test_an_orphan_never_produces_a_conflict_or_an_overwrite_row_either(self):
+        r = D.diff_records({"9": {"a": "X", "b": "Y"}}, {}, self.fields, "record_id")
+        self.assertEqual(r["conflicts"], [])
+        self.assertEqual(r["overwrites"], [])
+
+    def test_an_orphan_row_carries_every_compared_field_even_when_blank(self):
+        """A uniform row keeps the report a table, not a ragged edge."""
+        r = D.diff_records({"9": {"a": "X"}}, {}, self.fields, "record_id")
+        self.assertEqual(r["orphans"], [{"record_id": "9", "a": "X", "b": ""}])
+        self.assertEqual(r["counts"][D.ORPHAN], 2, "orphan cells are counted, blank or not")
+
+    def test_a_present_record_is_still_compared_normally(self):
+        """Only ABSENCE makes an orphan — an existing but wholly blank record still fills."""
+        r = D.diff_records({"9": {"a": "X", "b": "Y"}}, {"9": {"a": "", "b": ""}},
+                           self.fields, "record_id")
+        self.assertEqual(r["orphans"], [])
         self.assertEqual(r["counts"][D.FILL], 2)
+        self.assertEqual(r["updates"], [{"record_id": "9", "a": "X", "b": "Y"}])
+
+    def test_current_ids_with_no_computed_counterpart_are_reported(self):
+        """The other half of the gap report: records the linkage found nothing for."""
+        r = D.diff_records({"1": {"a": "X", "b": ""}},
+                           {"1": {"a": "", "b": ""}, "2": {"a": "q", "b": "r"}},
+                           self.fields, "record_id")
+        self.assertEqual(r["missing_link"], [{"record_id": "2"}])
+
+    def test_missing_link_is_empty_when_every_current_id_was_computed(self):
+        r = D.diff_records({"1": {"a": "X"}}, {"1": {"a": ""}}, self.fields, "record_id")
+        self.assertEqual(r["missing_link"], [])
+
+    def test_orphans_and_missing_link_are_the_two_directions_of_the_same_gap(self):
+        r = D.diff_records({"1": {"a": "X"}, "9": {"a": "Y"}}, {"1": {"a": ""}, "7": {"a": "z"}},
+                           self.fields, "record_id")
+        self.assertEqual([o["record_id"] for o in r["orphans"]], ["9"])
+        self.assertEqual([m["record_id"] for m in r["missing_link"]], ["7"])
 
     def test_rows_with_nothing_to_do_are_omitted_entirely(self):
         computed = {"1": {"a": "same", "b": "same"}}
@@ -115,6 +160,14 @@ class TestDiffRecords(unittest.TestCase):
         current = {"1": {"a": "", "b": "OLD"}, "2": {"a": "same", "b": "keep"}}
         r = D.diff_records(computed, current, self.fields, "record_id")
         self.assertEqual(sum(r["counts"].values()), 4)
+
+    def test_counts_still_add_up_when_some_records_are_orphans(self):
+        """Four classes, one accounting: every cell on the computed side lands in exactly one."""
+        computed = {"1": {"a": "X", "b": "NEW"}, "9": {"a": "P", "b": "Q"}}
+        current = {"1": {"a": "", "b": "OLD"}}
+        r = D.diff_records(computed, current, self.fields, "record_id")
+        self.assertEqual(sum(r["counts"].values()), 4)
+        self.assertEqual(r["counts"][D.ORPHAN], 2)
 
     def test_overwrite_file_holds_only_the_conflicting_cells(self):
         computed = {"1": {"a": "X", "b": "NEW"}}

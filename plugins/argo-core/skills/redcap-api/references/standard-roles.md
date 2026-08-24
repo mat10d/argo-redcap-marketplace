@@ -5,15 +5,55 @@ description: ARGO's four standard REDCap user roles (Study Builder, PI, PM, Data
 
 # Standard ARGO roles
 
-Every ARGO cohort REDCap is set up with these four roles. Used by [[manage-redcaps]] when standing up a new study or copying roles between studies.
+Every ARGO cohort REDCap is set up with these four roles. [[build-study]] step 4 generates them
+as an upload-ready CSV (`make_roles_csv.py`); the JSON payloads below are the same roles for the
+`userRole` API endpoint, used when copying a role set between studies by hand.
 
 Placeholders to replace:
 - `<all_forms>` — every form in the target study, set to the indicated access level
 - `<clinical_forms>` — only the clinical data forms (Data Entry gets View & Edit on these and Read Only on `qa`)
 
+## The roles CSV (the normal path — no access key needed)
+
+`make_roles_csv.py <dd.csv>` writes REDCap's exact upload format, columns in this order:
+
+```
+unique_role_name,role_label,design,alerts,user_rights,data_access_groups,
+reports,stats_and_charts,manage_survey_participants,calendar,
+data_import_tool,data_comparison_tool,logging,file_repository,
+data_quality_create,data_quality_execute,api_export,api_import,
+mobile_app,mobile_app_download_data,record_create,record_rename,record_delete,
+lock_records_customization,lock_records,lock_records_all_forms,
+forms,forms_export
+```
+
+`unique_role_name` is left blank — REDCap generates project-specific IDs on upload. The `forms`
+and `forms_export` cells use `form1:level,form2:level,...` syntax, quoted because of the inner
+commas.
+
+Upload it in the UI: **User Rights → User Roles → Upload user roles (CSV)**. People are then
+assigned to roles on the same page; we never generate an assignment file, because we don't know
+anyone's real REDCap username.
+
 ## Access-level values
 
-See `manage-redcaps` SKILL.md for the full form-access and form-export level tables.
+`forms` — what someone can do with a form:
+
+| Value | Meaning |
+|---|---|
+| 0 | No Access |
+| 1 | View & Edit |
+| 2 | Read Only |
+| 3 | Edit Survey Responses Only |
+
+`forms_export` — what someone can take out of a form:
+
+| Value | Meaning |
+|---|---|
+| 0 | No Access |
+| 1 | Full Data Set |
+| 2 | De-Identified |
+| 3 | Remove All Identifier Fields |
 
 ---
 

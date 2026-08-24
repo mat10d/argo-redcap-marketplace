@@ -4,8 +4,7 @@
 Everything is saved as a file on your computer. Nothing in this script changes anything in
 REDCap; it only reads. (Importing is a separate, more careful path — see the SKILL.md.)
 
-Usage:
-    set -a; source ~/.argo/.env; set +a
+Usage (the script finds your settings file itself — nothing to load first):
 
     # See what a key opens, without downloading anything
     python3 export.py --token-env CRC_TOKEN --info
@@ -26,10 +25,9 @@ If you need a de-identified extract, ask your REDCap administrator for a key tie
 whose export rights are set to "De-Identified", and always open the resulting file and check it
 before sharing it with anyone.
 
-If you don't have an access key for the study, that's expected — most ARGO studies don't have one
-(see access-tiers.md, Tier 2). Download the export from the REDCap website instead: go to the
-project, choose Data Exports, Reports and Stats, then export "All data" as CSV, and download the
-data dictionary from the Dictionary page. Every ARGO analysis tool works from those two files.
+If there's no access key for the study yet, the script says so and explains where a key goes —
+your ARGO settings file, never the chat. Without one, the same two files can be downloaded from
+the REDCap website by hand (see access-tiers.md, Tier 2), and every ARGO tool reads those.
 """
 from __future__ import annotations
 
@@ -51,17 +49,31 @@ for _cand in (_here / "scripts",
 from argo_redcap_client import RedcapClient, RedcapError  # noqa: E402
 
 
-NO_TOKEN_ADVICE = (
-    "You don't need an access key to carry on — you can download the same thing from the REDCap\n"
-    "website by hand, and every ARGO analysis tool reads those files happily:\n"
-    "\n"
-    "  1. Open the study in REDCap in your web browser.\n"
-    "  2. For the data: go to 'Data Exports, Reports, and Stats', choose 'All data', and export\n"
-    "     it as CSV.\n"
-    "  3. For the field list: go to the 'Data Dictionary' page and download it as CSV.\n"
-    "\n"
-    "Save both files somewhere you'll find them again, then point the analysis tools at them."
-)
+def no_token_advice(setting_name: str = "CRC_TOKEN") -> str:
+    """What to do about a missing key: add one, or download the files by hand.
+
+    Downloading an export is the whole point of this script, so the first thing offered is the
+    key — added to the settings file, never typed into a chat. The website route stays here for
+    anyone who can't get a key: no ARGO workflow may depend on having one.
+    """
+    return (
+        "If you do have a key for this study, it belongs in your ARGO settings file — the file\n"
+        "called .env inside your ARGO folder. The quickest way there: open the ARGO folder and\n"
+        "double-click 'Add keys here', which opens that file in a text editor. Add a line reading\n"
+        f"    {setting_name}=<the key your REDCap administrator gave you>\n"
+        "save the file, and run this again. Never type a key into a chat message — it stays in\n"
+        "the transcript.\n"
+        "\n"
+        "If you can't get a key, nothing is blocked: the same two files can be downloaded from the\n"
+        "REDCap website by hand, and every ARGO tool reads them happily.\n"
+        "\n"
+        "  1. Open the study in REDCap in your web browser.\n"
+        "  2. For the data: go to 'Data Exports, Reports, and Stats', choose 'All data', and export\n"
+        "     it as CSV.\n"
+        "  3. For the field list: go to the 'Data Dictionary' page and download it as CSV.\n"
+        "\n"
+        "Save both files somewhere you'll find them again, then point the analysis tools at them."
+    )
 
 
 def human_size(n: int) -> str:
@@ -83,7 +95,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(
         description="Download records and/or the data dictionary from a REDCap study.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=NO_TOKEN_ADVICE,
+        epilog=no_token_advice(),
     )
     ap.add_argument("--token-env", required=True,
                     help="The name of the setting that holds your access key for this study, "
@@ -104,7 +116,8 @@ def main() -> int:
     client = RedcapClient.from_env(args.token_env)
     if client is None:
         print(RedcapClient.explain_missing_token(
-            args.token_env, "download anything from this study", fallback=NO_TOKEN_ADVICE))
+            args.token_env, "download anything from this study",
+            fallback=no_token_advice(args.token_env)))
         return 1
 
     try:

@@ -18,6 +18,19 @@ Pairs with [[export-data]] (also in argo-database-manager) for pulling the files
 references. The actual analysis of a linked cohort belongs to argo-data-analyst ([[run-analysis]]),
 which works on the merged table this skill produces — no access key needed there.
 
+## First: ask which two things you're linking
+
+A linkage is only as good as the two files that went into it, and the folder usually holds
+several exports that all look plausible. **If the user hasn't attached or named both sides, ask
+where they are — one question.** If you have looked and found likely candidates, don't assume:
+name what you found and confirm in the same one question.
+
+> I can see `crc_records_2026-08-12.csv` and `pathology_export.xlsx` in your folder — is that the
+> pair you want linked, or is one of them somewhere else?
+
+Never pick a file because it was the only one matching a guess, and never treat a synthetic or
+test export as the study. Ask once, then get on with it.
+
 ## When to use
 
 "Link the R01 and CRC cohorts," "match these pathology slides to the registry," "which cBioPortal
@@ -69,12 +82,23 @@ REDCap value (both normalized — trim, treat `nan`/blank as empty, drop numeric
 | **blank** | non-blank | **safe-fill** → goes in the update payload |
 | non-blank | blank | skip (nothing to add) |
 | non-blank, **differs** | non-blank | **conflict** → quarantined, NOT pushed |
+| **no such record** | anything | **orphan** → gap report only, NEVER payload |
 
-Emit three files:
-- `*_update.csv` — safe-fills only; push with `overwriteBehavior=normal`.
+**An id that isn't in the REDCap side is not a blank record.** Treating it as one turns every
+value on it into a "safe fill", and importing that file would CREATE records in the project
+instead of filling gaps in it. Whether those people or samples belong in the study at all is a
+decision for the user, made on the orphan report — never a side effect of a write-back.
+
+Emit five files — the three-file payload, plus the two halves of the gap report:
+- `*_update.csv` — safe-fills only, on records that already exist; push with
+  `overwriteBehavior=normal`.
 - `*_conflicts.csv` — long format (`id, field, existing, computed`) for human triage.
 - `*_overwrite.csv` — the conflict rows in wide form; push only after explicit human approval
   with `overwriteBehavior=overwrite`.
+- `*_orphans.csv` — ids found only on the computed side, with their values. A report, not a
+  payload.
+- `*_missing_link.csv` — ids found only on the current/REDCap side: the records the linkage
+  found nothing for.
 
 The reusable helper `diff_payload.py` implements exactly this (see below).
 
@@ -86,11 +110,19 @@ The reusable helper `diff_payload.py` implements exactly this (see below).
 
 - `master_linkage.csv` — one row per linked entity with the IDs from each source + link flags
   (`*_linked`) + carried-over key fields.
-- Gap/orphan reports — unmatched rows on each side (e.g. `r01_not_in_cbioportal.csv`,
-  `cbioportal_unlinked.csv`, `*_missing_link.csv`).
+- **Gap/orphan reports — unmatched rows on each side.** `diff_payload.py` writes these two for
+  every run, alongside the payload, and prints both counts:
+  - `*_orphans.csv` — ids only on the computed side (no record to fill; never pushed).
+  - `*_missing_link.csv` — ids only on the current/REDCap side (nothing was computed for them).
+
+  A multi-source linkage adds its own per-source versions of the same idea (e.g.
+  `r01_not_in_cbioportal.csv`, `cbioportal_unlinked.csv`).
 - `*_integrity.csv` — ranked structural issues (duplicate/orphan join IDs) and low-score fuzzy
   mismatches, worst first.
-- The three payload CSVs above when writing back.
+- The three payload CSVs above (`*_update` / `*_conflicts` / `*_overwrite`) when writing back.
+
+Always show the user both gap counts, not just the fill count — "13 fills, 24 conflicts, 15
+records only in the new file, 155 with nothing to link to" is the honest summary of a linkage.
 
 ## Workflow
 
@@ -104,8 +136,11 @@ The reusable helper `diff_payload.py` implements exactly this (see below).
 3. **Match** — exact join on primary keys; for leftovers, optional fuzzy fallback → candidate list.
 4. **Build the master** — reconcile into `master_linkage.csv`; set link flags.
 5. **Report gaps & integrity** — emit unmatched/orphan/duplicate reports and the ranked integrity CSV.
-6. **(If writing back) build the diff-only payload** with `diff_payload.py`; show the user the
-   update/conflict/overwrite counts. **Dry-run.**
+6. **(If writing back) build the diff-only payload** with `diff_payload.py`; show the user all
+   five counts — fills, conflicts, no-ops, orphans, and records with nothing to link to.
+   **Dry-run.** If there are orphans, say what they are before anything else: those ids have no
+   record in the project, and nothing will be written for them unless the user decides the
+   records should be created (a separate, deliberate step).
 7. **Confirm & push** — only after approval: confirm target project title, push `*_update.csv`
    (normal). Handle `*_overwrite.csv` separately, only with explicit sign-off.
 8. **Close out the request** — when the linked table is delivered (or the write-back has landed),
@@ -115,13 +150,21 @@ The reusable helper `diff_payload.py` implements exactly this (see below).
 ## Reusable helper: diff_payload.py
 
 Generic implementation of the diff-only pattern — give it the computed and current states as CSVs
-keyed by an ID field; it writes the three payload files:
+keyed by an ID field; it writes the three payload files and the two gap reports, and prints the
+counts for all five:
 
 ```bash
 D=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name diff_payload.py 2>/dev/null | head -1)
 python3 "$D" --computed computed.csv --current current.csv \
     --id-field record_id --out-dir database-manager/linkage/<name>/ --prefix pathology_r01
 ```
+
+Without `--fields` it compares every column the two files share, **except** the ID, REDCap's
+structural columns (`redcap_data_access_group`, `redcap_event_name`, `redcap_repeat_instrument`,
+`redcap_repeat_instance`) and the per-form `*_complete` columns. Those describe how REDCap stores
+a record, not what the record says — comparing the data access group proposes moving records
+between sites. The run prints which columns it skipped; pass `--fields` to compare an exact list
+(including one of those, if you really mean to).
 
 ## The original study-specific pipelines
 

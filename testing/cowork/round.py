@@ -99,7 +99,7 @@ ROLES = {
         "prompt": ("I'm the ARGO program manager. Give me the weekly portfolio update across "
                    "the admin trackers."),
         "expect": [
-            "routes to monitor-studies; finds the .env in the connected folder",
+            "routes to weekly-check; finds the .env in the connected folder",
             "if the sandbox has network: dashboard for all 5 trackers, keys never printed",
             "if egress is blocked: says it's an org restriction, NOT a bad key",
             "snapshot lands in the workspace or names where it went",

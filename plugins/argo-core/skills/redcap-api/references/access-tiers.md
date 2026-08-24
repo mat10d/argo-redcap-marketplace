@@ -29,8 +29,10 @@ removes automation without removing any admin dependency.
 
 Configured permanently in the settings file — and **by everyone on the team**, not just whoever runs the weekly portfolio (revised 2026-08-20: the shared dashboard should work from any member's session). This is the only standing credential set.
 
-- `monitor-studies/portfolio.py` — read-only weekly pull across all 5 trackers. Writes nothing back
+- `weekly-check/portfolio.py` — read-only weekly pull across all 5 trackers. Writes nothing back
   except a local snapshot file.
+- `open_requests.py` (argo-core, vendored into each skill) — read-only queue view over the four
+  request trackers, run by the same weekly check.
 - `build-study/sir_update.py` — writes build progress to the **SIR record** (Study Tracker, PID 224).
   One push per build step, no batching. This is what keeps the portfolio's progress column current.
 - `build-study/backfill_sir_from_csv.py` — bulk SIR record loads from a CSV. Same tracker token.
@@ -45,7 +47,7 @@ actually needs (a key always carries its account's full rights — [[access-tier
 | Key | PID | API Export | API Import | Why |
 |---|---|---|---|---|
 | `STUDY_INITIATION_REQUEST` | 224 | yes | **yes** | `sir_update.py` writes build progress after every step; `backfill_sir_from_csv.py` bulk-loads records |
-| `STUDY_PERSONELL_REQUEST` | 221 | yes | **yes** (+ create records) | manage-redcaps creates SPR records by API import |
+| `STUDY_PERSONELL_REQUEST` | 221 | yes | **yes** (+ create records) | SPR records are created by API import when a study needs accounts that don't exist yet |
 | `DATA_LINKING_REQUEST` | 222 | yes | no | portfolio reads only |
 | `DATA_REQUEST` | 223 | yes | no | portfolio reads only |
 | `SUPPORT_TICKET_REQUEST` | 225 | yes | no | portfolio reads only; triage is done in the UI |
@@ -60,7 +62,6 @@ and it isn't sitting around between uses.
 
 - `export-data` — exports and imports against a study project
 - `link-data` — cross-study record linkage and diff-only write-back
-- `manage-redcaps/set_roles.py` — role assignment on a study
 - `build-study/fill_new_project.py` — project setup fields
 
 **Revised 2026-08-20:** a study key is **encouraged for each study a person is QAing**, stored
@@ -141,7 +142,8 @@ What follows from that, and is already implemented:
   layouts so far — simply doesn't matter to the code. The `find ... -name argo_setup.py | head -1`
   commands in the docs still work everywhere; all hits are identical copies.
 - **Never write next to a script.** The plugin directory is read-only. All state goes to an
-  external location: snapshots to `$ARGO_PM_ROOT` (falling back to `~/.argo/pm`), dry-run receipts
+  external location: snapshots to `$ARGO_PM_ROOT` (the ARGO folder's `database-manager/`, falling back to
+  `~/.argo/database-manager`), dry-run receipts
   to `~/.argo/qa-dry-run-receipts`.
 - **Don't rely on `${CLAUDE_PLUGIN_ROOT}` in a command you tell the user to run.** It's empty in
   Cowork, so the path silently becomes relative and the command fails. Locate the script instead:

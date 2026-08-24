@@ -37,7 +37,7 @@ Any choice that affects:
 This convention applies to:
 - Importing external/historical data — every column→field translation that isn't 1:1
 - `argo-database-manager/build-study` Path B — every audit finding with a non-obvious fix
-- `argo-database-manager/manage-redcaps` — every write to a live project
+- `argo-database-manager` — every write to a live project
 - Any `argo-project-manager` skill that closes a ticket or modifies an admin REDCap
 
 ## See also

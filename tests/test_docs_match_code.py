@@ -20,7 +20,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 PLUGINS = REPO / "plugins"
 os.environ.setdefault("ARGO_SETUP_NO_OPEN", "1")  # suites must not pop text editors
-PORTFOLIO_DIR = PLUGINS / "argo-project-manager/skills/monitor-studies"
+PORTFOLIO_DIR = PLUGINS / "argo-database-manager/skills/weekly-check"
 
 
 def load_portfolio():

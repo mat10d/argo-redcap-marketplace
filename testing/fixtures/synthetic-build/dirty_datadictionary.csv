@@ -32,3 +32,7 @@ surgery_date,clinical,,text,Date of surgery,,,date_dmy,,,,,,,,,,
 referral_source,clinical,,text,Referred from,,"[06-06-6666, Patient does not know  07-07-7777, Patient refused to answer  08-08-8888, Missing in case notes  09-09-9999, Other missing (add comment for reason missing)]",,,,,,,,,,,
 clinical_summary,clinical,,notes,Clinical summary,,,,,,,,,,,,,
 short_row_var,clinical,,text,Row with a missing column,,"[-666, Patient does not know  -777, Patient refused to answer  -888, Missing in case notes  -999, Other missing (add comment for reason missing)]",,,,,,,,,,
+likert_exempt_1,clinical,Validated scale (fabricated) — MDC waived by annotation,radio,Waived scale item 1 (annotated),"0, Not at all | 1, Several days | 2, More than half the days | 3, Nearly every day",,,,,,,,RH,,syn_likert_exempt,,@MDC-EXEMPT
+likert_exempt_2,clinical,,radio,Waived scale item 2 (waived by its group),"0, Not at all | 1, Several days | 2, More than half the days | 3, Nearly every day",,,,,,,,RH,,syn_likert_exempt,,
+likert_plain_1,clinical,"Same shape, no annotation — still flagged",radio,Un-waived scale item 1,"0, Not at all | 1, Several days | 2, More than half the days | 3, Nearly every day",,,,,,,,RH,,syn_likert_plain,,
+likert_plain_2,clinical,,radio,Un-waived scale item 2,"0, Not at all | 1, Several days | 2, More than half the days | 3, Nearly every day",,,,,,,,RH,,syn_likert_plain,,

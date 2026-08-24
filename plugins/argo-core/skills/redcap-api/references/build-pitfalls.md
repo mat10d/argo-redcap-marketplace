@@ -5,7 +5,7 @@ description: Consolidated gotchas from real ARGO builds. Every entry here is som
 
 # Build pitfalls
 
-This is the running list of mistakes we've made on real ARGO builds and the rules we now follow to avoid repeating them. Reference from `build-study` and `manage-redcaps`.
+This is the running list of mistakes we've made on real ARGO builds and the rules we now follow to avoid repeating them. Reference from `build-study`.
 
 ## DD construction
 
@@ -115,5 +115,5 @@ SIR's `pi_first_name` may contain "DR." or "PROF." — strip before deriving the
 | `argo-database-manager/build-study` Path B | Before auditing an existing DD — items 1-5 plus 8, 11 |
 | Importing external/historical data | Before designing an import pass — items 6-11 |
 | `argo-database-manager/build-study` (triage) | Before generating a paste box / triaging a SIR — items 12, 13, 14, 17, 18, 19 |
-| `argo-database-manager/manage-redcaps` | Before any live-project write — items 12, 13, 14 |
+| Any live-project write (roles, rights, records) | Before touching a project with real data — items 12, 13, 14 |
 | All skills | Item 15 + 16 (decision protocol) always applies |

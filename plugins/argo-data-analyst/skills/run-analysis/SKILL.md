@@ -35,8 +35,15 @@ does the download for you — but never send an analyst off to get a key.)
 3. *(optional)* **Existing analysis scripts** — Python/R/Stata the team already wrote. Reuse and
    adapt these rather than reinventing; ask the user where they live.
 
-If either required input is missing, ask the user for its path before doing anything else. If they
-don't have it yet, [[getting-files-from-redcap]] is the click-by-click download.
+**Ask where the data is — never go hunting and assume.** If they haven't attached the files or
+named them, ask. If you can see likely candidates in the folder, don't pick one silently: name
+what you found and confirm with **one** question — "I can see `crc_export_2026-08-19.csv` and a
+data dictionary in `data-analyst/` — are those the two files?" A session once nearly analysed a
+synthetic test export as if it were the real study. One wrong file is a wrong answer with no
+warning attached.
+
+If a required input doesn't exist yet, [[getting-files-from-redcap]] is the click-by-click
+download.
 
 ## The contract (non-negotiable)
 
@@ -82,6 +89,31 @@ Scripts are numbered in run order (`01_table1.py`, `02_survival_by_stage.R`, …
 
 ## Workflow
 
+### 0. Check what this computer can run, and scaffold the folder
+
+Do this once per study, **before** writing any script — and after you have the two file paths
+from the user (see **Inputs** above: ask, don't hunt). Never decide a language is missing from a
+bare `command -v` — the session's shell has a thin PATH (it usually leaves out `/usr/local/bin`),
+so `command -v Rscript` says "not installed" on machines where R is installed and works. That
+exact mistake was made on a machine with `/usr/local/bin/Rscript` sitting right there.
+
+```bash
+T=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name argo_tools.py 2>/dev/null | head -1)
+python3 "$T"
+```
+
+It prints Python, R and Stata with a ✓ or ✗ and the **full path** to each. Then:
+
+- Tell the user in **one line** which languages are usable ("Python and R are both ready here;
+  Stata isn't installed on this computer") — and nothing more unless they ask.
+- **Use the full paths it reports, in every command from then on** — `/usr/local/bin/Rscript
+  scripts/02_x.R`, not `Rscript scripts/02_x.R`. The bare name is exactly what fails.
+- If the language they want is missing, say how to get it (R is free: https://cran.r-project.org;
+  Stata is licensed — their IT installs it) and offer the same analysis in a language they do
+  have. Never leave them stuck.
+- Then scaffold, passing the check through so the paths land in the study folder — see
+  [Scaffolding](#scaffolding) below.
+
 ### 1. Orient on the data
 - Locate `export.csv` and `data_dictionary.csv`. Read the **data dictionary first**: list the
   forms, field types, the record-ID field (it is often NOT `record_id` — see
@@ -113,7 +145,9 @@ each planned script. Get explicit sign-off and record the plan in `README.md`.
 For each approved analysis:
 - Write `scripts/NN_name.{py,R,do}` following the **script template contract** below.
 - Reuse the team's existing scripts where they fit — read them, adapt, credit in the header.
-- Run it (`python3`, `Rscript`, or `stata -b do`); check availability first (`command -v`).
+- Run it **by the full interpreter path from step 0** — e.g. `/usr/bin/python3 scripts/01_x.py`,
+  `/usr/local/bin/Rscript scripts/02_x.R`, `/Applications/Stata/StataSE.app/Contents/MacOS/StataSE
+  -b do scripts/03_x.do`. The paths are recorded in the study's `README.md`.
 - Confirm outputs landed in `outputs/`; show the user the table/figure and its path.
 - Append a line to `ANALYSIS_LOG.md`: date, script, what it did, headline result.
 
@@ -127,8 +161,9 @@ should stand alone: someone with only this directory can rerun every script and 
   seaborn). Python 3.9+.
 - **R / Stata** when the user prefers them or when adapting an existing R/Stata script. Keep the
   same contract (header block, reads `data/`, writes `outputs/`).
-- Detect the interpreter before running; if it's missing, tell the user rather than silently
-  switching languages.
+- **Which of the three are actually available is settled by step 0's check, not by `command -v`,
+  and never by guessing.** If the language they want isn't installed, say so with how to get it,
+  and offer the analysis in one they have — don't switch silently.
 
 ## Data-handling rules (don't skip)
 
@@ -187,13 +222,18 @@ Figures: matplotlib, `fig.savefig(path, dpi=150, bbox_inches="tight")`, then `pl
 
 ```bash
 S=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name scaffold.py 2>/dev/null | head -1)
+T=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name argo_tools.py 2>/dev/null | head -1)
 python3 "$S" data-analyst/<study> \
-    --export /path/to/export.csv --dictionary /path/to/DD.csv
+    --export /path/to/export.csv --dictionary /path/to/DD.csv --tools "$T"
 ```
 
 It copies the inputs into `data/`, creates `outputs/{tables,figures}` and `scripts/`, and writes
 `README.md`, `ANALYSIS_LOG.md`, and `scripts/00_explore.py` (a commented starter that loads the
 data and prints a structured summary).
+
+`--tools` runs the same language check as step 0 and writes the **full path** to each usable
+language into `README.md` and the first `ANALYSIS_LOG.md` line, so anyone re-running the folder
+later (including you, in a session with a different PATH) has the commands that work.
 
 ## See also
 

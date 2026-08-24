@@ -1,6 +1,6 @@
 ---
 name: export-data
-description: Fulfil a data request — get a study's records and its data dictionary out of REDCap and onto disk as files someone can actually work with. Downloads them directly when an access key for that study is configured, and gives click-by-click website instructions when there isn't one. Use when taking a data request off your request queue, when someone asks for an export or "the data", or when you need a clean cohort export before analysis, tables or a manuscript. Analysing the export itself is run-analysis.
+description: Fulfil a data request — get a study's records and its data dictionary out of REDCap and onto disk as files someone can actually work with. Downloads them directly with the study's access key; when there isn't one yet it offers to add it to your settings file, and falls back to click-by-click website instructions if a key can't be had. Use when taking a data request off your request queue, when someone asks for an export or "the data", or when you need a clean cohort export before analysis, tables or a manuscript. Analysing the export itself is run-analysis.
 allowed-tools: Read, Bash, Write, Glob, Edit, Grep
 ---
 
@@ -13,20 +13,40 @@ fulfilling.
 For base API conventions (URL form, key handling) see [[redcap-api]] (argo-core).
 For project-identification safety see [[token-confirmation]] and [[record-id-safety]].
 Studies you're assigned to may already have an access key in your settings file — if one is
-there, use it. If not, the website download below does everything ([[access-tiers]]).
+there, use it. If there isn't one yet, offer to put the settings file on screen so they can add
+it (below), and fall back to the website download only if they can't get a key ([[access-tiers]]).
 
-## Start here: `export.py`
+## Ask which study, and where the files go
 
-**Use the script, not the `curl` recipes below.** `export.py` finds the key, checks it opens the
-project you meant, retries when REDCap is briefly unreachable, and names the output files
-consistently. The `curl` snippets further down are kept for debugging by hand and for
-operations the script doesn't cover yet — they are not the normal path ([[access-tiers]]).
+Don't infer the study from whatever happens to be in the folder. If the user hasn't said which
+study they mean, **ask — one question.** If you already looked and found something plausible,
+name it and confirm in that same question ("the request says the CRC cohort — is that
+`database-manager/exports/crc`?"). Two studies in one workspace look alike from the outside, and
+a synthetic or test export looks exactly like the real thing.
+
+The same applies to files coming the other way: if they've downloaded an export by hand, ask
+where they put it rather than picking the closest-looking CSV.
+
+## `export.py` is the only path
+
+**Run `export.py`. Never hand-roll the export.** Not a `python3 -c` snippet, not a
+`RedcapClient` call you write yourself, not `urllib`/`requests`, not a `curl` you assemble from
+the reference below. The one time an agent improvised a snippet it built a malformed `fields`
+parameter and put a raw traceback in front of the user.
+
+`export.py` finds the key, confirms the key opens the project you meant, retries when REDCap is
+briefly unreachable, names the output files consistently, and fails in plain language rather than
+in a traceback. Those are exactly the things a hand-written call leaves out.
+
+**And never go looking for a project through the API.** There is no "list my projects" call worth
+improvising — a key opens exactly one project, and `--info` says which. If you're not sure which
+study is meant, ask the user; don't probe keys to find out.
 
 `--token-env` takes the *name of the setting* that holds your access key for this study — the key
-itself stays in the settings file and is never typed into a command.
+itself stays in the settings file and is never typed into a command. The script loads the
+settings file by itself; there is nothing to `source` first.
 
 ```bash
-set -a; source ~/.argo/.env; set +a
 E=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name export.py 2>/dev/null | head -1)
 
 # What does this key open? (reads nothing else)
@@ -43,19 +63,50 @@ python3 "$E" --token-env CRC_TOKEN \
 Useful flags: `--what records|metadata|both`, `--forms a,b,c`, `--raw` (codes instead of labels),
 `--expect-project NAME_OR_PID`.
 
-## No key? The REDCap website path works for everything
+If `export.py` can't do what's needed, say so and ask before doing anything by hand — the `curl`
+reference much further down is documentation of REDCap's API for a human reading it, not a set of
+commands to run in place of the script.
 
-A key has to be issued by a REDCap administrator per person, per project
-([[project-no-super-token]]) — so nothing here requires one.
-Without a key, the way to get data out is:
+## No key for this study? Ask for it — the export is the whole point
+
+An export puts files on disk. That is what was asked for, so **ask for the key rather than
+handing back instructions**: one line, then one question.
+
+> This study doesn't have an access key in your settings file yet — with one, I can download the
+> records and the data dictionary straight into your folder. **Want me to put your settings file
+> on screen so you can paste it in?**
+
+Then:
+
+1. **Yes → put the file itself in the chat.** Cowork sessions have a file-presenting tool
+   (`present_files` on the cowork tool server); present the settings file with it. Otherwise:
+   tell them to open their ARGO folder and double-click **'Add keys here'**, which opens the
+   settings file in a text editor. Say which line the key goes on (`<STUDY>_TOKEN=`, one per
+   study) and to save.
+2. **Wait.** Don't fill the silence with the website instructions — they're doing the thing you
+   asked for.
+3. **Verify, don't assume.** Run the client check and relay the result in one line:
+   ```bash
+   D=$(dirname "$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name argo_setup.py 2>/dev/null | head -1)")
+   python3 "$D/argo_redcap_client.py" --check
+   ```
+4. **Then export**, with `export.py` as above.
+
+**Never ask them to paste a key into the chat** — a key typed here is in the transcript forever.
+If they start, stop them and point at the file.
+
+**Only if they say they can't get one** (a key is issued by a REDCap administrator per person,
+per project — [[project-no-super-token]]), take the website path, which does everything:
 
 1. Open the study in REDCap in a browser.
 2. **Data Exports, Reports, and Stats** → "All data" → export as CSV.
 3. **Data Dictionary** page → download as CSV.
 
-Those two files are exactly what [[run-analysis]] and the QA tools expect. Click-by-click instructions, written for someone who doesn't know REDCap's menus: [[getting-files-from-redcap]]. Treat `export.py` as
-the shortcut for the studies where a key happens to exist — never as a prerequisite, and never
-ask the user to go and get an access key before helping them.
+Those two files are exactly what [[run-analysis]] and the QA tools expect. Click-by-click
+instructions, written for someone who doesn't know REDCap's menus:
+[[getting-files-from-redcap]]. Nothing in ARGO requires a key, so this path is never a failure —
+but don't reach for it before offering the key, and never make getting a key a precondition for
+helping.
 
 Save the two files into `database-manager/exports/<study>/` so the export is where the next
 person will look for it.
@@ -74,6 +125,15 @@ When the files are on disk and handed over, mark the request record complete in 
 
 - An access key with the needed permissions for the target project — optional, see above
 - The REDCap API URL (e.g., `https://redcap.oauife.edu.ng/api/`), set once as `REDCAP_URL`
+
+## REDCap API reference (for reading, not for running)
+
+Everything below documents REDCap's API surface: what the parameters mean, what each `content=`
+returns. It's here so you can explain an option, check a flag, or hand a developer a recipe.
+
+**It is not the export path.** Doing an export is `export.py` (top of this file) — including when
+a snippet below looks like it would be quicker. If a job genuinely needs something `export.py`
+can't do, say that out loud and confirm with the user before running anything by hand.
 
 ## Exporting records (study data)
 

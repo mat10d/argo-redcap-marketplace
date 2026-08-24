@@ -23,11 +23,11 @@ fixtures and from the code itself, so they can be run on any machine, including 
 | `test_build_study_feasibility.py` | DB-manager build task: `dd_builder.py` on `fields.json` must produce a DD that `validate_dd.py` passes clean, and the engineered `dirty_datadictionary.csv` must report exactly its MANIFEST's violations (`testing/fixtures/synthetic-build/`). |
 | `test_linkage_merge.py` | Analyst/DB-manager task: merging TWO studies. Drives `link-data`'s `diff_payload.py` across `synthetic-study` and `synthetic-study-b` (which share the `syn_id` space) and asserts fills, conflicts, no-ops and orphans against study B's `MANIFEST.json`. Also pins the orphan defect: ids absent from the current side are classified as safe-fills and no orphan report is emitted. |
 | `test_analysis_parity.py` | Analyst task: the same Table 1 from Python, R and Stata. `table1.py` is compared byte-for-byte with the committed `expected_table1.csv`; `table1.R` numerically with tolerance, and only where `Rscript` exists; `table1.do` is reference-only (no headless Stata licence) and only its presence is checked. |
-| `test_qa_audit_round_trip.py` | QA task 2: build → seeded RA-returned workbooks (`generate_returns.py`) → `review_responses.py`, triage counts asserted against `MANIFEST.json`'s `returned` block. Also pins four known defects in the audit path so they stay visible. |
+| `test_qa_audit_round_trip.py` | QA task 2: build → seeded RA-returned workbooks (`generate_returns.py`) → `review_responses.py`, triage counts asserted against `MANIFEST.json`'s `returned` block. Also covers `--from-worklists` (returns for an arbitrary session's build) and `summarize_for_ra.py`'s no-key file mode. The four defects it used to pin were fixed in 0.17.2; the assertions now hold the correct behaviour. |
 
 ### The drift checks are the interesting ones
 
-`test_docs_match_code.py` exists because `monitor-studies`'s `SKILL.md` and `portfolio.py` had
+`test_docs_match_code.py` exists because `weekly-check`'s `SKILL.md` and `portfolio.py` had
 quietly diverged in four separate ways at once — a missing tracker, wrong done-marker fields,
 wrong project titles, a wrong build-step count, and a snapshot path that described a file where
 the code writes a directory. Each was individually plausible and collectively meant the doc
