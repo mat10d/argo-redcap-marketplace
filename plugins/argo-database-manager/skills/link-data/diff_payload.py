@@ -33,10 +33,17 @@ out of the comparison — they describe how REDCap stores a record, not what the
 record says, and treating them as linkable data moves people between data access
 groups. Name them in --fields if you really do mean to compare them.
 
+Reading the two sides for an ANALYSIS merge, with no intention of writing anything back? Add
+`--for-analysis`. The same comparison runs, but the two payload files are named for what they
+mean to a reader rather than for a REDCap import — `<prefix>_fills.csv` (values one source has
+and the other doesn't) and `<prefix>_disagreements.csv` (values the two sources contradict each
+other on) — and nothing is printed about pushing. The conflicts, orphans and missing-link
+reports are written either way; they are the merge's gap report, not a payload.
+
 Usage:
     python3 diff_payload.py --computed computed.csv --current current.csv \\
         --id-field record_id --out-dir database-manager/linkage/<name>/ \\
-        [--prefix linkage] [--fields a,b,c]
+        [--prefix linkage] [--fields a,b,c] [--for-analysis]
 """
 import argparse
 import csv
@@ -97,6 +104,10 @@ def main():
     ap.add_argument("--fields", default="",
                     help="Comma-separated fields to compare (default: every shared column except "
                          "the ID, REDCap's structural columns and the *_complete columns)")
+    ap.add_argument("--for-analysis", action="store_true",
+                    help="Merging two sources for analysis, not writing back to REDCap: name the "
+                         "two files _fills.csv and _disagreements.csv, and say nothing about "
+                         "pushing")
     args = ap.parse_args()
 
     computed, comp_cols = load(args.computed, args.id_field)
@@ -142,11 +153,18 @@ def main():
             w.writerows(rows)
         return path
 
+    # The two file names carry the whole framing. For a write-back they name REDCap import
+    # modes; for an analysis merge that language is wrong — nobody is pushing anything — and
+    # telling a user to "push with overwriteBehavior=normal" when they asked for a merged table
+    # is how a read-only task starts looking like a write to the person doing it.
+    fills_name = "fills" if args.for_analysis else "update"
+    disagree_name = "disagreements" if args.for_analysis else "overwrite"
+
     header = [args.id_field] + fields
-    p_update = write(f"{args.prefix}_update.csv", updates, header)
+    p_update = write(f"{args.prefix}_{fills_name}.csv", updates, header)
     p_conf = write(f"{args.prefix}_conflicts.csv", conflicts,
                    [args.id_field, "field", "existing", "computed"])
-    p_over = write(f"{args.prefix}_overwrite.csv", overwrites, header)
+    p_over = write(f"{args.prefix}_{disagree_name}.csv", overwrites, header)
     p_orph = write(f"{args.prefix}_orphans.csv", orphans, header)
     p_miss = write(f"{args.prefix}_missing_link.csv", missing_link, [args.id_field])
 
@@ -154,11 +172,23 @@ def main():
     if skipped:
         print(f"not compared: {', '.join(skipped)} (REDCap's own columns — "
               f"name them in --fields to include them)")
-    print(f"safe-fills : {n_fill}  ({len(updates)} records)  -> {p_update.name}")
+    fills_label = "fills      " if args.for_analysis else "safe-fills "
+    print(f"{fills_label}: {n_fill}  ({len(updates)} records)  -> {p_update.name}")
     print(f"conflicts  : {n_conflict}  ({len(overwrites)} records) -> {p_conf.name} / {p_over.name}")
     print(f"no-ops     : {n_noop}")
     print(f"orphans    : {len(orphans)} records ({n_orphan_cells} values) only in the computed file -> {p_orph.name}")
     print(f"no link    : {len(missing_link)} records only in the current file -> {p_miss.name}")
+
+    if args.for_analysis:
+        print(f"\nAnalysis merge — nothing here is pushed anywhere. {p_update.name} is where one "
+              f"source has a value and the other doesn't; {p_over.name} is where they disagree "
+              f"and a human has to pick.")
+        if orphans:
+            print(f"{p_orph.name} holds the records only the first file knows about, and "
+                  f"{p_miss.name} the ones only the second does — say both counts out loud, "
+                  f"they are what the merge could NOT do.")
+        return
+
     print(f"\nDry-run complete. Review before pushing. Push {p_update.name} with overwriteBehavior=normal.")
     print(f"Only push {p_over.name} (overwrite) after explicit sign-off on {p_conf.name}.")
     if orphans:

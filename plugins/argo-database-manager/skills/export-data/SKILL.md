@@ -8,7 +8,9 @@ allowed-tools: Read, Bash, Write, Glob, Edit, Grep
 
 Get a study's records and its data dictionary out of REDCap and onto disk. Your entry point is
 your request queue — say "show my outstanding requests" and pick the data request you're
-fulfilling.
+fulfilling. That record says *what was asked for and by whom*, and it is the thing you tick when
+you're done; it does not say which project to pull from or which key opens it. Once you're
+exporting, the trackers are out of the picture (see below).
 
 For base API conventions (URL form, key handling) see [[redcap-api]] (argo-core).
 For project-identification safety see [[token-confirmation]] and [[record-id-safety]].
@@ -26,6 +28,18 @@ a synthetic or test export looks exactly like the real thing.
 
 The same applies to files coming the other way: if they've downloaded an export by hand, ask
 where they put it rather than picking the closest-looking CSV.
+
+### The key identifies the study. Nothing else does.
+
+**Do not open the Study Tracker or SIR records during an export — they are irrelevant to pulling
+data.** The trackers are ARGO's bookkeeping: they hold no access keys, and no tracker can say
+which REDCap project a given key opens. Only `export.py --info` can, because only REDCap knows.
+
+So when the user says "the CRC data", the question is *which access key*, not *which tracker
+record*. Look in the settings file for a key whose name matches; run `--info` on it and read back
+the project name and number it actually opens. If there is no key for the study, **ask the user
+which project they mean and solicit the key** (next section) — do not go looking for the answer
+in the trackers, and never probe other keys to find out which one fits.
 
 ## `export.py` is the only path
 
@@ -60,8 +74,41 @@ python3 "$E" --token-env CRC_TOKEN \
     --expect-project 77 --out database-manager/exports/crc
 ```
 
-Useful flags: `--what records|metadata|both`, `--forms a,b,c`, `--raw` (codes instead of labels),
+Useful flags: `--what records|metadata|both`, `--forms a,b,c`, `--only-raw`, `--only-labelled`,
 `--expect-project NAME_OR_PID`.
+
+### What one run produces
+
+**The whole set, every time.** There is no encoding to choose up front, because choosing it
+means knowing what you'll need before you've looked:
+
+| File | What it is | Give it to |
+|---|---|---|
+| `<slug>_datadictionary_<date>.csv` | the field list, with choice codes and the `Identifier?` flags | everything |
+| `<slug>_records_raw_<date>.csv` | codes (`1`, `2`) | **[[run-analysis]] and the QA tools — this is the one they read** |
+| `<slug>_records_labelled_<date>.csv` | the same records, labels (`Male`) | a human reading by eye |
+| `<slug>_records_deidentified_raw_<date>.csv` | raw, minus every field the dictionary flags as an identifier | the one that can leave the building |
+| `<slug>_records_deidentified_labelled_<date>.csv` | the same, labelled | reading by eye, shareable |
+| `<slug>_records_labelled_tidy_<date>.csv` | labelled, with each checkbox field folded back into one column | a spreadsheet a person will scroll |
+| `README.md` | what each file is, how many records, which the tools read, which is safe to share | whoever opens the folder next |
+
+Tell the user in those words — "raw codes", "readable labels", "de-identified" — never just
+"the export". The "Saved" lines say the same things, so read them back rather than paraphrasing.
+
+**De-identification is a filter, not a judgement.** The `_deidentified_` files drop the fields
+REDCap's own dictionary marks `Identifier?` — and nothing else. A free-text note naming a
+relative, or a rare diagnosis in a small district, is still in them. Say that when you hand one
+over. If the dictionary flags nothing, **no de-identified copy is written at all** (an identical
+file under that name would be a lie); the README says so, and that is worth passing on — it
+usually means someone never ticked the boxes in the Designer.
+
+A relative `--out` is measured from the folder holding the ARGO settings file — the user's ARGO
+folder — not from wherever the command ran. Absolute paths are used as given.
+
+Counts are real CSV rows, not lines of text: a free-text answer with a line break in it spans
+several lines of the file. They say `records`, and add a patient count only when the record-ID
+column proves one row per patient; a project with repeat instruments reads "2,143 records across
+1,525 patients".
 
 If `export.py` can't do what's needed, say so and ask before doing anything by hand — the `curl`
 reference much further down is documentation of REDCap's API for a human reading it, not a set of
@@ -99,11 +146,15 @@ If they start, stop them and point at the file.
 per project — [[project-no-super-token]]), take the website path, which does everything:
 
 1. Open the study in REDCap in a browser.
-2. **Data Exports, Reports, and Stats** → "All data" → export as CSV.
+2. **Data Exports, Reports, and Stats** → "All data" → export as CSV, choosing
+   **CSV / Microsoft Excel (raw data)** when it asks about the format.
 3. **Data Dictionary** page → download as CSV.
 
-Those two files are exactly what [[run-analysis]] and the QA tools expect. Click-by-click
-instructions, written for someone who doesn't know REDCap's menus:
+Those two files are what [[run-analysis]] and the QA tools expect — **provided the data export is
+the raw one.** The website also offers a labelled export, and that is a different file: the tools
+read codes and decode them from the dictionary themselves. The two paths land in the same place
+only when both are raw; say which encoding the file in front of you is before using it. Click-by-
+click instructions, written for someone who doesn't know REDCap's menus:
 [[getting-files-from-redcap]]. Nothing in ARGO requires a key, so this path is never a failure —
 but don't reach for it before offering the key, and never make getting a key a precondition for
 helping.
@@ -111,10 +162,16 @@ helping.
 Save the two files into `database-manager/exports/<study>/` so the export is where the next
 person will look for it.
 
-**Identifiable data:** REDCap decides what an export contains from the permissions of the account
-the key belongs to. Nothing in `export.py` can strip identifiers. For a de-identified extract, the
-key must belong to an account whose export rights are set to "De-Identified" — ask the REDCap
-administrator, and check the file before sharing it.
+**Identifiable data:** REDCap decides what an export contains *at all* from the permissions of
+the account the key belongs to. `export.py` then writes the `_deidentified_` copies described
+above by dropping the fields the data dictionary marks `Identifier?` — a filter, and only as good
+as those flags: a field nobody ticked is still in them. For an extract that is de-identified at
+source, the key must belong to an account whose export rights are set to "De-Identified" — ask
+the REDCap administrator. Either way, check the file before sharing it.
+
+Downloading by hand from the website gives you the raw export and the dictionary and nothing
+else — no de-identified copy, no README. If the files need to be shared, either run `export.py`
+with a key, or drop the flagged columns by hand and say which ones you dropped.
 
 ## Close out the request
 

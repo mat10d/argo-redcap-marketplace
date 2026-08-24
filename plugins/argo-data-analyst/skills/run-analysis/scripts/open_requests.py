@@ -57,6 +57,19 @@ def _form_fields(client: RedcapClient, form: str) -> list:
             for m in meta if m.get("form_name") == form]
 
 
+def _clean_label(label: str, width: "int | None" = 40) -> str:
+    """A DD field label, ready to have ': value' appended to it.
+
+    REDCap labels are written to be read on a form, so most of them already end in a colon
+    ("Full study title:"). Appending our own produced "Full study title:: Hepatectomy" on every
+    line of the queue. Collapse the wrapping the Designer inserts, drop the trailing colon, and
+    drop it again after truncation in case the cut landed on one. `width=None` keeps the whole
+    label, for the one-record view where there is room for it.
+    """
+    text = " ".join(str(label or "").split()).rstrip(" :")
+    return (text if width is None else text[:width]).rstrip(":")
+
+
 def _summarise(rec: dict, fields: list, id_field: str) -> str:
     """A one-line summary: the first few filled, non-triage fields, by label."""
     bits = []
@@ -66,11 +79,28 @@ def _summarise(rec: dict, fields: list, id_field: str) -> str:
         val = str(rec.get(name, "")).strip()
         if not val:
             continue
-        label = " ".join(label.split())[:40]
-        bits.append(f"{label}: {val[:60]}")
+        bits.append(f"{_clean_label(label)}: {val[:60]}")
         if len(bits) == 3:
             break
     return "; ".join(bits) if bits else "(no details filled in)"
+
+
+def _study_label(rec: dict) -> str:
+    """'<short name> — PI: <surname>', for the studies-to-build queue.
+
+    The weekly check's other half (the portfolio) identifies every study by its short name and
+    PI. When this half showed only a record number and the first few form fields, the two halves
+    named the same study differently and nobody could match them up by eye. Either part is
+    dropped when the record doesn't carry it — a half-filled request still gets a useful line.
+    """
+    short = str(rec.get("shortened_study_name") or "").strip()
+    pi = str(rec.get("pi_surname") or "").strip()
+    bits = []
+    if short:
+        bits.append(short[:55])
+    if pi:
+        bits.append(f"PI: {pi}")
+    return " — ".join(bits)
 
 
 def _open_records(client: RedcapClient, done_marker: str) -> "tuple[list, str]":
@@ -106,8 +136,10 @@ def show_queue(key: str, expand: bool = True) -> "int | None":
         fields = _form_fields(client, SOURCE_FORMS[env_var])
         for rec in open_recs:
             rid = rec.get(id_field, "?")
+            study = _study_label(rec) if key == "builds" else ""
+            lead = f"{study} — " if study else ""
             extra = f"  [{_sir_progress(rec)} build steps done]" if key == "builds" else ""
-            print(f"  {rid}: {_summarise(rec, fields, id_field)}{extra}")
+            print(f"  {rid}: {lead}{_summarise(rec, fields, id_field)}{extra}")
         print(f"  -> fulfilled in {ROUTE[key]}; when done, mark the record's"
               f" '{done_marker}' box in the {title} project on the REDCap website.")
     return len(open_recs)
@@ -130,7 +162,7 @@ def show_record(key: str, record_id: str) -> int:
     for name, val in records[0].items():
         val = str(val).strip()
         if val and not name.endswith("_complete"):
-            print(f"  {labels.get(name, name)}: {val}")
+            print(f"  {_clean_label(labels.get(name, name), width=None)}: {val}")
     return 0
 
 

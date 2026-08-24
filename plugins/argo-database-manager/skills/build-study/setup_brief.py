@@ -9,18 +9,33 @@ Works with or without an access key ([[token-optional]]): pulls the SIR via the 
 Tracker key is set, or reads a pre-pulled record JSON (`sir_update.py <RID> --pull > rec.json`)
 with --from-json.
 
-Usage:
-    set -a; source ~/.argo/.env; set +a
+Usage (it finds your ARGO settings file by itself — there is nothing to load first):
     python3 setup_brief.py <RID> --out database-manager/<study> [--moniker HPV_SelfSampling]
     python3 setup_brief.py <RID> --from-json rec.json --out database-manager/<study> --moniker HPV_SelfSampling
 """
 import argparse, json, os, re, sys, datetime, urllib.parse, urllib.request
+from pathlib import Path
+
+# The shared ARGO scripts are vendored into this skill's own scripts/ folder by release.py,
+# so imports never depend on where — or whether — other plugins are installed. The parents walk
+# is only for running from a source checkout before the first sync.
+_here = Path(__file__).resolve().parent
+for _cand in (_here / "scripts",
+              *(p / "plugins/argo-core/skills/redcap-api/scripts" for p in _here.parents)):
+    if (_cand / "argo_redcap_client.py").exists():
+        sys.path.insert(0, str(_cand))
+        break
+from argo_redcap_client import load_env_file  # noqa: E402
 
 def pull(rid):
+    load_env_file()          # the settings file loads itself; nothing to source by hand
     url=os.environ.get("REDCAP_URL"); tok=os.environ.get("STUDY_INITIATION_REQUEST")
     if not (url and tok):
-        sys.exit("No REDCAP_URL/STUDY_INITIATION_REQUEST in env. Either source ~/.argo/.env, "
-                 "or pass --from-json (sir_update.py <RID> --pull > rec.json).")
+        sys.exit("The REDCap address (REDCAP_URL) or the Study Tracker access key\n"
+                 "(STUDY_INITIATION_REQUEST) isn't in your ARGO settings file yet. Add them —\n"
+                 "open your ARGO folder and double-click 'Add keys here' — or work from a\n"
+                 "pre-pulled record instead: sir_update.py <RID> --pull > rec.json, then pass\n"
+                 "--from-json rec.json.")
     data=urllib.parse.urlencode({"token":tok,"content":"record","format":"json","records[0]":rid}).encode()
     recs=json.loads(urllib.request.urlopen(urllib.request.Request(url,data=data,method="POST"),timeout=60).read())
     if not recs: sys.exit(f"SIR record {rid} not found.")

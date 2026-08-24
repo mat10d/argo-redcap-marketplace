@@ -48,6 +48,11 @@ REVIEWER = QA_SKILL / "review_responses.py"
 BUILDER = QA_SKILL / "build_worklists.py"
 SUMMARIZER = QA_SKILL / "summarize_for_ra.py"
 
+# The highlight colours come from the skill's own single definition, never retyped here: a test
+# that hunts for a hex the builder stopped painting finds nothing and asserts nothing.
+sys.path.insert(0, str(QA_SKILL))
+from qa_colours import AMBER_HEX, YELLOW_HEX  # noqa: E402
+
 try:
     import openpyxl  # noqa: F401
     import pandas  # noqa: F401
@@ -305,7 +310,7 @@ class TestQAAuditRoundTrip(unittest.TestCase):
         answered = 0
         for r in range(3, ws.max_row + 1):
             cell = ws.cell(row=r, column=2)
-            if str(cell.fill.fgColor.rgb or "").upper().endswith("FFC7CE"):
+            if str(cell.fill.fgColor.rgb or "").upper().endswith(YELLOW_HEX):
                 cell.value = "Poorly differentiated"
                 answered += 1
         dst = build / "onefield_site_alpha_RETURNED.xlsx"
@@ -472,6 +477,139 @@ class TestSummarizeForRAFileMode(unittest.TestCase):
         self.assertIn("--metadata-csv", msg)
         self.assertIn("--token-env", msg)
         self.assertNotIn("Traceback", msg)
+
+
+class TestHighlightColoursHaveOneDefinition(unittest.TestCase):
+    """0.17.2 #29: "yellow" was #FFC7CE — a pale rose.
+
+    Every instruction to every RA says "fill in the yellow cells", which is a sentence you
+    cannot follow when the cells are pink. Worse, the hex was retyped in four files: the builder
+    that paints it, the reviewer and the ingester that recognise it coming back, and the fixture
+    generator that imitates an RA. Any one of them drifting silently discards a site's answers.
+    One definition, imported everywhere.
+    """
+
+    FILES = {
+        "build_worklists.py": QA_SKILL / "build_worklists.py",
+        "review_responses.py": QA_SKILL / "review_responses.py",
+        "ingest_response.py": QA_SKILL / "ingest_response.py",
+        "generate_returns.py": GENERATOR,
+    }
+
+    def test_the_fill_is_actually_yellow(self):
+        r, g, b = (int(YELLOW_HEX[i:i + 2], 16) for i in (0, 2, 4))
+        self.assertEqual(r, g, f"{YELLOW_HEX} isn't yellow: red and green must match")
+        self.assertGreater(r, 200, "yellow has to be bright")
+        self.assertLess(b, r - 40, f"{YELLOW_HEX} has too much blue to read as yellow")
+
+    def test_amber_stays_distinguishable(self):
+        self.assertNotEqual(AMBER_HEX, YELLOW_HEX)
+        self.assertEqual(AMBER_HEX, "FFE9B8", "the amber 'please check' fill is unchanged")
+
+    def test_nobody_retypes_a_colour(self):
+        for name, path in self.FILES.items():
+            text = path.read_text()
+            with self.subTest(name):
+                self.assertIn("from qa_colours import", text,
+                              f"{name} must import the colours, not define its own")
+                self.assertNotIn(f'"{YELLOW_HEX}"', text, f"{name} retypes the yellow hex")
+                self.assertNotIn("FFC7CE", text, f"{name} still carries the old rose fill")
+
+    def test_all_four_readers_agree_on_both_colours(self):
+        """Loaded, not grepped: the values the running code actually holds."""
+        import review_responses, ingest_response, build_worklists  # noqa: E402
+        self.assertEqual(review_responses.YELLOW_HEX, YELLOW_HEX)
+        self.assertEqual(review_responses.AMBER_HEX, AMBER_HEX)
+        self.assertEqual(ingest_response.YELLOW_HEX, YELLOW_HEX)
+        self.assertEqual(str(build_worklists.YELLOW.start_color.rgb)[-6:], YELLOW_HEX)
+        self.assertEqual(str(build_worklists.UNCERTAIN.start_color.rgb)[-6:], AMBER_HEX)
+        spec = importlib.util.spec_from_file_location("_argo_gen_returns", GENERATOR)
+        gen = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(gen)
+        self.assertEqual(gen.YELLOW_HEX, YELLOW_HEX)
+        self.assertEqual(gen.AMBER_HEX, AMBER_HEX)
+
+    @unittest.skipIf(not DEPS, "pandas/openpyxl/yaml not installed")
+    def test_a_built_workbook_really_is_painted_that_colour(self):
+        """Not just the constant — the cells an RA opens."""
+        out = Path(tempfile.mkdtemp())
+        try:
+            cfg = out / "one.yaml"
+            cfg.write_text("workbooks:\n  - name: onefield\n    title: One\n"
+                           "    fields: [histology_grade]\n")
+            proc = subprocess.run(
+                [sys.executable, str(BUILDER),
+                 "--records-csv", str(FIXTURE / "records.csv"),
+                 "--metadata-csv", str(FIXTURE / "datadictionary.csv"),
+                 "--fields", str(cfg), "--out", str(out / "b"),
+                 "--id-field", "syn_id", "--round="],
+                capture_output=True, text=True, timeout=300)
+            self.assertEqual(proc.returncode, 0, proc.stderr[-800:])
+            ws = openpyxl.load_workbook(out / "b" / "with_MDC" /
+                                        "onefield_site_alpha.xlsx").active
+            fills = {str(ws.cell(row=r, column=2).fill.fgColor.rgb or "").upper()[-6:]
+                     for r in range(3, ws.max_row + 1)}
+            self.assertIn(YELLOW_HEX, fills, "no cell was painted the yellow the RA is told about")
+            self.assertNotIn("FFC7CE", fills)
+        finally:
+            shutil.rmtree(out, ignore_errors=True)
+
+
+class TestSiteHeadersAreWholeHeaders(unittest.TestCase):
+    """0.17.2 #32: `parse_questions` keyed on the header's FIRST WORD.
+
+    `## Site Alpha` and `## Site Beta` both became "site", so one site's open questions were
+    served to every RA in the study. The key is now the whole header, lowercased with its
+    whitespace collapsed — and two headers that collapse to the same key are merged loudly,
+    because the quiet reading of that situation is one RA receiving another site's questions.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("_argo_summarize", SUMMARIZER)
+        cls.mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.mod)
+
+    def _questions(self, text, warn=lambda *_a: None):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            path = tmp / "RA_questions.md"
+            path.write_text(text)
+            return self.mod.parse_questions(str(path), warn=warn)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    DOC = ("# Open questions\n"
+           "\n## Site Alpha\n### SYN-0003 — alpha's question\n\n"
+           "## Site Beta\n### SYN-0125 — beta's question\n")
+
+    def test_two_multiword_sites_stay_apart(self):
+        got = self._questions(self.DOC)
+        self.assertEqual(sorted(got), ["site alpha", "site beta"])
+        self.assertIn("alpha's question", got["site alpha"])
+        self.assertNotIn("beta's question", got["site alpha"])
+
+    def test_the_first_word_is_not_the_key(self):
+        """The exact defect: both sites used to collapse onto 'site'."""
+        self.assertNotIn("site", self._questions(self.DOC))
+
+    def test_case_and_spacing_are_ignored(self):
+        got = self._questions("## SITE   ALPHA\n### q\n")
+        self.assertEqual(list(got), ["site alpha"])
+
+    def test_a_genuine_collision_is_merged_but_warned_about(self):
+        warnings = []
+        got = self._questions(
+            "## Site Alpha\n### first\n\n## site  alpha\n### second\n", warn=warnings.append)
+        self.assertEqual(list(got), ["site alpha"])
+        self.assertIn("first", got["site alpha"])
+        self.assertIn("second", got["site alpha"])
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("same site", warnings[0])
+
+    def test_an_underscored_site_name_is_unchanged(self):
+        """`## SITE_ALPHA` was already a single word, and must keep behaving identically."""
+        self.assertEqual(list(self._questions("## SITE_ALPHA\n### q\n")), ["site_alpha"])
 
 
 if __name__ == "__main__":

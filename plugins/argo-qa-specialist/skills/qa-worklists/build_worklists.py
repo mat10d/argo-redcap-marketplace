@@ -12,9 +12,8 @@ For each configured workbook (a named bundle of fields), this:
 Highlighted yellow cells = the RA needs to resolve these in REDCap. A second
 header row shows each field's branching prerequisite in plain language.
 
-Usage:
+Usage (it finds your ARGO settings file by itself — there is nothing to load first):
   python build_worklists.py \\
-      --url $REDCAP_URL \\
       --token-env CRC_TOKEN \\
       --fields fields.yaml \\
       --out qa-specialist/<study>/worklists \\
@@ -40,6 +39,7 @@ import os
 import re
 import sys
 from io import StringIO
+from pathlib import Path
 
 import pandas as pd
 import requests
@@ -47,6 +47,21 @@ import yaml
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
+
+# Same-folder imports, always: this skill carries its own copy of everything it needs.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from qa_colours import AMBER_HEX, YELLOW_HEX  # noqa: E402
+
+# The shared ARGO scripts are vendored into this skill's own scripts/ folder by release.py,
+# so imports never depend on where — or whether — other plugins are installed. The parents walk
+# is only for running from a source checkout before the first sync.
+_here = Path(__file__).resolve().parent
+for _cand in (_here / "scripts",
+              *(p / "plugins/argo-core/skills/redcap-api/scripts" for p in _here.parents)):
+    if (_cand / "argo_redcap_client.py").exists():
+        sys.path.insert(0, str(_cand))
+        break
+from argo_redcap_client import load_env_file  # noqa: E402
 
 
 # -----------------------------------------------------------------------------
@@ -235,6 +250,32 @@ def augment_fields_with_triggers(fields: list, metadata: list) -> tuple[list, di
     return augmented, prereq
 
 
+def logic_is_readable(logic: str) -> bool:
+    """Whether every clause of this branching condition parses at all.
+
+    Drives the wording of the RA-facing prerequisite row. An unreadable condition (a datediff
+    call, say) used to be printed raw after the words "only if", which reads as an instruction
+    written in a language the RA doesn't speak — and implies we understood it. We didn't, and
+    the cells below are amber for exactly that reason, so the row should say so.
+    """
+    if not logic or not logic.strip():
+        return True
+    for clause in re.split(r"\s+(?:AND|OR)\s+", logic, flags=re.IGNORECASE):
+        if _clause_parts(clause) is None:
+            return False
+    return True
+
+
+def prereq_text(logic: str, meta_by: dict) -> str:
+    """The second header row's cell for one field: its prerequisite, in plain English."""
+    logic = (logic or "").strip()
+    if not logic:
+        return ""
+    if logic_is_readable(logic):
+        return "only if " + format_branching_logic(logic, meta_by)
+    return "couldn't read this condition: " + logic
+
+
 def format_branching_logic(logic: str, meta_by: dict) -> str:
     """Render branching logic with choice labels for the RA-facing prereq row."""
     if not logic:
@@ -305,11 +346,11 @@ def labelize(df: pd.DataFrame, metadata: list, fields: list) -> tuple[pd.DataFra
 
 SENTINEL_CODES = {"666", "-666", "-777", "-888", "-999"}
 
-YELLOW          = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+YELLOW          = PatternFill(start_color=YELLOW_HEX, end_color=YELLOW_HEX, fill_type="solid")
 # A distinct fill for cells whose branching condition we could not read. These are shown so
 # nothing is ever silently dropped, but they are NOT an assertion that the RA missed something —
 # they mean "we couldn't tell whether this applies; please check".
-UNCERTAIN       = PatternFill(start_color="FFE9B8", end_color="FFE9B8", fill_type="solid")
+UNCERTAIN       = PatternFill(start_color=AMBER_HEX, end_color=AMBER_HEX, fill_type="solid")
 HEADER_FILL     = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
 RESPONSE_HEADER = PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid")
 HEADER_FONT     = Font(bold=True, color="FFFFFF")
@@ -406,12 +447,8 @@ def build_workbook(labeled: pd.DataFrame, raw_by_id: dict, meta_by: dict,
     header = id_cols + [label_map.get(f, f) for f in display_fields] + ["RESPONSE"]
     prereq_row = (
         [""] * len(id_cols)
-        + [
-            ("only if " + format_branching_logic(
-                meta_by.get(f, {}).get("branching_logic") or "", meta_by))
-            if (meta_by.get(f, {}).get("branching_logic") or "").strip() else ""
-            for f in display_fields
-        ]
+        + [prereq_text(meta_by.get(f, {}).get("branching_logic") or "", meta_by)
+           for f in display_fields]
         + ["per-row notes from the RA: why blank, RESOLVED, etc."]
     )
     ws.append(header); ws.append(prereq_row)
@@ -489,8 +526,10 @@ def load_metadata_csv(path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--url", help="REDCap API URL (API mode)")
-    ap.add_argument("--token-env", help="Env var holding the API token (API mode)")
+    ap.add_argument("--url", help="REDCap API URL. Only needed if REDCAP_URL isn't already "
+                                 "in your ARGO settings file")
+    ap.add_argument("--token-env", help="Name of the setting holding your access key for this "
+                                        "study, e.g. CRC_TOKEN (access-key mode)")
     ap.add_argument("--records-csv", help="No-token mode: local record export CSV (use instead of --url/--token-env)")
     ap.add_argument("--metadata-csv", help="No-token mode: local Data Dictionary CSV (paired with --records-csv)")
     ap.add_argument("--fields", required=True, help="Path to fields YAML")
@@ -533,24 +572,40 @@ def main():
         print(f"No-token mode: reading {args.records_csv} + {args.metadata_csv} ...")
         raw = pd.read_csv(args.records_csv, dtype=str, keep_default_na=False)
         metadata = load_metadata_csv(args.metadata_csv)
-    elif args.url and args.token_env:
+    elif args.token_env:
+        # Load the ARGO settings file ourselves. There is nothing for the user to source first,
+        # and --url is only needed if their REDCap address isn't in that file already.
+        load_env_file()
+        url = args.url or os.environ.get("REDCAP_URL")
         token = os.environ.get(args.token_env)
         if not token:
             sys.exit(
-        f"No access key for {args.token_env} is set up on this computer, so I can't reach REDCap.\n"
+        f"No access key called {args.token_env} is in your ARGO settings file, so I can't reach\n"
+        "REDCap.\n"
         "\n"
         "An access key (REDCap calls it an API token) is a long password that lets a tool read\n"
         "or update one specific REDCap project on your behalf. Your REDCap administrator\n"
         "creates it for you — it isn't something you can generate yourself.\n"
         "\n"
-        "If you already have one, add it to the file ~/.argo/.env, then load it into this\n"
-        "terminal window and try again:\n"
+        "If you already have one: open your ARGO folder, double-click 'Add keys here' to open\n"
+        f"your settings file, add the line {args.token_env}=<your key>, save, and run this again.\n"
+        "Never type a key into a chat message — it stays in the transcript.\n"
         "\n"
-        "    set -a; source ~/.argo/.env; set +a"
+        "No key at all? Nothing is blocked: download the records export and the data dictionary\n"
+        "from the REDCap website and pass them with --records-csv and --metadata-csv instead."
     )
-        print(f"Pulling records + metadata from {args.url} ...")
-        raw = pull_records(args.url, token)
-        metadata = pull_metadata(args.url, token)
+        if not url:
+            sys.exit(
+        "I have your access key, but not the web address of your REDCap system.\n"
+        "\n"
+        "It's a single line of text ending in /api/. Open your ARGO folder, double-click\n"
+        "'Add keys here', and add it on the REDCAP_URL line:\n"
+        "\n"
+        "    REDCAP_URL=https://your-redcap-site.org/api/"
+    )
+        print(f"Pulling records + metadata from {url} ...")
+        raw = pull_records(url, token)
+        metadata = pull_metadata(url, token)
     else:
         sys.exit(
             "I need to know where to get the study's data from, and you haven't told me yet.\n"
@@ -560,7 +615,7 @@ def main():
             "      --records-csv records.csv --metadata-csv datadictionary.csv\n"
             "\n"
             "  Or, if you have an access key for this study set up:\n"
-            "      --url $REDCAP_URL --token-env YOUR_STUDY_TOKEN"
+            "      --token-env YOUR_STUDY_TOKEN"
         )
     meta_by = {m["field_name"]: m for m in metadata}
 

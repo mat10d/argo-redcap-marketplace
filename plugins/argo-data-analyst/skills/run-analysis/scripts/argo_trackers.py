@@ -21,7 +21,7 @@ from __future__ import annotations
 ARGO_REDCAP_URL = "https://redcap.oauife.edu.ng/api/"
 
 # Stamped by release.py on every release — the runtime answer to "which version am I running?".
-TOOLKIT_VERSION = "0.17.1"
+TOOLKIT_VERSION = "0.17.2"
 
 ADMIN_TRACKERS = [
     ("STUDY_INITIATION_REQUEST", "Study Tracker",             "224", "study_production"),

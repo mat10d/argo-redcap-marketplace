@@ -10,8 +10,7 @@ Reads all 5 admin REDCaps and surfaces a weekly snapshot:
 
 Saves a JSON snapshot per run so weekly diffs are possible.
 
-Usage:
-    set -a; source ~/.argo/.env; set +a
+Usage (it finds your ARGO settings file by itself — there is nothing to load first):
     python3 portfolio.py              # render dashboard, save snapshot
     python3 portfolio.py --diff       # also show diff vs previous snapshot
 """
@@ -25,7 +24,10 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-REDCAP_URL = os.environ.get("REDCAP_URL")
+# Filled in by main(), from the settings file this script loads itself. NOT read at import:
+# reading it here meant the weekly check only worked for someone who had already sourced their
+# settings file by hand, which is the one thing every other ARGO script does for you.
+REDCAP_URL = None
 
 
 def state_dir() -> Path:
@@ -121,7 +123,7 @@ def confirm_token(token: str, expected_title: str) -> dict:
     if expected_title.lower() not in title.lower():
         raise RuntimeError(
             f"Token title mismatch: expected '{expected_title}', got '{title}'. "
-            f"Refusing to proceed — check ~/.argo/.env."
+            f"Refusing to proceed — check the access keys in your ARGO settings file."
         )
     return info
 
@@ -282,6 +284,28 @@ def find_argo_core() -> "str | None":
     return None
 
 
+def load_settings() -> "Path | None":
+    """Find and load the ARGO settings file, exactly the way every other ARGO script does.
+
+    The shared client owns the search list (`load_env_file`), so the weekly check can never
+    disagree with `--check` about which file is in force. Returns the file it read, or None if
+    there is nothing to read — never raises, because a missing settings file is a thing to
+    explain in plain words a moment later, not a crash.
+    """
+    core = find_argo_core()
+    if core is None:
+        return None
+    sys.path.insert(0, core)
+    try:
+        from argo_redcap_client import load_env_file
+    except ImportError:
+        return None
+    try:
+        return load_env_file()
+    except Exception:
+        return None
+
+
 def run_setup_check() -> int:
     """Check every tracker key without pulling any data. Delegates to argo-core's shared client."""
     core = find_argo_core()
@@ -301,22 +325,32 @@ def run_setup_check() -> int:
 
 
 def main():
+    global REDCAP_URL
+
     if "--check" in sys.argv:
         sys.exit(run_setup_check())
 
+    # Load the settings file first — before anything reads REDCAP_URL or a tracker key.
+    settings = load_settings()
+    REDCAP_URL = os.environ.get("REDCAP_URL")
+
     if not REDCAP_URL:
+        where = (f"Your settings file is here:\n\n    {settings}\n"
+                 if settings else
+                 "Open your ARGO folder and double-click 'Add keys here' — that opens your\n"
+                 "settings file in a text editor.\n")
         sys.exit(
             "This tool needs to know the web address of your REDCap system before it can check\n"
-            "anything, and that address isn't set on this computer yet.\n"
+            "anything, and that address isn't set yet.\n"
             "\n"
             "It's a single line of text ending in /api/ — ask your ARGO REDCap administrator for\n"
-            "it if you don't have it. Add it to the file ~/.argo/.env like this:\n"
+            "it if you don't have it. It goes in your ARGO settings file, on its own line:\n"
             "\n"
             "    REDCAP_URL=https://your-redcap-site.org/api/\n"
             "\n"
-            "then load it into this terminal window and try again:\n"
-            "\n"
-            "    set -a; source ~/.argo/.env; set +a"
+            + where +
+            "\nSave it, then run this again. There is nothing to load by hand — this tool reads\n"
+            "the settings file itself."
         )
 
     want_diff = "--diff" in sys.argv
@@ -326,6 +360,11 @@ def main():
     snap_dir.mkdir(parents=True, exist_ok=True)
 
     prev = load_previous(snap_dir.parent) if want_diff else None
+    if want_diff and prev is None:
+        # Saying nothing here reads as "nothing changed this week", which is the opposite of
+        # the truth: there is no earlier snapshot to have changed FROM.
+        print("First snapshot — nothing to compare against yet; next run will show what "
+              "changed.\n")
     curr = collect(snap_dir)
     diff = compute_diff(curr, prev) if prev else None
 
@@ -341,9 +380,8 @@ def main():
         print("is wrong, NOT because there was no activity this week.")
         print("")
         print("Each tracker below says what went wrong. The most common causes are: the access")
-        print("keys in ~/.argo/.env were never loaded into this terminal window (run")
-        print("'set -a; source ~/.argo/.env; set +a' and try again), the REDCap address changed,")
-        print("or REDCap is temporarily down.")
+        print("keys are missing from your ARGO settings file (run this with --check to see which")
+        print("ones), the REDCap address changed, or REDCap is temporarily down.")
         print("!" * 72)
         print("")
 

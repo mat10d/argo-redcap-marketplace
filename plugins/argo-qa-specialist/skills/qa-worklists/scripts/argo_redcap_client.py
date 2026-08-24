@@ -148,6 +148,43 @@ def settings_candidates(explicit: "str | None" = None) -> list:
     return candidates
 
 
+# A settings-file line that defines an access key: NAME_TOKEN=<something>, with or without
+# `export` in front of it. The value has to be non-empty — a blank line in the scaffolded
+# template is a placeholder, not a key.
+_TOKEN_LINE = re.compile(r"^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*_TOKEN)\s*=\s*(.*)$")
+
+
+def settings_file_keys(path) -> list:
+    """The access-key names actually written, with a value, in ONE settings file.
+
+    Study-key discovery reads this and never `os.environ`. The process environment is full of
+    other people's secrets — CI runners, editor integrations, the agent harness itself all export
+    `*_TOKEN` variables — and a --check that harvested them POSTed an unrelated secret to REDCap
+    as though it were a study key, then told the user their key was broken. A key counts as a
+    study key because the user wrote it in their own ARGO settings file, and for no other reason.
+
+    Returns names in file order, de-duplicated. Anything unreadable yields an empty list.
+    """
+    names: list = []
+    if not path:
+        return names
+    try:
+        text = Path(path).read_text()
+    except (OSError, UnicodeDecodeError, ValueError):
+        return names
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = _TOKEN_LINE.match(line)
+        if not match:
+            continue
+        name, value = match.group(1), match.group(2).strip().strip('"').strip("'")
+        if value and name not in names:
+            names.append(name)
+    return names
+
+
 def load_env_file(explicit: str | None = None) -> "Path | None":
     """Load REDCap settings from a .env file, if one can be found and isn't already loaded.
 
@@ -652,9 +689,16 @@ def run_check() -> int:
             broken += 1
 
     # Study keys (one per study a person is QAing) get verified too, not just listed.
+    #
+    # They are discovered from the SETTINGS FILE that was just loaded — never from os.environ.
+    # Scanning the environment for `*_TOKEN` swept up secrets belonging to whatever else was
+    # running (a session harness's own messaging token, in one walkthrough), POSTed them to
+    # REDCap as if they were study keys, and then reported the user's setup as broken because
+    # REDCap quite rightly refused them. Only a key the user wrote in their own settings file
+    # is a study key.
     tier1 = {env for env, *_ in TIER1_PROJECTS}
-    study_keys = sorted(k for k in os.environ
-                        if k.endswith("_TOKEN") and k not in tier1 and os.environ.get(k))
+    study_keys = sorted(k for k in settings_file_keys(found)
+                        if k not in tier1 and os.environ.get(k))
     if study_keys:
         print("\nStudy keys:")
         for name in study_keys:
@@ -682,8 +726,9 @@ def run_check() -> int:
                  "paste them into your ARGO settings file (double-click 'Add keys here'\n"
                  "in your ARGO folder).")
         print(
-            "\nNo REDCap access keys are set up yet. Everyone on the ARGO team should\n"
-            "have the five tracker keys — ask your ARGO REDCap administrator, then\n"
+            "\nNo REDCap access keys are set up yet — nothing here is broken, there is\n"
+            "just nothing configured. Everyone on the ARGO team should have the five\n"
+            "tracker keys — ask your ARGO REDCap administrator, then\n"
             + where + "\n"
             "Nothing is blocked meanwhile: every ARGO task also works from files\n"
             "downloaded off the REDCap website."

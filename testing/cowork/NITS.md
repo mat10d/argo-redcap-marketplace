@@ -166,3 +166,12 @@ Ranked. The top two are silent-data-loss class.
     misses the nested tree fetch_templates.py itself writes, and searching all of `~` can pick
     a stale copy from an unrelated folder. Search ONLY the workspace's
     project-manager/templates-official, recursively.
+40. **export-data must never consult the Study Tracker to identify the study** (Cowork CRC round,
+    Matteo): the key identifies the project (`export.py --info`); no key → ask which project, one
+    question, no tracker lookups. And with a key, "all we want is pull from remote": produce a
+    SET of files — records RAW and records LABELLED (both), the data dictionary, plus a short
+    README in the export folder saying what each file is, its encoding and its record count.
+    (+) Also in the default export SET: a DE-IDENTIFIED records file (every field the data
+    dictionary marks Identifier?=y dropped, both encodings or at least raw), named so it's
+    obvious which is safe to share; README says which fields were removed. Checkbox-column
+    collapsing is a nice-to-have extra file, never a replacement.

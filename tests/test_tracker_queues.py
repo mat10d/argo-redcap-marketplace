@@ -321,6 +321,78 @@ class TestSirProgress(unittest.TestCase):
                 self.assertEqual(PORTFOLIO.sir_progress(rec), "7/7", rec["record_id"])
 
 
+class TestLabelsReadAsSentences(unittest.TestCase):
+    """0.17.2 #26: doubled colons. REDCap labels are written to sit on a form, so most of them
+    already end in ':' — appending our own gave "Full study title:: Hepatectomy" on every line
+    of every queue."""
+
+    def test_a_trailing_colon_on_the_label_is_dropped(self):
+        self.assertEqual(OR._clean_label("Full study title:"), "Full study title")
+        self.assertEqual(OR._clean_label("Name of the person requesting :"),
+                         "Name of the person requesting")
+
+    def test_a_label_without_one_is_unchanged(self):
+        self.assertEqual(OR._clean_label("Full study title"), "Full study title")
+
+    def test_wrapping_is_collapsed_before_the_colon_is_dropped(self):
+        self.assertEqual(OR._clean_label("Purpose of the\n   linkage:"),
+                         "Purpose of the linkage")
+
+    def test_truncation_can_never_leave_a_dangling_colon(self):
+        label = "x" * 39 + ":" + " and more text"
+        self.assertFalse(OR._clean_label(label).endswith(":"))
+
+    def test_the_whole_label_is_kept_for_the_one_record_view(self):
+        long_label = "A very long question that a form would wrap over three separate lines:"
+        self.assertEqual(OR._clean_label(long_label, width=None), long_label.rstrip(":"))
+
+    def test_no_summary_line_in_the_fixture_ever_shows_a_doubled_colon(self):
+        for env_var, e in MANIFEST["trackers"].items():
+            client = FixtureClient(env_var)
+            fields = OR._form_fields(client, e["source_form"])
+            open_recs, id_field = OR._open_records(client, e["done_marker"])
+            for rec in open_recs:
+                line = OR._summarise(rec, fields, id_field)
+                self.assertNotIn("::", line, f"{env_var} {rec[id_field]}: {line!r}")
+
+
+class TestBuildsQueueNamesTheStudy(unittest.TestCase):
+    """0.17.2 #26: the two halves of the weekly check named studies differently.
+
+    The portfolio identifies a study by its short name and PI; the build queue showed a record
+    number and the first few form fields, so nobody could match one against the other by eye.
+    """
+
+    def _sir(self, record_id):
+        e = entry("STUDY_INITIATION_REQUEST")
+        recs = json.loads((FIXTURE / e["records_file"]).read_text())
+        return next(r for r in recs if r["record_id"] == record_id)
+
+    def test_a_filled_record_carries_short_name_and_pi(self):
+        rec = self._sir("9")
+        label = OR._study_label(rec)
+        self.assertIn(rec["shortened_study_name"], label)
+        self.assertIn(rec["pi_surname"], label)
+        self.assertIn("PI:", label)
+
+    def test_the_same_two_facts_the_portfolio_shows(self):
+        """Same study, same words, on both halves of the weekly check."""
+        rec = self._sir("9")
+        portfolio_line = PORTFOLIO.summarize("STUDY_INITIATION_REQUEST", rec)
+        for fact in (rec["shortened_study_name"], rec["pi_surname"]):
+            self.assertIn(fact, portfolio_line)
+            self.assertIn(fact, OR._study_label(rec))
+
+    def test_a_blank_record_produces_no_stray_dashes(self):
+        """A half-filled request still gets a usable line — never ' — PI: ' with nothing in it."""
+        self.assertEqual(OR._study_label(self._sir("2")), "")
+        self.assertEqual(OR._study_label({}), "")
+
+    def test_only_one_of_the_two_is_still_useful(self):
+        self.assertEqual(OR._study_label({"shortened_study_name": "Hepatectomy"}), "Hepatectomy")
+        self.assertEqual(OR._study_label({"pi_surname": "Alatise"}), "PI: Alatise")
+
+
 class TestPortfolioSummarize(unittest.TestCase):
     """portfolio.summarize reads named fields; the fixture must actually carry them."""
 

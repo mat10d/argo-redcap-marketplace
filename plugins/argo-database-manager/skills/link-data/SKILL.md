@@ -100,7 +100,9 @@ Emit five files — the three-file payload, plus the two halves of the gap repor
 - `*_missing_link.csv` — ids found only on the current/REDCap side: the records the linkage
   found nothing for.
 
-The reusable helper `diff_payload.py` implements exactly this (see below).
+The reusable helper `diff_payload.py` implements exactly this (see below). Those file names are
+the write-back ones; on an analysis merge (`--for-analysis`) the same two files are called
+`*_fills.csv` and `*_disagreements.csv`, because there is nothing to update or overwrite.
 
 ## Outputs
 
@@ -109,17 +111,22 @@ The reusable helper `diff_payload.py` implements exactly this (see below).
 `data-analyst/<study>/`. Everything below lands in whichever of those two applies.
 
 - `master_linkage.csv` — one row per linked entity with the IDs from each source + link flags
-  (`*_linked`) + carried-over key fields.
+  (`<left>_linked` / `<right>_linked`) + a `link_class` + every field from both sides. Written by
+  `build_master_linkage.py` (below), not by hand.
 - **Gap/orphan reports — unmatched rows on each side.** `diff_payload.py` writes these two for
   every run, alongside the payload, and prints both counts:
-  - `*_orphans.csv` — ids only on the computed side (no record to fill; never pushed).
-  - `*_missing_link.csv` — ids only on the current/REDCap side (nothing was computed for them).
+  - `*_orphans.csv` — ids only on the computed/right side (no record to fill; never pushed).
+  - `*_missing_link.csv` — ids only on the current/left side (nothing was computed for them).
 
   A multi-source linkage adds its own per-source versions of the same idea (e.g.
   `r01_not_in_cbioportal.csv`, `cbioportal_unlinked.csv`).
-- `*_integrity.csv` — ranked structural issues (duplicate/orphan join IDs) and low-score fuzzy
-  mismatches, worst first.
-- The three payload CSVs above (`*_update` / `*_conflicts` / `*_overwrite`) when writing back.
+- `*_integrity.csv` — ranked structural issues (duplicate/orphan join IDs, sites that disagree
+  between sources) worst first, each with a count and a sentence on what it means for the
+  analysis. Also written by `build_master_linkage.py`.
+- The two comparison CSVs, named for what the run is for:
+  - writing back — `*_update.csv` (safe fills) and `*_overwrite.csv` (the conflict rows);
+  - merging for analysis (`--for-analysis`) — `*_fills.csv` and `*_disagreements.csv`.
+  `*_conflicts.csv` (long format, for triage) is written either way.
 
 Always show the user both gap counts, not just the fill count — "13 fills, 24 conflicts, 15
 records only in the new file, 155 with nothing to link to" is the honest summary of a linkage.
@@ -133,14 +140,19 @@ records only in the new file, 155 with nothing to link to" is the honest summary
    data dictionary downloaded from the REDCap website ([[getting-files-from-redcap]]) — the
    linkage never needs a key to run. Normalize keys (string, strip, drop `.0`); read the data
    dictionary for labels/branching if needed.
-3. **Match** — exact join on primary keys; for leftovers, optional fuzzy fallback → candidate list.
-4. **Build the master** — reconcile into `master_linkage.csv`; set link flags.
-5. **Report gaps & integrity** — emit unmatched/orphan/duplicate reports and the ranked integrity CSV.
-6. **(If writing back) build the diff-only payload** with `diff_payload.py`; show the user all
-   five counts — fills, conflicts, no-ops, orphans, and records with nothing to link to.
-   **Dry-run.** If there are orphans, say what they are before anything else: those ids have no
-   record in the project, and nothing will be written for them unless the user decides the
-   records should be created (a separate, deliberate step).
+3. **Match** — run `diff_payload.py` (add `--for-analysis` when there is no write-back in
+   prospect); it does the exact join on the id and classifies every shared cell.
+4. **Build the master** — run `build_master_linkage.py` on the same two files plus step 3's
+   output. It writes both of this skill's promised deliverables in one go: `master_linkage.csv`
+   (link flags, `link_class`, both sources' columns) and the ranked `*_integrity.csv`.
+5. **Report gaps & integrity** — read the integrity report back, worst first, and give both gap
+   counts (see "Always show the user both gap counts", above).
+6. **(If writing back) re-run `diff_payload.py` without `--for-analysis`**, so the two files
+   carry the write-back names and the run prints the push instructions. Show the user all five
+   counts — fills, conflicts, no-ops, orphans, and records with nothing to link to. **Dry-run.**
+   If there are orphans, say what they are before anything else: those ids have no record in the
+   project, and nothing will be written for them unless the user decides the records should be
+   created (a separate, deliberate step).
 7. **Confirm & push** — only after approval: confirm target project title, push `*_update.csv`
    (normal). Handle `*_overwrite.csv` separately, only with explicit sign-off.
 8. **Close out the request** — when the linked table is delivered (or the write-back has landed),
@@ -165,6 +177,51 @@ structural columns (`redcap_data_access_group`, `redcap_event_name`, `redcap_rep
 a record, not what the record says — comparing the data access group proposes moving records
 between sites. The run prints which columns it skipped; pass `--fields` to compare an exact list
 (including one of those, if you really mean to).
+
+## Merging two sources for analysis — the read side, end to end
+
+This is the common case: two studies, one merged table, nothing written anywhere. Say so with
+`--for-analysis` and the whole run speaks the right language — the two files come out as
+`*_fills.csv` (one source has a value, the other doesn't) and `*_disagreements.csv` (they
+contradict each other), and nothing is printed about pushing or `overwriteBehavior`, because
+nobody is pushing anything. The gap reports are written exactly as before.
+
+```bash
+L=$(dirname "$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name diff_payload.py 2>/dev/null | head -1)")
+
+# 1. compare the two sources
+python3 "$L/diff_payload.py" --for-analysis \
+    --current cohort_records.csv --computed pathology.csv \
+    --id-field syn_id --out-dir data-analyst/<study>/ --prefix pathology
+
+# 2. build the merged table + the integrity report
+python3 "$L/build_master_linkage.py" \
+    --left cohort_records.csv --left-name cohort \
+    --right pathology.csv     --right-name pathology \
+    --diff-dir data-analyst/<study>/ --diff-prefix pathology \
+    --id-field syn_id --out data-analyst/<study>/master_linkage.csv
+```
+
+`--left` is whatever you gave `--current`, `--right` whatever you gave `--computed`; the script
+checks that against the diff's own reports and stops if they look swapped. `--left-name` and
+`--right-name` name the two sources in the output columns (`cohort_linked`,
+`pathology_linked`), so the table reads as itself rather than as "left" and "right".
+
+`build_master_linkage.py` reads the diff engine's verdicts rather than comparing the two files a
+second time — the fill/conflict/orphan rule is a safety rule and lives in exactly one place. It
+writes:
+
+- **`master_linkage.csv`** — one row per id across both sources, with `<left>_linked` /
+  `<right>_linked` flags, a `link_class` (`matched_agree`, `matched_fill`, `matched_conflict`,
+  `<left>_only`, `<right>_only`), a `conflict_fields` list, and every column from both sides.
+  Where a column name exists on both sides, **both values are kept** — the right-hand one is
+  suffixed `_<right-name>`. Nothing is reconciled automatically: a disagreement is for a human.
+- **`<prefix>_integrity.csv`** — the structural problems, ranked worst first, each with a count
+  and a sentence saying what it means. An issue with a count of zero drops to `info`, so the
+  top of the file is always this run's real problems.
+
+It accepts either naming for the comparison files, so it works after a `--for-analysis` run or
+a write-back one.
 
 ## The original study-specific pipelines
 

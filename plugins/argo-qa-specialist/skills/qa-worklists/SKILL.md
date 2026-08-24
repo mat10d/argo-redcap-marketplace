@@ -82,9 +82,7 @@ workbooks:
 ### Run it
 
 ```bash
-set -a; source ~/.argo/.env; set +a   # makes REDCAP_URL and your access keys available
 python3 .../argo-qa-specialist/skills/qa-worklists/build_worklists.py \
-    --url "$REDCAP_URL" \
     --token-env CRC_TOKEN \
     --fields qa_fields.yaml \
     --out qa-specialist/<study>/worklists \
@@ -94,9 +92,11 @@ python3 .../argo-qa-specialist/skills/qa-worklists/build_worklists.py \
 ```
 
 `--token-env` takes the *name* of the setting that holds your access key, never the key itself.
-`--fields` points at the `qa_fields.yaml` I wrote and you confirmed.
+`--fields` points at the `qa_fields.yaml` I wrote and you confirmed. The script finds and reads
+your settings file itself — there is nothing to `source` first, and `--url` is only needed if
+your REDCap address isn't on the `REDCAP_URL` line of that file.
 
-*No key?* Replace `--url`/`--token-env` with `--records-csv export.csv --metadata-csv
+*No key?* Replace `--token-env` with `--records-csv export.csv --metadata-csv
 data_dictionary.csv` — everything else is the same, and the Data Dictionary's human column
 headers are mapped automatically.
 
@@ -124,11 +124,23 @@ round folders, so every round shares it and a change to the plan shows up as a d
   doesn't know. Every condition that caused one is listed at the end of the run so the parser
   can be extended. In practice this is rare — across two live projects and ~11,000 evaluations
   there were none — but it exists so a field is never silently omitted.
-- A second header row (`only if ...`) shows each field's prerequisite in plain English ("only if treatment_received includes Surgery").
+- A second header row shows each field's prerequisite in plain English ("only if
+  treatment_received includes Surgery"). For an amber column it instead says
+  **"couldn't read this condition: `<the raw expression>`"** — the raw REDCap expression is
+  shown because that is honestly all we have, and the wording says so rather than presenting an
+  expression nobody could parse as if it were an instruction.
 - "Gate context" columns are surfaced automatically: if `surgery_intent` is flagged because `treatment_received` includes Surgery, the workbook also shows `treatment_received` so the RA can see *why*.
 - Workbook is filtered — only patients and fields with at least one highlighted cell appear.
 
 ### Hand it to the RAs
+
+**Send the `with_MDC/` workbooks.** That is the default, every round, and it is what the rest of
+this skill assumes: the RAs revisit cells already holding a coded-missing value (`-666`/`-777`/
+`-888`/`-999`/`666`) as well as blank ones, because a code entered in a hurry is not the same as
+a code someone stood behind. `no_MDC/` is the exception, and it needs a decision from you as the
+QA specialist: send it only when you have decided the coded-missing cells are settled and should
+not be revisited this round. Say which variant you sent, in the covering message and in the round
+notes — a site that received one and is asked about the other has no way to tell.
 
 Send each site its own workbook, and tell them:
 
@@ -207,16 +219,32 @@ Section structure expected in `RA_questions.md`:
 ...
 ```
 
-The `## <SITE>` headers are matched (case-insensitive) against the site names so the right
-questions show up in the right summary.
+The **whole** `## ` header is the site name — matched ignoring case and spacing, so
+`## Site Alpha`, `## SITE ALPHA` and `## site  alpha` are one site, and `## Site Alpha` and
+`## Site Beta` are two. (Only the first word used to count, which quietly served one site's
+questions to every RA in the study.) Two headers that collapse to the same name are merged, and
+the run says so.
 
 Loop with the RA until all questions resolve; new answers either become READY or NO_ACTION.
 
-### Confirm the gaps closed
+### Confirm the gaps closed — and where to stop when you can't yet
 
-Re-run Task 1's build. Cells the RAs resolved drop out of the new worklist — anything still
-yellow is either a fix that didn't land in REDCap or a new gap. Diff against the prior round for
-a clean "did this round do what we expected" check.
+Re-run Task 1's build **on a fresh export**. Cells the RAs resolved drop out of the new worklist —
+anything still yellow is either a fix that didn't land in REDCap or a new gap. Diff against the
+prior round for a clean "did this round do what we expected" check.
+
+**If there is no post-RA export, the round stops here — and that is a finished state, not a
+failure.** The RAs enter their answers in REDCap, so the only way to see whether a gap closed is
+to pull the data again; re-checking the old export would just re-report the same gaps, and
+nothing in a returned workbook is evidence that REDCap changed. So:
+
+1. Send the summaries and the open questions (below) — that work is complete and doesn't wait.
+2. Ask for a fresh export: either the study's access key in the settings file, or a new Data
+   Export + Data Dictionary download ([[getting-files-from-redcap]]).
+3. Say plainly what is outstanding — "N cells answered, verification pending the next pull" —
+   and stop. Don't mark anything verified, and don't run VERIFY against the pre-RA export.
+
+The round closes on the next pull, when the rebuild shows the cells gone.
 
 ### Send each RA their summary
 
@@ -227,12 +255,14 @@ python3 .../argo-qa-specialist/skills/qa-worklists/summarize_for_ra.py \
     --out qa-specialist/<study>/RA_summaries/ --round-label "<today>"
 ```
 
-*Have the study's key?* Replace `--metadata-csv data_dictionary.csv` with `--url "$REDCAP_URL"
---token-env CRC_TOKEN`. Either way the dictionary is only used to turn field codes back into
-the wording the RA will recognise — no key is required for this step.
+*Have the study's key?* Replace `--metadata-csv data_dictionary.csv` with
+`--token-env CRC_TOKEN` (it reads your settings file itself). Either way the dictionary is only
+used to turn field codes back into the wording the RA will recognise — no key is required for
+this step.
 
 Outputs `RA_summaries/<round>/<site>.md` per site, each with the questions still open for that
-RA, pulled from the `RA_questions.md` sections matching the site name. (`--push-drafts` is a
+RA, pulled from the `RA_questions.md` sections matching the site name. A site name with spaces
+in it becomes underscores in the filename (`## Site Alpha` → `site_alpha.md`). (`--push-drafts` is a
 migration-only input — see [[migration-push]]; a normal QA round stages nothing, so leave it
 out entirely.)
 

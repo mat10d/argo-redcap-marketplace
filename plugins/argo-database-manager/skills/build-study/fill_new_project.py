@@ -5,8 +5,7 @@ Ported from the prior ~/.claude/skills/study-intake/SKILL.md (Step 1).
 Until a Super API Token is granted, project creation in REDCap is manual UI work.
 This script prepares every field value so the human paste-step is trivial.
 
-Usage:
-    set -a; source ~/.argo/.env; set +a
+Usage (it finds your ARGO settings file by itself — there is nothing to load first):
     python3 fill_new_project.py 17 18 19 24      # one or more SIR record IDs
 """
 import json
@@ -15,9 +14,22 @@ import re
 import sys
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
-REDCAP_URL = os.environ.get("REDCAP_URL")
-SIR_TOKEN = os.environ.get("STUDY_INITIATION_REQUEST")
+# The shared ARGO scripts are vendored into this skill's own scripts/ folder by release.py,
+# so imports never depend on where — or whether — other plugins are installed. The parents walk
+# is only for running from a source checkout before the first sync.
+_here = Path(__file__).resolve().parent
+for _cand in (_here / "scripts",
+              *(p / "plugins/argo-core/skills/redcap-api/scripts" for p in _here.parents)):
+    if (_cand / "argo_redcap_client.py").exists():
+        sys.path.insert(0, str(_cand))
+        break
+from argo_redcap_client import load_env_file  # noqa: E402
+
+# Filled in by main(), from the settings file this script loads itself — never read at import.
+REDCAP_URL = None
+SIR_TOKEN = None
 
 # Research sub-category derivation from project_description / project_title.
 # Order matters — first match wins.
@@ -137,17 +149,25 @@ def render(rec):
 
 
 def main():
+    global REDCAP_URL, SIR_TOKEN
+    settings = load_env_file()
+    REDCAP_URL = os.environ.get("REDCAP_URL")
+    SIR_TOKEN = os.environ.get("STUDY_INITIATION_REQUEST")
+
     if not REDCAP_URL or not SIR_TOKEN:
+        where = (f"Your settings file is here:\n\n    {settings}\n"
+                 if settings else
+                 "Open your ARGO folder and double-click 'Add keys here' — that opens your\n"
+                 "settings file in a text editor.\n")
         sys.exit(
         "This tool needs to know the web address of your REDCap system, and the access key for\n"
-        "the Study Tracker, before it can do anything. One or both isn't set on this computer.\n"
+        "the Study Tracker, before it can do anything. One or both isn't set yet.\n"
         "\n"
-        "Both live in a file called ~/.argo/.env. If you have that file already, load it into\n"
-        "this terminal window and try again:\n"
+        "Both live in your ARGO settings file, one per line (REDCAP_URL= and\n"
+        "STUDY_INITIATION_REQUEST=).\n"
         "\n"
-        "    set -a; source ~/.argo/.env; set +a\n"
-        "\n"
-        "If you don't have it yet, ask your ARGO REDCap administrator to set you up."
+        + where +
+        "\nIf you don't have the key yet, ask your ARGO REDCap administrator to set you up."
     )
     if len(sys.argv) < 2:
         sys.exit(

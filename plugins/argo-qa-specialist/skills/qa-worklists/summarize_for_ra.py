@@ -26,7 +26,7 @@ Usage (files you downloaded — no access key needed):
     --questions RA_questions.md --out RA_summaries/ [--round-label "2026-05-24"]
 
 Usage (with the study's access key):
-  python3 summarize_for_ra.py --url $REDCAP_URL --token-env CRC_TOKEN \\
+  python3 summarize_for_ra.py --token-env CRC_TOKEN \\
     --questions RA_questions.md --out RA_summaries/ [--round-label "2026-05-24"]
 
 `--push-drafts` is a migration-only input; a normal QA round has none and can leave it out.
@@ -41,6 +41,18 @@ import os
 import re
 import sys
 from io import StringIO
+from pathlib import Path
+
+# The shared ARGO scripts are vendored into this skill's own scripts/ folder by release.py,
+# so imports never depend on where — or whether — other plugins are installed. The parents walk
+# is only for running from a source checkout before the first sync.
+_here = Path(__file__).resolve().parent
+for _cand in (_here / "scripts",
+              *(p / "plugins/argo-core/skills/redcap-api/scripts" for p in _here.parents)):
+    if (_cand / "argo_redcap_client.py").exists():
+        sys.path.insert(0, str(_cand))
+        break
+from argo_redcap_client import load_env_file  # noqa: E402
 
 
 def load_metadata(url: str, token: str) -> dict:
@@ -190,20 +202,44 @@ def parse_push_drafts(push_dir: str, meta_by: dict, id_field: str) -> dict:
     return out
 
 
-def parse_questions(qpath: str) -> dict:
-    """{site_lower: markdown_text} — splits on `## <SITE>` headers."""
+def site_key(header: str) -> str:
+    """The site a `## ` header names, normalised: whole header, lowercased, spaces collapsed.
+
+    It used to take the FIRST WORD, so `## Site Alpha` and `## Site Beta` both became "site" and
+    one site's questions were served to every RA. The whole header is the name; only casing and
+    the whitespace someone typed are ignored.
+    """
+    return " ".join(str(header or "").split()).lower()
+
+
+def parse_questions(qpath: str, warn=print) -> dict:
+    """{site_key: markdown_text} — splits on `## <SITE>` headers.
+
+    Two headers that normalise to the same key are merged (they are the same site written
+    twice), but never silently: a warning names them, because the alternative reading — two
+    genuinely different sites the author expected to keep apart — would mean one RA receiving
+    another site's questions.
+    """
     if not os.path.exists(qpath):
         return {}
-    text = open(qpath).read()
+    with open(qpath) as fh:
+        text = fh.read()
     out = {}
+    seen_headers = {}
     # Split on '## ' at line start
     parts = re.split(r"\n## ", "\n" + text)
     for chunk in parts[1:]:
         first_line, _, body = chunk.partition("\n")
-        site = first_line.strip().split()[0].lower() if first_line.strip() else ""
-        if not site or site in ("(other", "—"):
+        header = first_line.strip()
+        site = site_key(header)
+        if not site or site.startswith("(other") or site in ("—", "-"):
             continue
-        out.setdefault(site, "").strip()
+        if site in seen_headers and seen_headers[site] != header:
+            warn(f"  Note: the headings '## {seen_headers[site]}' and '## {header}' name the "
+                 f"same site once spacing and capitals are ignored, so their questions have "
+                 f"been merged into one summary. Rename one of them if they are meant to be "
+                 f"different sites.")
+        seen_headers.setdefault(site, header)
         out[site] = (out.get(site, "") + "\n" + body).strip()
     return out
 
@@ -252,26 +288,38 @@ def main():
             "\n"
             "    --metadata-csv datadictionary.csv"
         )
-    elif args.url and args.token_env:
+    elif args.token_env:
+        # Load the ARGO settings file ourselves. Nothing for the user to source first, and
+        # --url is only needed if their REDCap address isn't in that file already.
+        load_env_file()
+        url = args.url or os.environ.get("REDCAP_URL")
         tok = os.environ.get(args.token_env)
         if not tok:
             sys.exit(
-        f"No access key for {args.token_env} is set up on this computer, so I can't reach REDCap.\n"
+        f"No access key called {args.token_env} is in your ARGO settings file, so I can't reach\n"
+        "REDCap.\n"
         "\n"
         "An access key (REDCap calls it an API token) is a long password that lets a tool read\n"
         "or update one specific REDCap project on your behalf. Your REDCap administrator\n"
         "creates it for you — it isn't something you can generate yourself.\n"
         "\n"
-        "If you already have one, add it to the file ~/.argo/.env, then load it into this\n"
-        "terminal window and try again:\n"
-        "\n"
-        "    set -a; source ~/.argo/.env; set +a\n"
+        "If you already have one: open your ARGO folder, double-click 'Add keys here' to open\n"
+        f"your settings file, add the line {args.token_env}=<your key>, save, and run this again.\n"
         "\n"
         "Or work from the data dictionary you downloaded instead — no key needed:\n"
         "\n"
         "    --metadata-csv datadictionary.csv"
     )
-        meta_by = load_metadata(args.url, tok)
+        if not url:
+            sys.exit(
+        "I have your access key, but not the web address of your REDCap system.\n"
+        "\n"
+        "It's a single line of text ending in /api/. Open your ARGO folder, double-click\n"
+        "'Add keys here', and add it on the REDCAP_URL line:\n"
+        "\n"
+        "    REDCAP_URL=https://your-redcap-site.org/api/"
+    )
+        meta_by = load_metadata(url, tok)
     else:
         sys.exit(
             "I need the study's field definitions to write the summaries, and you haven't told\n"
@@ -281,7 +329,7 @@ def main():
             "      --metadata-csv datadictionary.csv\n"
             "\n"
             "  Or, if you have an access key for this study set up:\n"
-            "      --url $REDCAP_URL --token-env YOUR_STUDY_TOKEN"
+            "      --token-env YOUR_STUDY_TOKEN"
         )
     changes = parse_push_drafts(args.push_drafts, meta_by, args.id_field)
     questions = parse_questions(args.questions)
@@ -290,8 +338,20 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     label = f" ({args.round_label})" if args.round_label else ""
 
+    # One file per site. A site name with spaces in it becomes underscores in the filename;
+    # if two site names would land on the same file, say so rather than overwrite one with the
+    # other — that would hand a whole site's questions to the wrong RA.
+    filenames = {}
     for site in sites:
-        path = os.path.join(args.out, f"{site}.md")
+        stem = re.sub(r"\s+", "_", site)
+        if stem in filenames:
+            print(f"  Note: sites '{filenames[stem]}' and '{site}' both want the file "
+                  f"{stem}.md; writing '{site}' second. Rename one of them.")
+        filenames[stem] = site
+
+    for site in sites:
+        stem = re.sub(r"\s+", "_", site)
+        path = os.path.join(args.out, f"{stem}.md")
         lines = [f"# QA summary — {site.upper()}{label}", ""]
         site_changes = changes.get(site, {})
         if site_changes:

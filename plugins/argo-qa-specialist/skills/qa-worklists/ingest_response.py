@@ -44,8 +44,9 @@ from openpyxl import load_workbook
 
 # Reuse the exact label-cleaning the worklist builder uses, so headers line up.
 from build_worklists import clean_label, parse_choices
-
-YELLOW_HEX = "FFC7CE"
+# ...and the exact fill the builder paints. A copy of the hex here that drifted from the
+# builder's would mean every flagged cell stops being recognised, silently. See qa_colours.py.
+from qa_colours import YELLOW_HEX
 
 # Normalized response substrings that mean "RA looked, it's missing from the chart".
 # Kept deliberately loose to absorb RA typos ("case not cannot be found").

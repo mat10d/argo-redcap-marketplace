@@ -59,13 +59,16 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
-BUILDER = os.path.join(REPO, "plugins", "argo-qa-specialist", "skills",
-                       "qa-worklists", "build_worklists.py")
+QA_SKILL = os.path.join(REPO, "plugins", "argo-qa-specialist", "skills", "qa-worklists")
+BUILDER = os.path.join(QA_SKILL, "build_worklists.py")
 
 SEED = 20260820
 
-YELLOW_HEX = "FFC7CE"   # build_worklists.YELLOW  — "this applies and is blank"
-AMBER_HEX = "FFE9B8"    # build_worklists.UNCERTAIN — "we couldn't read the condition"
+# The fills the builder paints, imported from the skill rather than retyped. A fixture that
+# hunts for a colour the builder stopped using would engineer zero RA answers and assert
+# nothing, cheerfully and green. See qa_colours.py.
+sys.path.insert(0, QA_SKILL)
+from qa_colours import AMBER_HEX, YELLOW_HEX  # noqa: E402
 SENTINELS = ["-888", "-777", "-999", "-666"]
 RESPONSE_HEADER_TOKENS = ("response", "comment", "note")
 

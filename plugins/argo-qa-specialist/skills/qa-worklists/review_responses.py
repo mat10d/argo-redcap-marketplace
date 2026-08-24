@@ -28,6 +28,9 @@ from typing import NamedTuple
 from openpyxl import load_workbook
 from openpyxl.utils import column_index_from_string
 
+# Same-folder imports, always: this skill carries its own copy of everything it needs.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 
 def open_worklist(path: str, role: str, **kwargs):
     """Open an Excel worklist, explaining clearly what to do when it can't be opened.
@@ -88,8 +91,10 @@ def _row_to_dict(ws, header_row=1, prereq_row=2):
     return rows, headers
 
 
-YELLOW_HEX = "FFC7CE"   # build_worklists.YELLOW    — "this applies and is blank"
-AMBER_HEX  = "FFE9B8"   # build_worklists.UNCERTAIN — "we couldn't read this field's condition"
+# The two fills the builder paints, from the one place they're defined. Retyping them here is
+# how a returned workbook stops being recognised at all — every RA answer in it silently
+# discarded — so this imports rather than copies. See qa_colours.py.
+from qa_colours import AMBER_HEX, YELLOW_HEX  # noqa: E402
 
 # Fill colour -> what the worklist was asking the RA to do.
 FLAG_KINDS = {YELLOW_HEX: "yellow", AMBER_HEX: "amber"}

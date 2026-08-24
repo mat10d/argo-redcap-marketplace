@@ -161,5 +161,56 @@ class TestTriggerExtraction(unittest.TestCase):
         self.assertEqual(bw.extract_branching_triggers("[a] = 1 OR [a] = 2"), ["a"])
 
 
+@unittest.skipIf(bw is None, "optional dependencies not installed")
+class TestPrerequisiteRowWording(unittest.TestCase):
+    """0.17.2 #30: the prerequisite header row printed unreadable conditions after "only if".
+
+    An RA opening an amber column saw `only if datediff([dx_date],[surgery_date],"d") > 30` —
+    an instruction in a language they don't speak, presented as though we had understood it. We
+    hadn't: the cells below are amber for precisely that reason. The row now says so, and still
+    shows the raw expression, because that is honestly all there is to show.
+    """
+
+    META = {
+        "sex": {"field_name": "sex", "select_choices_or_calculations": "1, Male | 2, Female"},
+        "treatment": {"field_name": "treatment",
+                      "select_choices_or_calculations": "1, Surgery | 2, Chemo"},
+    }
+
+    def test_a_readable_condition_still_reads_only_if(self):
+        self.assertEqual(bw.prereq_text("[sex] = '2'", self.META), "only if sex = Female")
+
+    def test_a_checkbox_condition_still_reads_only_if(self):
+        self.assertEqual(bw.prereq_text("[treatment(1)] = '1'", self.META),
+                         "only if treatment includes Surgery")
+
+    def test_no_condition_is_an_empty_cell(self):
+        self.assertEqual(bw.prereq_text("", self.META), "")
+        self.assertEqual(bw.prereq_text("   ", self.META), "")
+
+    def test_an_unreadable_condition_says_so_and_shows_the_expression(self):
+        expr = 'datediff([dx_date],[surgery_date],"d") > 30'
+        got = bw.prereq_text(expr, self.META)
+        self.assertEqual(got, f"couldn't read this condition: {expr}")
+        self.assertNotIn("only if", got)
+
+    def test_a_partly_unreadable_condition_is_treated_as_unreadable(self):
+        """One clause we can't parse makes the whole row a guess — don't half-claim it."""
+        expr = "[sex] = '2' AND datediff([a],[b],'d') > 5"
+        self.assertTrue(bw.prereq_text(expr, self.META).startswith("couldn't read this condition:"))
+
+    def test_readability_matches_what_makes_a_cell_amber(self):
+        """The wording and the fill must be driven by the same judgement, or they disagree."""
+        for expr in ("[sex] = '2'", "[treatment(1)] = '1'", "[age] >= 18"):
+            self.assertTrue(bw.logic_is_readable(expr), expr)
+            _applies, certain = bw.evaluate_branching(expr, {"sex": "2", "treatment___1": "1",
+                                                             "age": "40"})
+            self.assertTrue(certain, expr)
+        for expr in ('datediff([a],[b],"d") > 30', "[a] = '1' AND rounddown([x]) = 2"):
+            self.assertFalse(bw.logic_is_readable(expr), expr)
+            _applies, certain = bw.evaluate_branching(expr, {"a": "1"})
+            self.assertFalse(certain, expr)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

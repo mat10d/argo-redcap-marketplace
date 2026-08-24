@@ -9,11 +9,14 @@ These are cheap to keep passing and expensive to notice by hand.
 """
 from __future__ import annotations
 
+import ast
 import importlib.util
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -79,6 +82,178 @@ class TestPortfolioDocMatchesCode(unittest.TestCase):
         self.assertIn("summary.json", self.doc,
                       "SKILL.md must document that a snapshot is a directory containing "
                       "summary.json, not a single flat file")
+
+
+class TestScriptsSelfLoadTheSettingsFile(unittest.TestCase):
+    """0.17.2 #24: portfolio.py read `REDCAP_URL` from os.environ AT IMPORT and never loaded
+    the settings file, so the weekly check failed exactly as documented unless the user had
+    sourced their settings by hand first — the one chore every other ARGO script does for them.
+
+    Two rules, both mechanical:
+
+    1. **Nothing reads REDCAP_URL at module level.** An import-time read happens before any
+       script can load anything, so the value is whatever the shell happened to export. It also
+       makes the variable untestable and unfixable: by the time `main()` runs it is already
+       decided.
+    2. **A script that reads REDCAP_URL calls `load_env_file` (or goes through
+       `RedcapClient.from_env`, which calls it).** Reading the variable is what "talks to
+       REDCap" means here; a script that mentions it only in a usage example or an error
+       message isn't reading anything, so it isn't in scope.
+    """
+
+    # os.environ.get("REDCAP_URL") / os.environ["REDCAP_URL"] — in code, not in a docstring.
+    READ = re.compile(r"""os\.environ(?:\.get\(|\[)\s*['"]REDCAP_URL['"]""")
+
+    def scripts(self):
+        for py in sorted(PLUGINS.rglob("*.py")):
+            yield py, py.read_text()
+
+    def test_no_script_reads_redcap_url_at_module_level(self):
+        offenders = []
+        for py, text in self.scripts():
+            try:
+                tree = ast.parse(text)
+            except SyntaxError:                       # a broken file is another test's problem
+                continue
+            for node in tree.body:
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    continue
+                if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
+                    continue                          # module docstring
+                if self.READ.search(ast.unparse(node)):
+                    offenders.append(f"{py.relative_to(REPO)}:{node.lineno}")
+        self.assertFalse(
+            offenders,
+            "These read REDCAP_URL when the module is imported, before anything has had a "
+            "chance to load the settings file. Read it inside main(), after calling "
+            f"load_env_file(): {offenders}",
+        )
+
+    def test_every_script_that_reads_redcap_url_loads_the_settings_file(self):
+        offenders = []
+        for py, text in self.scripts():
+            if not self.READ.search(text):
+                continue
+            if "load_env_file" in text or "from_env" in text:
+                continue
+            offenders.append(str(py.relative_to(REPO)))
+        self.assertFalse(
+            offenders,
+            "These read REDCAP_URL but never load the ARGO settings file, so they only work for "
+            "someone who sourced it by hand. Call load_env_file() (or use "
+            f"RedcapClient.from_env): {offenders}",
+        )
+
+    def test_the_weekly_check_is_one_of_them(self):
+        """Belt and braces: the script the finding was about, named."""
+        text = (PORTFOLIO_DIR / "portfolio.py").read_text()
+        self.assertIn("load_env_file", text)
+        self.assertIn("REDCAP_URL = None", text,
+                      "portfolio.py must declare REDCAP_URL empty and fill it in main()")
+
+
+class TestWeeklyCheckSelfLoadsAndExplainsItself(unittest.TestCase):
+    """The behaviour behind the guard above, driven end to end with no network.
+
+    No tracker keys are configured, so every REDCap call is skipped before any socket is
+    opened — the run reports five unreadable trackers and exits 1, which is exactly the shape
+    needed to observe everything that happens BEFORE the fetch.
+    """
+
+    PORTFOLIO = PORTFOLIO_DIR / "portfolio.py"
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.env = dict(os.environ)
+        for var in list(self.env):
+            if var.endswith(("_TOKEN", "_REQUEST", "_INITIATION")) or var == "REDCAP_URL":
+                self.env.pop(var)
+        self.env["ARGO_PM_ROOT"] = str(self.tmp / "database-manager")
+        self.env["ARGO_SETUP_NO_OPEN"] = "1"
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def run_portfolio(self, settings: str, *args):
+        env_file = self.tmp / "argo.env"
+        env_file.write_text(settings)
+        env = dict(self.env, ARGO_ENV_FILE=str(env_file))
+        return subprocess.run([sys.executable, str(self.PORTFOLIO), *args],
+                              capture_output=True, text=True, timeout=120,
+                              env=env, cwd=str(self.tmp))
+
+    def test_the_address_is_read_from_the_settings_file_without_sourcing_it(self):
+        proc = self.run_portfolio("REDCAP_URL=https://redcap.example.org/api/\n", "--diff")
+        out = proc.stdout + proc.stderr
+        self.assertNotIn("address isn't set", out,
+                         "the settings file holds REDCAP_URL — it must be found and used")
+        self.assertIn("COULD NOT READ ANY OF THE ARGO TRACKERS", out,
+                      "it should get past the address check and fail on the missing keys")
+        self.assertNotIn("Traceback", out)
+
+    def test_a_missing_address_points_at_the_argo_settings_file(self):
+        proc = self.run_portfolio("# nothing configured yet\n")
+        out = proc.stdout + proc.stderr
+        self.assertIn("address isn't set", out)
+        self.assertIn("ARGO settings file", out)
+        self.assertNotIn("~/.argo/.env", out,
+                         "that path doesn't exist in Cowork — name the settings file instead")
+        self.assertNotIn("set -a; source", out,
+                         "the script loads the settings file itself; don't ask the user to")
+
+    def test_a_first_diff_says_it_is_the_baseline(self):
+        """0.17.2 #25: silence on the first --diff reads as 'nothing changed this week'."""
+        proc = self.run_portfolio("REDCAP_URL=https://redcap.example.org/api/\n", "--diff")
+        self.assertIn("First snapshot — nothing to compare against yet; next run will show "
+                      "what changed.", proc.stdout)
+
+    def test_a_run_without_diff_does_not_claim_to_be_a_baseline(self):
+        proc = self.run_portfolio("REDCAP_URL=https://redcap.example.org/api/\n")
+        self.assertNotIn("First snapshot", proc.stdout)
+
+
+class TestQaWorklistsDocMatchesCode(unittest.TestCase):
+    """The three qa-worklists doc gaps the Tier 1.5 walkthroughs found (0.17.2 #28/#30/#31).
+
+    Each of them is a question the skill left a live session to answer on its own — which
+    variant to send, whether to source a settings file, when a round is finished — and each
+    time it answered differently.
+    """
+
+    SKILL = PLUGINS / "argo-qa-specialist/skills/qa-worklists"
+    DOC = (SKILL / "SKILL.md").read_text()
+
+    def test_it_says_which_variant_the_ras_get(self):
+        """#28: the builder writes with_MDC/ and no_MDC/ and the doc never said which to send."""
+        hand_over = self.DOC.split("### Hand it to the RAs", 1)[1].split("\n## ", 1)[0]
+        self.assertIn("with_MDC", hand_over)
+        self.assertIn("no_MDC", hand_over)
+        self.assertRegex(hand_over, r"(?s)with_MDC.{0,400}default|default.{0,400}with_MDC")
+        self.assertIn("QA specialist", hand_over,
+                      "no_MDC is a decision someone makes, and the doc must say whose")
+
+    def test_the_run_block_does_not_ask_the_user_to_source_anything(self):
+        """#30: the scripts self-load; telling the user to source is both noise and, in Cowork,
+        an instruction they cannot follow (there is no ~/.argo/.env there)."""
+        self.assertNotIn("set -a; source", self.DOC)
+        self.assertNotIn("~/.argo/.env", self.DOC)
+        for script in ("build_worklists.py", "summarize_for_ra.py"):
+            self.assertIn("load_env_file", (self.SKILL / script).read_text(),
+                          f"the doc stops telling people to source, so {script} must self-load")
+
+    def test_the_amber_prerequisite_wording_is_the_one_the_code_writes(self):
+        """#30: the header row said 'only if <unreadable expression>'."""
+        self.assertIn("couldn't read this condition", self.DOC)
+        code = (self.SKILL / "build_worklists.py").read_text()
+        self.assertIn('"couldn\'t read this condition: "', code,
+                      "SKILL.md and build_worklists.py must use the same words")
+
+    def test_task_2_defines_where_to_stop_without_a_post_ra_export(self):
+        """#31: 'confirm the gaps closed' and VERIFY both assume a fresh export exists."""
+        task2 = self.DOC.split("## Task 2", 1)[1]
+        self.assertIn("no post-ra export", task2.lower())
+        self.assertIn("fresh export", task2)
+        self.assertIn("closes on the next pull", task2)
 
 
 class TestNoBracketEnvAccess(unittest.TestCase):

@@ -1,6 +1,6 @@
 {
   "name": "argo-project-manager",
-  "version": "0.17.1",
+  "version": "0.17.2",
   "description": "For the ARGO project manager. Draft the document package for a new study (protocol, SOP, questionnaire and the rest) from a concept note, and submit the study request: new-study-documents.",
   "author": {
     "name": "ARGO"

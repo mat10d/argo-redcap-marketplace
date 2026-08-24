@@ -19,6 +19,9 @@ don't relitigate them silently; revise them explicitly, with the reason, dated.
   `argo-core/skills/redcap-api/scripts/`). Imports are same-folder. Never reach across plugins;
   never glob plugin roots from a script (guard-tested). Four environment layouts broke
   cross-plugin discovery before this rule; a fifth cannot.
+- **Where a script lives says who owns it.** A skill's OWN scripts sit at the skill's root
+  (`skills/link-data/diff_payload.py`); the SHARED ones vendored from argo-core sit in that
+  skill's `scripts/` — so anything in a `scripts/` folder is a synced copy, never edited there.
 - **argo-core is plumbing.** Its capabilities surface *through* role skills. Only `start-here`
   (the door) competes for user triggers.
 - **Roles route, tasks shape.** The door asks who you are (once — `ARGO_ROLES=` in the settings

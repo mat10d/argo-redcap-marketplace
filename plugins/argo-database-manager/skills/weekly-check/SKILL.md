@@ -128,7 +128,12 @@ Snapshots land in `database-manager/weekly-check/` inside your ARGO folder. `ARG
 the settings file names the folder they go in (setup fills it in); set it yourself only if you
 keep them somewhere else.
 
-`--diff` compares against the most recent `snapshot-*/summary.json`.
+`--diff` compares against the most recent `snapshot-*/summary.json`. On the very first run there
+isn't one, and it says so — "First snapshot — nothing to compare against yet" — rather than
+leaving a silence that reads as "nothing changed this week".
+
+`portfolio.py` reads your ARGO settings file itself, so there is nothing to load or `source`
+first. If the REDCap address is missing it says which file to put it in.
 
 ## The five trackers
 
