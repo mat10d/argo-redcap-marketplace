@@ -9,7 +9,7 @@ Read this first after any context compaction. It is the agreed state and plan.
 309 fields from File-Repository questionnaires), documents from a real protocol (parked for
 collaborator review), QA audit (worked by improvisation → fixed), export/QA with no key.
 
-**0.17.2 is built and checkpoint-committed (e352863), NOT yet released.** Five slices +
+**0.17.2 is RELEASED (8079e7a, 371 tests) — org refresh pending.** Five slices +
 Tier 1.5 walkthroughs: eight tasks walked through by subagents on the new code, persona-answered,
 **8/8 pass, every number matched engineered truth**. They found 21 more defects (NITS 19–39,
 incl. a security-shaped one: --check posted any `*_TOKEN` env var to REDCap); all fixed or in
@@ -22,8 +22,7 @@ Lenient progress rule everywhere. Language preflight (Python/R/Stata) in --check
 run-analysis. IRB changelog rule in build-study.
 
 Next, in order:
-1. Fix-batch lands → suite green → whole-read touched SKILL.mds → `release.py --bump patch`
-   (0.17.2) → push → **org refresh (plugin names unchanged from 0.17.0)**.
+1. DONE: 0.17.2 released. **Matteo: org refresh (plugin names unchanged from 0.17.0).**
 2. Matteo reviews REVIEW-2026-08-24.md: are the QUESTIONS right? Adjust skills accordingly.
 3. Cowork sweep on 0.17.2, from a WIPED workspace, user-provided data only
    (~/Desktop/ARGO-test-data is the kit): (a) fresh setup incl. the Analysis-tools line;
