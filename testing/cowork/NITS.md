@@ -211,9 +211,10 @@ Ranked. The top two are silent-data-loss class.
     the ORIGINAL doc with tracked changes as `<name>_redcap_changes.docx`; if the original is
     a PDF, a `<name>_redcap_changes.md` listing them. The document IS the review vehicle.
     (b) OPEN QUESTIONS — assumptions the build made (unparseable branching etc.): "we assumed
-    X — accurate?" — a separate questions doc, never a tracked change. Pending Matteo:
-    whether the DD adopts only in-chat-approved changes (study-17 precedent) and whether
-    typos/numbering stay out of the changes doc entirely.
+    X — accurate?" — a separate questions doc, never a tracked change. FINAL (Matteo,
+    2026-08-26): the build always makes headway — the BEST GUESS goes into the DD, and the
+    open-questions doc records every guess for confirmation. Typos/numbering stay out of all
+    deliverables (default; revisit only if Matteo says so).
 49. **link-data redesign around the HARD LINK** (Matteo's spec, near-complete): it's a
     left/inner/right join; the work is DERIVING the join key (hospital number, or a ported
     other-study record-id column) and reasoning aloud about it. Deliverables: (1) name-
