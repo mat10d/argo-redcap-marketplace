@@ -472,6 +472,41 @@ class TestFigures(unittest.TestCase):
         self.assertEqual(figures.PALETTE[:3], ["#0072B2", "#E69F00", "#009E73"])
         self.assertEqual(figures.DPI, 300)
 
+    def test_the_legend_is_drawn_outside_the_plot_area(self):
+        """The legend used to sit at 'upper right' — on top of the tallest bar, which
+        is the bar the reader came for. Measured rather than read off the source: the
+        legend's box has to begin at or past the right-hand edge of the axes."""
+        measured = {}
+        original = figures._save
+
+        def spy(fig, path, plt):
+            fig.canvas.draw()               # a renderer, so the boxes can be measured
+            axes = fig.axes[0]
+            legend = axes.get_legend()
+            measured["legend"] = None if legend is None else legend.get_window_extent()
+            measured["axes"] = axes.get_window_extent()
+            return original(fig, path, plt)
+
+        figures._save = spy
+        try:
+            with quiet():
+                figures.bar_by_group(self.study, "education", GROUP_BY,
+                                     self.dir / "legend.png")
+        finally:
+            figures._save = original
+        self.assertIsNotNone(measured["legend"], "a chart of two groups must have a legend")
+        self.assertGreaterEqual(
+            round(measured["legend"].x0, 3), round(measured["axes"].x1, 3),
+            "the legend starts inside the plot area — it must sit clear of the bars")
+
+    def test_the_legend_geometry_is_stated_once(self):
+        """Both halves of the fix live in named constants, so neither can be undone
+        by editing one line of drawing code."""
+        self.assertGreater(figures.LEGEND_ANCHOR[0], 1.0,
+                           "the anchor must be past the right edge of the axes")
+        self.assertLess(figures.LEGEND_RIGHT, 1.0,
+                        "the axes must give up width for the legend to sit in")
+
     def test_a_chart_of_something_uncountable_says_why(self):
         with self.assertRaises(ValueError) as caught:
             figures.bar_by_group(self.study, "age", GROUP_BY, self.dir / "no.png")

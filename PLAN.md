@@ -9,7 +9,7 @@ Read this first after any context compaction. It is the agreed state and plan.
 309 fields from File-Repository questionnaires), documents from a real protocol (parked for
 collaborator review), QA audit (worked by improvisation → fixed), export/QA with no key.
 
-**0.19.0 is RELEASED (6d3fafa, 511 tests) — org refresh pending. LEDGER.md is the status doc.** Five slices +
+**0.20.0 is RELEASED (652 tests) — org refresh pending. LEDGER.md is the status doc.** Five slices +
 Tier 1.5 walkthroughs: eight tasks walked through by subagents on the new code, persona-answered,
 **8/8 pass, every number matched engineered truth**. They found 21 more defects (NITS 19–39,
 incl. a security-shaped one: --check posted any `*_TOKEN` env var to REDCap); all fixed or in

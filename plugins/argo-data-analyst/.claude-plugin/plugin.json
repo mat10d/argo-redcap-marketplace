@@ -1,6 +1,6 @@
 {
   "name": "argo-data-analyst",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "description": "Analysis on a local REDCap export \u2014 no access key needed. Interview-driven analysis plan, saved well-commented scripts (Python/R/Stata), and organized, auditable outputs (run-analysis). For API export/import and cross-study linkage, see argo-database-manager.",
   "author": {
     "name": "ARGO"

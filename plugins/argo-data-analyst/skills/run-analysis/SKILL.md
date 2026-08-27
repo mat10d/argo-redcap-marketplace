@@ -205,10 +205,13 @@ data access group), or by `district`?" — take the answer, write it into `READM
 put it into the Table 1 script. Once. Don't re-ask it for every script, and don't quietly
 change it later.
 
-The folder is usually scaffolded at step 0, before you have asked — so `01_table1.py`
-starts with a marked placeholder. Once you have the answer, either set `GROUP_BY` at the
-top of that script, or re-run `scaffold.py --group-by <variable> --force`. Never run the
-placeholder script hoping; it stops and tells you what it needs.
+The folder is usually scaffolded at step 0, before you have asked — so **both** Table 1
+scripts, `01_table1.py` and its R twin `01_table1.R`, start with a marked placeholder, and
+`README.md` says the answer is still owed. Once you have it, either set `GROUP_BY` at the
+top of both scripts and write it into `README.md`'s Study block, or — while the folder is
+still untouched — re-run `scaffold.py --group-by <variable> --force`, which fills in all
+three at once (it rewrites `README.md`, so don't reach for it after the interview answers
+are in there). Never run a placeholder script hoping; it stops and tells you what it needs.
 
 ### 3. Propose an analysis plan
 Based on the study + variable types, propose a short, concrete plan — e.g. "Table 1 of
@@ -225,7 +228,11 @@ For each approved analysis:
   **Never re-derive a mean, a percentage or a denominator** inside a study script: those
   live in `lib/`, tested once against a golden table, and a script that recomputes them
   is how two studies end up with two different Table 1s from the same data. `scaffold.py`
-  already wrote `scripts/01_table1.py`; read it before writing anything else.
+  already wrote `scripts/01_table1.py` **and its R twin `scripts/01_table1.R`** — the same
+  calls writing the same files, so only one of them is ever run: the Python one here, or —
+  where the user works in R and this session cannot execute it (step 0) — the R one handed
+  over with its command, for them to run on their own machine. Read it before writing
+  anything else.
 - **If it is not in the registry**, write `scripts/NN_name.{py,R,do}` by hand, following
   the **script template contract** below — same header block, same folders, same rules.
 - Reuse the team's existing scripts where they fit — read them, adapt, credit in the header.
@@ -381,20 +388,23 @@ python3 "$S" data-analyst/<study> \
 It copies the inputs into `data/`, copies the **analysis library** into `lib/` (Python and
 R), creates `outputs/{tables,figures}` and `scripts/`, and writes `README.md`,
 `ANALYSIS_LOG.md`, `scripts/00_explore.py` (a commented starter that loads the data and
-prints a structured summary) and `scripts/01_table1.py` (the Table 1, as library calls).
-`README.md` records what the toolkit can do, read from the `analyses/` registry — ready
-and planned, so the study folder can't drift from the code.
+prints a structured summary) and the Table 1 as library calls in **both languages** —
+`scripts/01_table1.py` and `scripts/01_table1.R`, twins that make the same numbers and
+write the same files. `README.md` records the grouping variable and variable list that
+were used, the command for each script with its full interpreter path, and what the
+toolkit can do, read from the `analyses/` registry — ready and planned, so the study
+folder can't drift from the code.
 
 `--variables` is what Table 1 describes. Leave it out and it defaults to the
 demographics form, read off the data dictionary — either way the list is written into
-`01_table1.py` in full, so the script says what it counted and the analyst can edit it
-without touching the library.
+both scripts in full, and into `README.md`, so the table says what it counted and the
+analyst can edit it without touching the library.
 
 `--group-by` is the grouping variable, from the one question in step 2. Pass it if you
 already have the answer. If you are scaffolding first (the usual order), leave it out:
-the generated `01_table1.py` then carries a clearly marked placeholder and stops with a
-plain instruction rather than guessing — no wrong table, but no table either. Fill it in
-after step 2, by editing `GROUP_BY` or re-running with `--group-by … --force`.
+both generated scripts then carry a clearly marked placeholder and stop with a plain
+instruction rather than guessing — no wrong table, but no table either. Fill it in after
+step 2, by editing `GROUP_BY` or re-running with `--group-by … --force`.
 
 `--tools` runs the same language check as step 0 and writes the **full path** to each usable
 language into `README.md` and the first `ANALYSIS_LOG.md` line, so anyone re-running the folder

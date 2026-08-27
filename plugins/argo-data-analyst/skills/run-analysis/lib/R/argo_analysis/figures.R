@@ -13,6 +13,8 @@
 #   * title  = the field's label, as the codebook words it
 #   * subtitle = "n = ... ; missing = ..." -- a figure that hides its denominator
 #     is a figure that will be misread
+#   * the legend outside the plot area, on the right -- a key drawn inside covers
+#     the tallest bar, which is the bar the reader came for
 #
 # Base graphics on purpose: no ggplot2, no install step. The script that made the
 # figure is its provenance -- there is no metadata to lose.
@@ -31,6 +33,43 @@ ARGO_PALETTE <- c("#0072B2", "#E69F00", "#009E73", "#CC79A7",
                   "#56B4E9", "#D55E00", "#F0E442", "#666666")
 
 ARGO_FIGURE_DPI <- 300
+
+# The legend goes OUTSIDE the plot area, against its right-hand edge. A key drawn
+# inside the plot sits on the tallest bar -- which is the bar the reader came for.
+# Base graphics cannot widen a margin after a plot is drawn, so both figures
+# reserve the room first (argo_legend_margin_lines) and draw into it afterwards
+# (argo_legend_right).
+ARGO_LEGEND_CEX <- 0.9
+
+#' Lines of right margin a legend of these labels needs.
+#'
+#' Measured on the open device rather than guessed, so a long site name is never
+#' cut in half. Falls back to a character count if the device will not measure.
+argo_legend_margin_lines <- function(labels, cex = ARGO_LEGEND_CEX, pad = 4) {
+  labels <- as.character(labels)
+  labels <- labels[nzchar(labels)]
+  if (!length(labels)) return(1.5)
+  widest <- max(nchar(labels))
+  fallback <- min(26, max(6, ceiling(0.62 * widest) + pad))
+  inches <- tryCatch(max(graphics::strwidth(labels, units = "inches", cex = cex)),
+                     error = function(e) NA_real_)
+  line <- tryCatch(graphics::par("csi"), error = function(e) NA_real_)
+  if (!is.finite(inches) || !is.finite(line) || line <= 0) return(fallback)
+  min(26, max(6, ceiling(inches / line) + pad))
+}
+
+#' Draw a legend in the right margin, clear of the plot.
+#'
+#' Anchored at the right edge of the axes and drawn with xpd = NA so it lives in
+#' the margin the caller reserved. Returns (invisibly) what graphics::legend
+#' returns -- the rectangle it drew, in user coordinates, which is what the test
+#' measures to prove nothing landed on a bar.
+argo_legend_right <- function(labels, cex = ARGO_LEGEND_CEX, ...) {
+  usr <- graphics::par("usr")
+  gap <- 0.02 * (usr[2] - usr[1])
+  invisible(graphics::legend(x = usr[2] + gap, y = usr[4], xjust = 0, yjust = 1,
+                             legend = labels, bty = "n", cex = cex, xpd = NA, ...))
+}
 
 #' Open a 300-dpi PNG device, whichever backend this R has.
 argo_open_png <- function(path, width = 8, height = 5) {
@@ -117,6 +156,9 @@ bar_by_group <- function(study, field, group_by, path, width = 8, height = 5) {
   argo_open_png(path, width, height)
   on.exit(grDevices::dev.off(), add = TRUE)
   colours <- rep(ARGO_PALETTE, length.out = nrow(pct))
+  # Reserve the legend's room BEFORE the bars are drawn -- a base-R margin cannot
+  # be widened afterwards, and a legend with nowhere to go ends up on the bars.
+  graphics::par(mar = c(5.5, 5, 4.5, argo_legend_margin_lines(rownames(pct))))
   # Fit the axis to the data, rounded up to a tidy multiple of 10, never past
   # 100 and never below 20 -- a bar chart of 2% against a 0-100 axis is unreadable,
   # and one against a 0-3 axis is a lie.
@@ -127,8 +169,7 @@ bar_by_group <- function(study, field, group_by, path, width = 8, height = 5) {
                           cex.names = 1.0, axes = TRUE)
   graphics::abline(h = graphics::axTicks(2), col = "#EEEEEE", lwd = 1)
   graphics::barplot(pct, beside = TRUE, col = colours, border = NA, add = TRUE, axes = FALSE)
-  graphics::legend("topright", legend = rownames(pct), fill = colours, border = NA,
-                   bty = "n", cex = 0.95, inset = c(0, -0.02), xpd = TRUE)
+  argo_legend_right(rownames(pct), fill = colours, border = NA)
   argo_figure_titles(argo_field_label(study, field), n_applicable - n_missing, n_missing)
   invisible(path)
 }
@@ -164,18 +205,20 @@ hist <- function(study, field, path, bins = 20, width = 8, height = 5) {
   }
 
   breaks <- if (is.null(bins)) "Sturges" else as.integer(bins)
-  # Measure first, then draw: the extra headroom keeps the median legend off the
-  # tallest bar.
+  # Measure first, then draw: a little headroom above the tallest bar keeps it off
+  # the top of the frame.
   shape <- graphics::hist(v, breaks = breaks, plot = FALSE)
+  median_label <- sprintf("median = %s", argo_format(stats::median(v), FALSE))
   argo_open_png(path, width, height)
   on.exit(grDevices::dev.off(), add = TRUE)
+  # The median key goes in the right margin, not over the distribution.
+  graphics::par(mar = c(5.5, 5, 4.5, argo_legend_margin_lines(median_label)))
   graphics::hist(v, breaks = breaks, col = ARGO_PALETTE[1], border = "white",
                  main = "", xlab = argo_field_label(study, field),
                  ylab = "Number of participants",
                  ylim = c(0, max(shape$counts) * 1.18))
   graphics::abline(v = stats::median(v), col = ARGO_PALETTE[6], lwd = 2, lty = 2)
-  graphics::legend("topright", legend = sprintf("median = %s", argo_format(stats::median(v), FALSE)),
-                   col = ARGO_PALETTE[6], lwd = 2, lty = 2, bty = "n", cex = 0.95)
+  argo_legend_right(median_label, col = ARGO_PALETTE[6], lwd = 2, lty = 2)
   argo_figure_titles(argo_field_label(study, field), length(v), n_missing)
   invisible(path)
 }

@@ -8,6 +8,9 @@
 #   * one workbook per analysis, one sheet per table
 #   * a bold header row, frozen, so the column names stay visible while scrolling
 #   * column widths fitted to the contents
+#   * statistics written as NUMBERS, not text, so they can be summed, sorted and
+#     charted -- and so this workbook and the Python one are the same to Excel;
+#     labels and levels stay text
 #   * a final "Notes" sheet carrying N, the missing-data rule, the
 #     applicable-denominator rule, and which script made the file, when
 #
@@ -46,6 +49,47 @@ argo_safe_sheet_name <- function(name, taken = character(0)) {
     i <- i + 1
   }
   clean
+}
+
+# Columns whose cells are LABELS, never numbers. A level coded "1" or a variable
+# called "2" is still a label: Excel must not right-align it, and nobody should be
+# able to sum it. Everything else in a Table 1 is a statistic.
+ARGO_LABEL_COLUMNS <- c("variable", "level", "statistic", "notes")
+
+#' Does every value in this column read as a plain number?
+#'
+#' Column by column, not cell by cell: one non-numeric value anywhere (a "n/a", a
+#' footnote marker) and the whole column stays text, so a column never comes out
+#' half number and half string. Identifiers are deliberately excluded -- a leading
+#' zero ("007") or more than 15 digits means Excel would silently change the value.
+argo_all_numeric <- function(x) {
+  v <- trimws(as.character(x))
+  v <- v[!is.na(v) & nzchar(v)]
+  if (!length(v)) return(FALSE)
+  if (!all(grepl("^[+-]?([0-9]+\\.?[0-9]*|\\.[0-9]+)([eE][+-]?[0-9]+)?$", v))) return(FALSE)
+  if (any(grepl("^[+-]?0[0-9]", v))) return(FALSE)
+  if (any(nchar(gsub("[^0-9]", "", v)) > 15)) return(FALSE)
+  TRUE
+}
+
+#' Statistics go into the workbook as NUMBERS; labels stay text.
+#'
+#' The R table1 formats every cell to a string so the CSV can be compared with
+#' Python's byte for byte. A workbook is not a CSV: a mean stored as "2.50" cannot
+#' be summed, sorted, charted or rounded, and the two languages' workbooks were
+#' different shapes to Excel. Converted here, at the point of writing, so the
+#' printed table and the CSV are untouched.
+argo_numeric_cells <- function(tb) {
+  for (name in names(tb)) {
+    column <- tb[[name]]
+    if (!is.character(column) && !is.factor(column)) next
+    if (tolower(name) %in% ARGO_LABEL_COLUMNS) next
+    if (!argo_all_numeric(column)) next
+    values <- trimws(as.character(column))
+    values[is.na(values) | !nzchar(values)] <- NA_character_
+    tb[[name]] <- suppressWarnings(as.numeric(values))
+  }
+  tb
 }
 
 #' N, read out of a Table 1 if one of the tables is a Table 1.
@@ -131,6 +175,7 @@ write_workbook <- function(tables, path, notes = character(0), n = NULL,
   for (i in seq_along(tables)) {
     tb <- tables[[i]]
     if (!is.data.frame(tb)) tb <- as.data.frame(tb, stringsAsFactors = FALSE)
+    tb <- argo_numeric_cells(tb)
     sheet <- argo_safe_sheet_name(names(tables)[i], used)
     used <- c(used, sheet)
     openxlsx::addWorksheet(wb, sheet)

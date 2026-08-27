@@ -34,6 +34,7 @@ import csv
 import importlib.util
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -41,9 +42,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 FIXTURE = REPO / "testing" / "fixtures" / "synthetic-study"
 GOLDEN = FIXTURE / "analysis" / "expected_table1.csv"
-LIB = (REPO / "plugins" / "argo-data-analyst" / "skills" / "run-analysis"
-       / "lib" / "R" / "argo_analysis")
+SKILL_DIR = REPO / "plugins" / "argo-data-analyst" / "skills" / "run-analysis"
+LIB = SKILL_DIR / "lib" / "R" / "argo_analysis"
 RUNNER = LIB / "run_table1.R"
+SCAFFOLD = SKILL_DIR / "scaffold.py"
 
 # The variables the golden describes, in the golden's order.
 GOLDEN_VARIABLES = "age,sex,education,marital_status,tobacco_use,histology_grade"
@@ -129,6 +131,33 @@ class TestTheLibraryIsPresent(unittest.TestCase):
     def test_survival_is_marked_planned_in_the_source(self):
         text = (LIB / "survival.R").read_text()
         self.assertIn("Survival analysis is planned but not built yet", text)
+
+    def test_the_legend_never_goes_back_inside_the_plot(self):
+        """A source guard, so it holds on a machine with no R: both figures draw their
+        key through the one helper that puts it in the reserved right margin."""
+        text = (LIB / "figures.R").read_text()
+        self.assertIn("argo_legend_right <- function", text,
+                      "the outside-the-plot legend helper is gone")
+        self.assertNotIn('legend("topright"', text,
+                         "a legend at topright covers the tallest bar")
+        bar = text.split("bar_by_group <- function", 1)[1].split("\nhist <- function", 1)[0]
+        histogram = text.split("\nhist <- function", 1)[1]
+        for body, name in ((bar, "bar_by_group"), (histogram, "hist")):
+            self.assertIn("argo_legend_right(", body,
+                          f"{name} does not use the outside-the-plot legend")
+            self.assertIn("argo_legend_margin_lines(", body,
+                          f"{name} draws before reserving the margin the legend needs")
+
+    def test_statistics_are_converted_to_numbers_before_they_are_written(self):
+        """A source guard for the same rule the workbook test measures: excel.R must
+        hand openxlsx numbers, and must leave the label columns alone."""
+        text = (LIB / "excel.R").read_text()
+        self.assertIn("argo_numeric_cells <- function", text)
+        self.assertIn("argo_numeric_cells(tb)", text,
+                      "write_workbook does not convert its tables before writing")
+        for label in ("variable", "level", "statistic"):
+            self.assertIn(f'"{label}"', text.split("ARGO_LABEL_COLUMNS", 1)[1][:200],
+                          f"{label} is not protected from being turned into a number")
 
     def test_the_only_package_dependency_is_guarded(self):
         """openxlsx is the one add-on the library uses, and a missing add-on must
@@ -394,6 +423,156 @@ class TestWorkbookAndFigures(unittest.TestCase):
             with open(path, "rb") as fh:
                 self.assertEqual(fh.read(8), b"\x89PNG\r\n\x1a\n",
                                  f"{path.name} is not a PNG")
+
+    def test_statistics_are_written_as_numbers_not_text(self):
+        """openxlsx was handed "2.50" as a string, so the R workbook and the Python
+        workbook of the same table were different objects to Excel: text cannot be
+        summed, sorted or charted, and a column of it sorts 10 before 9. Labels and
+        levels stay text — a level coded "1" is still a label."""
+        self._skip_if_openxlsx_missing()
+        try:
+            import openpyxl
+        except ImportError:
+            self.skipTest("openpyxl is not installed, so the workbook cannot be opened here")
+        sheet = openpyxl.load_workbook(self.xlsx)["Table 1"]
+        header = [cell.value for cell in sheet[1]]
+        rows = {(row[0].value, row[2].value): row for row in sheet.iter_rows(min_row=2)}
+        columns = [header.index(name) for name in ("site_alpha", "site_beta", "overall")]
+
+        counts = rows[("records", "n")]
+        self.assertEqual([counts[i].value for i in columns], [120, 80, 200])
+        for i in columns:
+            self.assertEqual(counts[i].data_type, "n",
+                             f"{header[i]} holds a count as {counts[i].data_type!r}, not a "
+                             "number — the Python workbook stores it as one")
+
+        golden = {(r["variable"], r["statistic"]): r for r in read_table(GOLDEN)[1]}
+        mean = rows[("age", "mean")]
+        for i in columns:
+            self.assertEqual(mean[i].data_type, "n", f"{header[i]} holds a mean as text")
+            self.assertIsInstance(mean[i].value, (int, float),
+                                  f"{header[i]} came back as {type(mean[i].value).__name__}")
+            self.assertAlmostEqual(float(mean[i].value),
+                                   float(golden[("age", "mean")][header[i]]), delta=TOL,
+                                   msg=f"the number itself changed in {header[i]}")
+        for name in ("variable", "level", "statistic"):
+            cell = mean[header.index(name)]
+            self.assertEqual(cell.data_type, "s",
+                             f"the {name} column must stay text, not become a number")
+
+
+@unittest.skipIf(RSCRIPT is None, SKIP)
+class TestTheLegendIsOutsideThePlotArea(unittest.TestCase):
+    """The legend was drawn at "topright" — inside the plot, on top of the tallest
+    bar, which is the bar the reader came for. Measured on a real device: the box the
+    legend draws must start at or past the right-hand edge of the axes."""
+
+    def test_the_legend_box_starts_past_the_right_edge_of_the_axes(self):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            probe = tmp / "probe.png"
+            body = (
+                'labels <- c("No formal schooling", "Secondary")\n'
+                f'argo_open_png({str(probe)!r})\n'
+                'graphics::par(mar = c(5, 5, 4, argo_legend_margin_lines(labels)))\n'
+                'graphics::barplot(c(80, 20), ylim = c(0, 100))\n'
+                'box <- argo_legend_right(labels, fill = c("#0072B2", "#E69F00"))\n'
+                'usr <- graphics::par("usr")\n'
+                'cat(sprintf("MEASURED %f %f %f\\n", box$rect$left, usr[2], box$rect$w))\n'
+                'invisible(grDevices::dev.off())\n'
+            )
+            proc = run_r(source_lines() + body, tmp)
+            self.assertEqual(proc.returncode, 0, proc.stderr[-1500:])
+            reported = [ln for ln in proc.stdout.splitlines() if ln.startswith("MEASURED")]
+            self.assertTrue(reported, f"the probe measured nothing:\n{proc.stdout}\n"
+                                      f"{proc.stderr[-800:]}")
+            left, axes_right, width = (float(x) for x in reported[0].split()[1:])
+            self.assertGreater(width, 0, "the legend drew nothing")
+            self.assertGreaterEqual(left, axes_right,
+                                    "the legend starts inside the plot area — it must sit "
+                                    "clear of the bars, in the reserved right margin")
+            self.assertTrue(probe.is_file() and probe.stat().st_size > 1000,
+                            "the probe figure was not written")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+@unittest.skipIf(RSCRIPT is None, SKIP)
+class TestTheScaffoldedRTwinRuns(unittest.TestCase):
+    """scaffold.py writes scripts/01_table1.R beside scripts/01_table1.py. What makes
+    it a twin rather than a decoration is that it RUNS — against the study folder's own
+    copied library, landing the same files the Python one lands."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp())
+        cls.root = cls.tmp / "study"
+        cls.scaffold = subprocess.run(
+            [sys.executable, str(SCAFFOLD), str(cls.root),
+             "--export", str(FIXTURE / "records.csv"),
+             "--dictionary", str(FIXTURE / "datadictionary.csv"),
+             "--group-by", "redcap_data_access_group"],
+            capture_output=True, text=True, timeout=300)
+        cls.script = cls.root / "scripts" / "01_table1.R"
+        cls.xlsx = cls.root / "outputs" / "tables" / "table1.xlsx"
+        cls.proc = (subprocess.run([RSCRIPT, str(cls.script)], capture_output=True,
+                                   text=True, timeout=600, cwd=str(cls.root))
+                    if cls.script.is_file() else None)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def _skip_if_openxlsx_missing(self):
+        if self.proc and "install.packages" in self.proc.stderr and not self.xlsx.exists():
+            self.skipTest("the openxlsx add-on is not installed in this R")
+
+    def test_the_scaffold_wrote_it(self):
+        self.assertEqual(self.scaffold.returncode, 0, self.scaffold.stderr[-800:])
+        self.assertTrue(self.script.is_file(), "scaffold.py wrote no scripts/01_table1.R")
+
+    def test_it_runs_against_the_study_folders_own_library(self):
+        self._skip_if_openxlsx_missing()
+        self.assertEqual(self.proc.returncode, 0,
+                         (self.proc.stdout + self.proc.stderr)[-1500:])
+        self.assertNotIn("could not find function", self.proc.stderr,
+                         "the generated script calls something the library does not define")
+
+    def test_it_writes_the_same_files_the_python_twin_writes(self):
+        self._skip_if_openxlsx_missing()
+        self.assertTrue(self.xlsx.is_file(),
+                        "no outputs/tables/table1.xlsx — the twins must write the same file")
+        figures = sorted((self.root / "outputs" / "figures").glob("*.png"))
+        self.assertTrue(figures, "the R twin wrote no figure")
+        self.assertTrue(
+            any("_by_redcap_data_access_group.png" in f.name for f in figures),
+            f"the figure is not named the way the Python twin names it: "
+            f"{[f.name for f in figures]}")
+        for figure in figures:
+            with open(figure, "rb") as fh:
+                self.assertEqual(fh.read(8), b"\x89PNG\r\n\x1a\n")
+
+    def test_the_workbook_it_writes_is_the_house_style(self):
+        self._skip_if_openxlsx_missing()
+        try:
+            import openpyxl
+        except ImportError:
+            self.skipTest("openpyxl is not installed, so the workbook cannot be opened here")
+        book = openpyxl.load_workbook(self.xlsx)
+        self.assertIn("Table 1", book.sheetnames)
+        self.assertEqual(book.sheetnames[-1], "Notes")
+        notes = " ".join(str(row[0]) for row in book["Notes"].iter_rows(values_only=True)
+                         if row[0])
+        self.assertIn("01_table1.R", notes,
+                      "the Notes sheet must name the script that made the file")
+        sheet = book["Table 1"]
+        row = next(r for r in sheet.iter_rows(min_row=2) if r[0].value == "records")
+        numbers = [c for c in row[3:] if c.value is not None]
+        self.assertTrue(numbers, "the records row is empty")
+        for cell in numbers:
+            self.assertEqual(cell.data_type, "n",
+                             "the scaffolded R script must produce the same cell types "
+                             "as the Python one")
 
 
 if __name__ == "__main__":

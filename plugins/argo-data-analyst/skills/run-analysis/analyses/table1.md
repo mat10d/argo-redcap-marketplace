@@ -63,7 +63,8 @@ write_workbook({"Table 1": tbl}, "outputs/tables/table1.xlsx", notes=["..."])
 bar_by_group(study, "sex", "site", "outputs/figures/sex_by_site.png")
 ```
 
-R (`scripts/01_table1.R`, the same calls, the same output shape):
+R (`scripts/01_table1.R`, written by `scaffold.py` at the same moment as the Python
+one — the same calls, the same numbers, the same files in `outputs/`):
 
 ```r
 for (f in c("core", "table1", "excel", "figures"))

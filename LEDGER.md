@@ -1,4 +1,4 @@
-# ARGO toolkit ledger — updated 2026-08-27 (0.19.0 released)
+# ARGO toolkit ledger — updated 2026-08-27 (0.20.0 released)
 
 The single answer to "what's done and what's outstanding". Supersedes PLAN.md's todo block for
 status; PLAN keeps the history and the spec.

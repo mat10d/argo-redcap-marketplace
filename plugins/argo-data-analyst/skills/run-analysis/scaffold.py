@@ -17,8 +17,13 @@ Creates:
         lib/                     # copy of the ARGO analysis library (Python + R)
         scripts/00_explore.py    # commented starter that summarizes the data
         scripts/01_table1.py     # Table 1, as a short list of library calls
+        scripts/01_table1.R      # the same Table 1 in R — the same calls, the same outputs
         outputs/tables/          # CSV / XLSX results land here
         outputs/figures/         # PNG / PDF figures land here
+
+`01_table1.py` and `01_table1.R` are twins: the same library calls in each language,
+writing the same files. Whoever opens the folder runs the one in the language they
+work in — nobody has to translate a script to check a number.
 
 The library is COPIED IN, not referenced: the study folder is then standalone —
 someone can move it, mail it, or open it a year later and every script still runs
@@ -60,10 +65,10 @@ from pathlib import Path
 EXPLORE_TEMPLATE = '''#!/usr/bin/env python3
 """00_explore.py — orient on the dataset before any analysis.
 
-Study   : <fill in>
+Study   : {STUDY}
 Inputs  : data/export.csv, data/data_dictionary.csv
 Outputs : prints a structured summary to stdout (no files written)
-Author  : <fill in>   Date: <fill in>
+Author  : <fill in>   Date: {DATE}
 Purpose : Understand structure (record ID, field types, choice maps) and data
           quality (missingness, MDC sentinels) so the analysis plan is grounded
           in what the data actually contains.
@@ -147,11 +152,15 @@ if __name__ == "__main__":
 TABLE1_TEMPLATE = '''#!/usr/bin/env python3
 """01_table1.py — Table 1: the cohort described, grouped by {GROUP_BY}.
 
-Study   : <fill in>
+Study   : {STUDY}
 Inputs  : data/export.csv, data/data_dictionary.csv
 Outputs : outputs/tables/table1.xlsx, one PNG in outputs/figures/
-Author  : <fill in>   Date: <fill in>
+Author  : <fill in>   Date: {DATE}
 Assumes : one row per record; MDC sentinels (-666/-777/-888/-999, 666) are missing.
+
+The twin of scripts/01_table1.R: the same library calls, the same numbers, the
+same files in outputs/. Run whichever language you work in — not both, they
+write the same files.
 
 Every number below is produced by the ARGO analysis library in lib/python.
 """
@@ -204,6 +213,85 @@ if FIGURE_FIELD:
     print("Wrote outputs/figures/" + figure.name)
 '''
 
+# The R twin of 01_table1.py. Same library, same call sequence, same output files —
+# written at the same moment from the same answers, so the two cannot drift apart.
+# It exists because the analyst who works in R should not have to translate a Python
+# script to check a number, and because a hand-written R script is where the parity
+# between the two libraries quietly breaks.
+TABLE1_R_TEMPLATE = '''#!/usr/bin/env Rscript
+# 01_table1.R — Table 1: the cohort described, grouped by {GROUP_BY}.
+#
+# Study   : {STUDY}
+# Inputs  : data/export.csv, data/data_dictionary.csv
+# Outputs : outputs/tables/table1.xlsx, one PNG in outputs/figures/
+# Author  : <fill in>   Date: {DATE}
+# Assumes : one row per record; MDC sentinels (-666/-777/-888/-999, 666) are missing.
+#
+# The twin of scripts/01_table1.py: the same library calls, the same numbers, the
+# same files in outputs/. Run whichever language you work in — not both, they write
+# the same files. Run it by the full path to Rscript recorded in README.md, e.g.
+#
+#     /usr/local/bin/Rscript scripts/01_table1.R
+#
+# Every number below is produced by the ARGO analysis library in lib/R.
+
+# The grouping variable. Table 1 cannot guess this — "by site" and "by district"
+# are different tables — so it is asked once, explicitly, and recorded here.
+GROUP_BY <- "{GROUP_BY}"
+
+# The variables Table 1 describes, in the order they appear. This is the
+# demographics form, read off the data dictionary when the folder was scaffolded.
+# It is written out in full on purpose: a table should say what it counted.
+# Edit the list to add, drop or reorder rows.
+VARIABLES <- {VARIABLES_R}
+
+# The one variable charted by group, to go with the table. Swap in any other
+# categorical variable, or set it to "" for no figure.
+FIGURE_FIELD <- "{FIGURE_FIELD}"
+
+if (substr(GROUP_BY, 1, 1) == "<") {
+  stop(paste0("This script needs to know which variable to group Table 1 by.\\n",
+              "Open scripts/01_table1.R, put the variable name into GROUP_BY near\\n",
+              "the top (in quotation marks, spelled as it is in the data\\n",
+              "dictionary), save the file, and run it again."), call. = FALSE)
+}
+if (!length(VARIABLES)) {
+  stop(paste0("This script has no variables to describe.\\n",
+              "Open scripts/01_table1.R and list the field names Table 1 should\\n",
+              "cover in VARIABLES near the top, spelled as they are in the data\\n",
+              "dictionary, then run it again."), call. = FALSE)
+}
+
+# The study folder, found from this script's own path, so the folder can be moved
+# and the script still run from anywhere.
+HERE <- local({
+  hit <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
+  if (length(hit)) dirname(dirname(normalizePath(sub("^--file=", "", hit[1]))))
+  else if (dir.exists(file.path(getwd(), "lib", "R"))) getwd()
+  else dirname(getwd())
+})
+
+for (module in c("core", "table1", "excel", "figures")) {
+  source(file.path(HERE, "lib", "R", "argo_analysis", paste0(module, ".R")))
+}
+
+study <- apply_missing(load_study(file.path(HERE, "data", "export.csv"),
+                                 file.path(HERE, "data", "data_dictionary.csv")))
+tbl <- table1(study, group_by = GROUP_BY, variables = VARIABLES)
+write_workbook(list("Table 1" = tbl),
+               file.path(HERE, "outputs", "tables", "table1.xlsx"),
+               notes = c(paste0("Grouped by ", GROUP_BY, "."),
+                         "Made by scripts/01_table1.R."))
+cat("Wrote outputs/tables/table1.xlsx\\n")
+
+if (nzchar(FIGURE_FIELD)) {
+  figure <- file.path(HERE, "outputs", "figures",
+                      paste0(FIGURE_FIELD, "_by_", GROUP_BY, ".png"))
+  bar_by_group(study, FIGURE_FIELD, GROUP_BY, figure)
+  cat(paste0("Wrote outputs/figures/", basename(figure), "\\n"))
+}
+'''
+
 README_TEMPLATE = """# Analysis: <study name>
 
 ## Study
@@ -211,6 +299,8 @@ README_TEMPLATE = """# Analysis: <study name>
 - **Design:** <cross-sectional / cohort / pre-post / ...>
 - **Unit of analysis:** <one row per patient / sample / event>
 - **Question(s):** <outcome(s) and grouping/comparison variable(s)>
+- **Grouping variable (Table 1):** {GROUP_BY}
+- **Table 1 variables:** {VARIABLES}
 - **Inclusion / exclusion:** <who counts in the analysis>
 
 ## Data
@@ -228,7 +318,11 @@ README_TEMPLATE = """# Analysis: <study name>
 1.
 
 ## How to reproduce
-Run scripts in order from this directory, e.g. `{PYTHON} scripts/00_explore.py`.
+Run the scripts from this directory, **by the full interpreter path** — a session's
+PATH often leaves installed programs out, and the bare name then looks missing:
+
+{REPRODUCE}
+
 Every output in `outputs/` is produced by exactly one script in `scripts/`.
 `lib/` is a copy of the ARGO analysis library — the scripts import from it, so this
 folder runs on its own, without the ARGO plugins installed.
@@ -393,6 +487,61 @@ def render_variables(names: list) -> str:
     return "[\n" + "\n".join(f"    {line}" for line in lines) + "\n]"
 
 
+def render_variables_r(names: list) -> str:
+    """The same list, as R's `c(...)` — written from the same answer at the same
+    moment as the Python one, which is what keeps the two scripts twins."""
+    if not names:
+        return "character(0)  # ← empty: list the fields Table 1 should describe"
+    body = ", ".join(f'"{n}"' for n in names)
+    lines = textwrap.wrap(body, width=70, break_long_words=False, break_on_hyphens=False)
+    if len(lines) == 1:
+        return f"c({lines[0]})"
+    return "c(\n" + "\n".join(f"  {line}" for line in lines) + "\n)"
+
+
+def study_group_by(group_by: "str | None") -> str:
+    """The grouping answer, for README.md's Study block.
+
+    It is written down where a reader looks first, not only into the script: the
+    question "grouped by what?" is the one that makes a Table 1 right or wrong, and
+    the answer has to survive someone opening the folder a year later.
+    """
+    if group_by:
+        return f"`{group_by}`"
+    return "<fill in — the variable Table 1 is grouped by; asked once, never guessed>"
+
+
+def study_variables(names: list, given: bool) -> str:
+    """The Table 1 variable list, for README.md's Study block, saying where it
+    came from — an explicit --variables answer, or the demographics-form default."""
+    if not names:
+        return "<fill in — the fields Table 1 describes>"
+    listed = ", ".join(f"`{n}`" for n in names)
+    source = ("given with `--variables`" if given
+              else "the demographics form, read from the data dictionary")
+    return f"{listed} ({source})"
+
+
+def reproduce_block(python: str, rscript: "str | None") -> str:
+    """The 'How to reproduce' list: every script, each with the interpreter path
+    that works on this computer — including the R twin of the Table 1 script."""
+    lines = [
+        f"- `{python} scripts/00_explore.py` — what is in the data",
+        f"- `{python} scripts/01_table1.py` — Table 1, in Python",
+    ]
+    if rscript:
+        lines.append(f"- `{rscript} scripts/01_table1.R` — the same Table 1, in R")
+    else:
+        lines.append("- `Rscript scripts/01_table1.R` — the same Table 1, in R. There is no "
+                     "working R on this computer (see above), so run this one where R is "
+                     "installed, using the full path to `Rscript` there.")
+    lines.append("")
+    lines.append("`01_table1.py` and `01_table1.R` are twins — the same library calls, the same "
+                 "numbers, the same files in `outputs/`. Run the one in the language you work "
+                 "in; running both only overwrites the same outputs.")
+    return "\n".join(lines)
+
+
 def parse_front_matter(path: Path) -> dict:
     """The `key: value` block between the first two `---` lines. Stdlib only."""
     fields = {}
@@ -504,6 +653,21 @@ def tools_python(found: "dict | None") -> str:
     if not found:
         return "python3"
     return (found.get("python") or {}).get("path") or "python3"
+
+
+def tools_rscript(found: "dict | None") -> "str | None":
+    """The full path to a WORKING Rscript, or None if this computer hasn't one.
+
+    None covers both states that matter: R absent, and R present but unable to run
+    a script. Either way the R twin has to be run somewhere else, and README.md
+    should say so rather than print a path that was never going to work.
+    """
+    if not found:
+        return None
+    entry = found.get("r") or {}
+    if not entry.get("found") or entry.get("runs") is False:
+        return None
+    return entry.get("path") or None
 
 
 def describe_tools(module, found: "dict | None") -> "tuple[str, str]":
@@ -618,15 +782,35 @@ def main():
     else:
         variables = demographics_variables(data / "data_dictionary.csv", args.group_by)
     charted = figure_field(data / "data_dictionary.csv", variables)
+
+    # The two facts every generated header used to leave as "<fill in>": which study
+    # folder this is, and when it was made. Both are known here, so neither is asked
+    # of the analyst — an unfilled header is one nobody ever goes back to fill.
+    study_name = root.resolve().name or str(root.resolve())
+    today = datetime.date.today().isoformat()
+
     targets = {
         root / "README.md": (README_TEMPLATE.replace("{TOOLS}", tools_block)
                              .replace("{REGISTRY}", registry_block(registry))
-                             .replace("{PYTHON}", tools_python(tools_found))),
+                             .replace("{GROUP_BY}", study_group_by(args.group_by))
+                             .replace("{VARIABLES}",
+                                      study_variables(variables, bool(args.variables)))
+                             .replace("{REPRODUCE}",
+                                      reproduce_block(tools_python(tools_found),
+                                                      tools_rscript(tools_found)))),
         root / "ANALYSIS_LOG.md": LOG_TEMPLATE.replace("{TOOLS}", tools_log),
-        scripts / "00_explore.py": EXPLORE_TEMPLATE,
+        scripts / "00_explore.py": (EXPLORE_TEMPLATE.replace("{STUDY}", study_name)
+                                    .replace("{DATE}", today)),
         scripts / "01_table1.py": (TABLE1_TEMPLATE.replace("{GROUP_BY}", group_by)
+                                   .replace("{STUDY}", study_name)
+                                   .replace("{DATE}", today)
                                    .replace("{VARIABLES}", render_variables(variables))
                                    .replace("{FIGURE_FIELD}", charted)),
+        scripts / "01_table1.R": (TABLE1_R_TEMPLATE.replace("{GROUP_BY}", group_by)
+                                  .replace("{STUDY}", study_name)
+                                  .replace("{DATE}", today)
+                                  .replace("{VARIABLES_R}", render_variables_r(variables))
+                                  .replace("{FIGURE_FIELD}", charted)),
     }
     for path, content in targets.items():
         if path.exists() and not args.force:
@@ -636,6 +820,8 @@ def main():
         print(f"wrote: {path}")
 
     print(f"\nScaffolded: {root}")
+    print("Table 1 is written twice, once per language: scripts/01_table1.py and "
+          "scripts/01_table1.R — the same calls, the same outputs.")
     if library_copied:
         print(f"Analysis library copied to: {root / 'lib'} (Python + R)")
     else:

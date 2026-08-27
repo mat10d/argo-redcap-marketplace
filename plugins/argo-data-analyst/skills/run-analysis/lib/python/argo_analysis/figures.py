@@ -20,6 +20,8 @@ wide by someone who is not looking for it:
   * a footnote naming the script and the date — the provenance of a figure is
     the script that made it, and a figure that has drifted from the file it came
     from is how the wrong version ends up in a submission
+  * the legend outside the plot area, against its right-hand edge — a key drawn
+    inside sits on the tallest bar, which is the bar the reader came for
   * no chartjunk: no top or right frame, a faint horizontal grid, nothing else
 
 Percentages here obey the same rule as everywhere in this library: they are out
@@ -54,6 +56,14 @@ FIGSIZE = (7.5, 4.5)
 GRID_COLOUR = "#D9D9D9"
 INK = "#222222"
 QUIET_INK = "#666666"
+
+#: The legend goes OUTSIDE the plot area, against its right-hand edge. A legend
+#: placed inside lands on the tallest bar — which is the bar the reader came for.
+#: The anchor is in axes coordinates, so x > 1 is "past the right edge"; the axes
+#: give up the width in LEGEND_RIGHT so the legend has somewhere to sit.
+LEGEND_LOC = "upper left"
+LEGEND_ANCHOR = (1.02, 1.0)
+LEGEND_RIGHT = 0.78
 
 MATPLOTLIB_MISSING = (
     "This chart needs matplotlib, a free add-on for Python that draws graphs.\n"
@@ -185,11 +195,15 @@ def bar_by_group(study, field, group_by, path):
     ax.set_xticks(range(len(levels)))
     ax.set_xticklabels(levels, fontsize=9.5)
     ax.set_ylabel("% of those asked and answered", fontsize=9.5, color=QUIET_INK)
-    if len(groups) > 1:
-        ax.legend(frameon=False, fontsize=9, loc="upper right")
+    legended = len(groups) > 1
+    if legended:
+        ax.legend(frameon=False, fontsize=9, loc=LEGEND_LOC,
+                  bbox_to_anchor=LEGEND_ANCHOR, borderaxespad=0.0)
     _dress(fig, ax, core.field_label(study, field),
            f"n = {answered_total} ; missing = {missing_total}")
-    fig.subplots_adjust(top=0.80)
+    # The axes give up their right-hand strip to the legend, so no key is ever
+    # drawn over a bar.
+    fig.subplots_adjust(top=0.80, **({"right": LEGEND_RIGHT} if legended else {}))
     return _save(fig, path, plt)
 
 

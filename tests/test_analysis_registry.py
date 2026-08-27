@@ -22,7 +22,10 @@ can be tested before lib/ lands.
 from __future__ import annotations
 
 import ast
+import datetime
 import importlib.util
+import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -36,6 +39,7 @@ SCAFFOLD = SKILL_DIR / "scaffold.py"
 ANALYSES = SKILL_DIR / "analyses"
 LIB = SKILL_DIR / "lib"
 FIXTURE = REPO / "testing" / "fixtures" / "synthetic-study"
+TOOLS = REPO / "plugins/argo-core/skills/redcap-api/scripts/argo_tools.py"
 
 
 def load_scaffold():
@@ -380,6 +384,152 @@ class TestScaffoldedStudyFolder(unittest.TestCase):
         self.assertIn("table1 — ready", self.proc.stdout)
         self.assertIn("survival — planned", self.proc.stdout)
 
+    # ------------------------------------------------- the R twin (NITS 57)
+
+    def test_an_r_twin_of_the_table1_script_is_written_too(self):
+        """The R analyst must not have to translate a Python script to get a table.
+        Hand-writing the R half is where the two libraries quietly drift apart."""
+        script = self.root / "scripts" / "01_table1.R"
+        self.assertTrue(script.is_file(), "no scripts/01_table1.R was generated")
+        text = script.read_text()
+        for module in ("core", "table1", "excel", "figures"):
+            self.assertIn(f'"{module}"', text,
+                          f"the R twin never sources lib/R/argo_analysis/{module}.R")
+        self.assertIn('file.path(HERE, "lib", "R", "argo_analysis"', text,
+                      "the R twin must source the study's OWN copied library")
+        for call in ("load_study", "apply_missing", "table1(", "write_workbook",
+                     "bar_by_group"):
+            self.assertIn(call, text, f"the R twin never calls {call}")
+
+    def test_the_two_table1_scripts_are_twins(self):
+        """Same answers in, same files out — or they are not twins."""
+        py = (self.root / "scripts" / "01_table1.py").read_text()
+        r = (self.root / "scripts" / "01_table1.R").read_text()
+
+        def value(text, name, arrow):
+            match = re.search(rf'^{name} {arrow} "([^"]*)"', text, re.M)
+            return match.group(1) if match else None
+
+        self.assertEqual(value(py, "GROUP_BY", "="), value(r, "GROUP_BY", "<-"))
+        self.assertEqual(value(py, "FIGURE_FIELD", "="), value(r, "FIGURE_FIELD", "<-"))
+        variables = re.compile(r'"([a-z0-9_]+)"')
+        py_vars = variables.findall(py.split("VARIABLES = ", 1)[1].split("\n\n", 1)[0])
+        r_vars = variables.findall(r.split("VARIABLES <- ", 1)[1].split("\n\n", 1)[0])
+        self.assertTrue(py_vars, "no variables were written into the Python script")
+        self.assertEqual(py_vars, r_vars, "the twins describe different variables")
+        for text, language in ((py, "Python"), (r, "R")):
+            self.assertIn("table1.xlsx", text, f"the {language} script writes no workbook")
+            self.assertIn('"outputs"', text, f"the {language} script writes outside outputs/")
+            self.assertIn("_by_", text, f"the {language} script names no figure")
+
+    def test_the_r_twin_is_valid_r_that_the_shipped_library_can_be_read_by(self):
+        """Parsed, not run: this check has to pass on a machine with no R at all."""
+        text = (self.root / "scripts" / "01_table1.R").read_text()
+        self.assertEqual(text.count("{"), text.count("}"), "unbalanced braces in the R twin")
+        self.assertEqual(text.count("("), text.count(")"), "unbalanced brackets in the R twin")
+        self.assertNotIn("{GROUP_BY}", text, "a placeholder was never filled in")
+        self.assertNotIn("{VARIABLES_R}", text, "a placeholder was never filled in")
+        self.assertNotIn("{STUDY}", text)
+        self.assertNotIn("{DATE}", text)
+
+    # ------------------------------- the headers say which study, and when (NITS 56)
+
+    def test_every_generated_header_carries_the_study_folder_and_today(self):
+        """`<fill in>` in a header is a blank nobody ever goes back to fill — and both
+        facts are known at scaffold time."""
+        today = datetime.date.today().isoformat()
+        for name in ("00_explore.py", "01_table1.py", "01_table1.R"):
+            with self.subTest(script=name):
+                header = (self.root / "scripts" / name).read_text()[:1200]
+                self.assertIn(f"Study   : {self.root.name}", header,
+                              f"{name} does not name the study folder")
+                self.assertIn(f"Date: {today}", header, f"{name} carries no date")
+                self.assertNotIn("Date: <fill in>", header)
+
+    # ------------------------------------------- README carries the answers (NITS 56)
+
+    def test_the_readme_study_block_records_the_grouping_variable(self):
+        """The answer to the one question that makes a Table 1 right or wrong belongs
+        where a reader looks first, not only inside a script."""
+        readme = (self.root / "README.md").read_text()
+        study = readme.split("## Study", 1)[1].split("\n## ", 1)[0]
+        self.assertIn("redcap_data_access_group", study,
+                      "the grouping answer never reached README.md's Study block")
+        self.assertIn("Table 1 variables", study)
+        for field in ("age", "sex", "education"):
+            self.assertIn(f"`{field}`", study,
+                          f"{field} is in the generated script but not in README.md")
+
+    def test_the_readme_reproduces_both_twins_by_interpreter_path(self):
+        readme = (self.root / "README.md").read_text()
+        how = readme.split("## How to reproduce", 1)[1]
+        self.assertIn("scripts/01_table1.py", how)
+        self.assertIn("scripts/01_table1.R", how,
+                      "README.md never says how to run the R twin")
+        self.assertIn("scripts/00_explore.py", how)
+
+
+class TestReadmeRecordsTheAnswersItWasGiven(unittest.TestCase):
+    """One scaffold run WITH the language check: README.md must carry the answers the
+    scaffold was given (grouping variable, variable list) and a runnable command for
+    each script, by full interpreter path — the bare name is what fails in a session
+    with a thin PATH."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp())
+        cls.root = cls.tmp / "crc-cohort"
+        cls.proc = subprocess.run(
+            [sys.executable, str(SCAFFOLD), str(cls.root),
+             "--export", str(FIXTURE / "records.csv"),
+             "--dictionary", str(FIXTURE / "datadictionary.csv"),
+             "--group-by", "district",
+             "--variables", "age,sex",
+             "--tools", str(TOOLS)],
+            capture_output=True, text=True, timeout=300)
+        cls.readme = (cls.root / "README.md").read_text()
+        cls.found = SCAFFOLD_MOD.detect_tools(SCAFFOLD_MOD.load_tools(str(TOOLS)))
+
+    def test_it_ran(self):
+        self.assertEqual(self.proc.returncode, 0, self.proc.stderr[-800:])
+
+    def test_the_given_grouping_variable_is_in_the_study_block(self):
+        study = self.readme.split("## Study", 1)[1].split("\n## ", 1)[0]
+        self.assertIn("`district`", study)
+        self.assertNotIn("fill in — the variable Table 1 is grouped by", study)
+
+    def test_the_given_variable_list_is_in_the_study_block(self):
+        study = self.readme.split("## Study", 1)[1].split("\n## ", 1)[0]
+        self.assertIn("`age`", study)
+        self.assertIn("`sex`", study)
+        self.assertIn("--variables", study,
+                      "README should say the list was given, not defaulted")
+        self.assertNotIn("`education`", study,
+                         "the demographics default overrode the list that was asked for")
+
+    def test_each_script_has_a_command_with_a_full_interpreter_path(self):
+        if self.found is None:
+            self.skipTest("the language check could not run here")
+        how = self.readme.split("## How to reproduce", 1)[1]
+        python = SCAFFOLD_MOD.tools_python(self.found)
+        self.assertTrue(os.path.isabs(python), f"the check returned a bare name: {python}")
+        self.assertIn(f"`{python} scripts/00_explore.py`", how)
+        self.assertIn(f"`{python} scripts/01_table1.py`", how)
+        rscript = SCAFFOLD_MOD.tools_rscript(self.found)
+        if rscript:
+            self.assertIn(f"`{rscript} scripts/01_table1.R`", how)
+        else:
+            self.assertIn("scripts/01_table1.R", how,
+                          "the R twin must still be listed, with where to run it")
+            self.assertIn("no working R", how,
+                          "a machine without R must be told so, not given a path that fails")
+
+    def test_no_placeholder_survives_anywhere_in_the_readme(self):
+        for placeholder in ("{TOOLS}", "{REGISTRY}", "{REPRODUCE}", "{GROUP_BY}",
+                            "{VARIABLES}", "{PYTHON}"):
+            self.assertNotIn(placeholder, self.readme,
+                             f"{placeholder} was never filled in")
+
 
 class TestScaffoldWithoutAGroupingVariable(unittest.TestCase):
     """No --group-by: a marked placeholder that stops plainly — never a wrong table."""
@@ -416,6 +566,25 @@ class TestScaffoldWithoutAGroupingVariable(unittest.TestCase):
 
     def test_the_run_says_the_script_is_waiting_on_an_answer(self):
         self.assertIn("group", self.proc.stdout.lower())
+
+    def test_the_r_twin_carries_the_same_placeholder_and_the_same_refusal(self):
+        """Both twins have to refuse — a filled-in Python script beside a guessing R
+        one is exactly the wrong-table-nobody-caught defect, in the other language."""
+        text = (self.root / "scripts" / "01_table1.R").read_text()
+        self.assertIn("FILL IN", text, "the placeholder must be unmistakable")
+        self.assertIn('substr(GROUP_BY, 1, 1) == "<"', text,
+                      "the R twin never checks for the placeholder")
+        self.assertIn("group Table 1 by", text)
+        self.assertIn("01_table1.R", text, "the message must say which file to edit")
+        self.assertNotIn('GROUP_BY <- "site"',
+                         text, "an unasked grouping variable must never be invented")
+
+    def test_the_readme_marks_the_grouping_variable_as_unanswered(self):
+        study = (self.root / "README.md").read_text().split("## Study", 1)[1]
+        study = study.split("\n## ", 1)[0]
+        self.assertIn("fill in", study.lower())
+        self.assertIn("never guessed", study.lower(),
+                      "README must say the answer is asked for, not inferred")
 
 
 # ---------------------------------------------------------------- doc guards

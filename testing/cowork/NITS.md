@@ -248,3 +248,12 @@ Round verdicts from the same review: export-from-API "perfect"; returning-after-
     add scipy to Python for exact r×c Fisher.
 55. Checkbox parent fields: Python table1 describes them (levels = options); R excludes them
     with a warning. Add to both or neither — together.
+56. scaffold --group-by must also write the grouping answer into README.md's Study block (it
+    only filled the script), and the generated script header should carry the study folder
+    name and today's date instead of <fill in>.
+57. scaffold must generate scripts/01_table1.R alongside 01_table1.py (same library calls) —
+    the R twin was hand-written in the walkthrough; run_table1.R writes CSV only, below house
+    style.
+58. excel.R stores statistics as text ("2.50"); Python stores numbers. Write numerics as numbers
+    so the two workbooks are the same shape to Excel.
+59. figures: legend overlaps the tallest bar — place it outside the plot area.
