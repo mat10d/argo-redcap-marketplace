@@ -206,11 +206,14 @@ Ranked. The top two are silent-data-loss class.
 47. **build-study intake speed**: immediately port the request's attached documents into the
     build folder (questionnaires etc. from the SIR) as the first act — "more quickly make a
     folder of documents to upload".
-48. **build-study: track-changes questionnaire deliverable** (DESIGN — Q&A with Matteo before
-    writing): a Word questionnaire in the request should yield `<name>_redcap_changes.docx`
-    with TRACKED CHANGES for the edits made during the build (so it can be sent back), while
-    the changelog becomes OPEN QUESTIONS only. Must not conflict with the IRB minimal-change
-    rule — resolve via questions first.
+48. **build-study: changes vs questions split** (RESOLVED with Matteo, 2026-08-26): two
+    deliverables, split by KIND. (a) CHANGES — what the questionnaire itself needs changed:
+    the ORIGINAL doc with tracked changes as `<name>_redcap_changes.docx`; if the original is
+    a PDF, a `<name>_redcap_changes.md` listing them. The document IS the review vehicle.
+    (b) OPEN QUESTIONS — assumptions the build made (unparseable branching etc.): "we assumed
+    X — accurate?" — a separate questions doc, never a tracked change. Pending Matteo:
+    whether the DD adopts only in-chat-approved changes (study-17 precedent) and whether
+    typos/numbering stay out of the changes doc entirely.
 49. **link-data redesign around the HARD LINK** (Matteo's spec, near-complete): it's a
     left/inner/right join; the work is DERIVING the join key (hospital number, or a ported
     other-study record-id column) and reasoning aloud about it. Deliverables: (1) name-
