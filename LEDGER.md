@@ -1,4 +1,4 @@
-# ARGO toolkit ledger — updated 2026-08-26
+# ARGO toolkit ledger — updated 2026-08-27 (0.19.0 released)
 
 The single answer to "what's done and what's outstanding". Supersedes PLAN.md's todo block for
 status; PLAN keeps the history and the spec.
@@ -27,11 +27,14 @@ status; PLAN keeps the history and the spec.
   image; official questionnaire is a design guide)
 - naqiya's study session (real work — unexamined)
 
-## Outstanding tests
-- K  Export with no key (solicitation path; Claude comments out the CRC line first)
-- M  Table 1 in R (continue B's chat: "Redo the Table 1 in R.")
-- O  Repeat weekly-check + Table 1 once each (demo reproducibility)
+## Outstanding tests (all on 0.19.0 after the org refresh)
+- K  Export with no key — the CRC line is ALREADY commented out in ~/Desktop/ARGO-cowork/.env;
+     fresh chat "Export the CRC study to disk." → at the solicitation, tell Claude "restore the key"
+- M  Table 1 in R — now a HAND-OFF by design (Cowork can't run Mac R): expect the R script + the
+     command to run it yourself; run it, report the numbers
 - Q  Audit on the regenerated kit (new colours; fresh chat, same audit prompt)
+- O  Repeat weekly-check + Table 1 once each (demo reproducibility)
+- Fresh-folder onboarding once more on 0.19.0 (the door now PUTS the file on screen)
 - P  WINDOWS probe (friend's machine; ARGO-test-data/WINDOWS-PROBE.md) — the last real unknown
 
 ## Outstanding non-test
