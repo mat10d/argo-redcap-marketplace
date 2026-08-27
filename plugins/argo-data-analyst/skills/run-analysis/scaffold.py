@@ -6,7 +6,7 @@ dictionary that are already on disk. Stdlib only, so it always runs.
 
 Usage:
     python3 scaffold.py <analysis_dir> --export EXPORT.csv --dictionary DD.csv [--force]
-                        [--tools /path/to/argo_tools.py]
+                        [--tools /path/to/argo_tools.py] [--group-by FIELD]
 
 Creates:
     <analysis_dir>/
@@ -14,9 +14,26 @@ Creates:
         ANALYSIS_LOG.md      # append-only run history
         data/export.csv          # copy of the export (read-only input)
         data/data_dictionary.csv # copy of the codebook (read-only input)
+        lib/                     # copy of the ARGO analysis library (Python + R)
         scripts/00_explore.py    # commented starter that summarizes the data
+        scripts/01_table1.py     # Table 1, as a short list of library calls
         outputs/tables/          # CSV / XLSX results land here
         outputs/figures/         # PNG / PDF figures land here
+
+The library is COPIED IN, not referenced: the study folder is then standalone —
+someone can move it, mail it, or open it a year later and every script still runs
+without the plugin being installed. README.md records what the library can do,
+read from the skill's analyses/ registry, so "ready" and "planned" never drift
+apart from the code.
+
+--variables is the fields Table 1 describes; it defaults to the demographics form,
+read off the data dictionary and written into the script as an explicit list, so the
+script says what it counted instead of relying on a default that could change.
+
+--group-by is the variable Table 1 is grouped by. Table 1 cannot guess it ("by
+site" and "by district" are different tables), so the skill asks once and passes
+the answer here. Without it the generated script carries a clearly marked
+placeholder and stops with a plain instruction until someone fills it in.
 
 It also records which analysis languages this computer can run — Python, R, Stata —
 and the FULL PATH to each, into README.md and ANALYSIS_LOG.md, so every script is
@@ -29,9 +46,11 @@ three states R is in — runs, found-but-broken, or absent — so nobody writes 
 analysis against an R that was never going to execute it.
 """
 import argparse
+import csv
 import datetime
 import shutil
 import sys
+import textwrap
 from pathlib import Path
 
 # The starter analysis script written into scripts/. It is intentionally
@@ -121,6 +140,70 @@ if __name__ == "__main__":
     main()
 '''
 
+# The Table 1 script. It is short on purpose: every statistic comes from the
+# analysis library copied into lib/, which is tested once against a golden table.
+# Study scripts are lists of library calls -- they never re-derive a mean, a
+# percentage or a denominator of their own.
+TABLE1_TEMPLATE = '''#!/usr/bin/env python3
+"""01_table1.py — Table 1: the cohort described, grouped by {GROUP_BY}.
+
+Study   : <fill in>
+Inputs  : data/export.csv, data/data_dictionary.csv
+Outputs : outputs/tables/table1.xlsx, one PNG in outputs/figures/
+Author  : <fill in>   Date: <fill in>
+Assumes : one row per record; MDC sentinels (-666/-777/-888/-999, 666) are missing.
+
+Every number below is produced by the ARGO analysis library in lib/python.
+"""
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent.parent
+
+# The grouping variable. Table 1 cannot guess this — "by site" and "by district"
+# are different tables — so it is asked once, explicitly, and recorded here.
+GROUP_BY = "{GROUP_BY}"
+
+# The variables Table 1 describes, in the order they appear. This is the
+# demographics form, read off the data dictionary when the folder was scaffolded.
+# It is written out in full on purpose: a table should say what it counted.
+# Edit the list to add, drop or reorder rows.
+VARIABLES = {VARIABLES}
+
+# The one variable charted by group, to go with the table. Swap in any other
+# categorical variable, or set it to "" for no figure.
+FIGURE_FIELD = "{FIGURE_FIELD}"
+
+if GROUP_BY.startswith("<"):
+    sys.exit("This script needs to know which variable to group Table 1 by.\\n"
+             "Open scripts/01_table1.py, put the variable name into GROUP_BY near\\n"
+             "the top (in quotation marks, spelled as it is in the data\\n"
+             "dictionary), save the file, and run it again.")
+if not VARIABLES:
+    sys.exit("This script has no variables to describe.\\n"
+             "Open scripts/01_table1.py and list the field names Table 1 should\\n"
+             "cover in VARIABLES near the top, spelled as they are in the data\\n"
+             "dictionary, then run it again.")
+
+sys.path.insert(0, str(HERE / "lib" / "python"))
+from argo_analysis.core import load_study, apply_missing         # noqa: E402
+from argo_analysis.table1 import table1                          # noqa: E402
+from argo_analysis.excel import write_workbook                   # noqa: E402
+from argo_analysis.figures import bar_by_group                   # noqa: E402
+
+study = apply_missing(load_study(HERE / "data" / "export.csv",
+                                 HERE / "data" / "data_dictionary.csv"))
+table = table1(study, group_by=GROUP_BY, variables=VARIABLES)
+write_workbook({"Table 1": table}, HERE / "outputs" / "tables" / "table1.xlsx",
+               notes=["Grouped by " + GROUP_BY + ".", "Made by scripts/01_table1.py."])
+print("Wrote outputs/tables/table1.xlsx")
+
+if FIGURE_FIELD:
+    figure = HERE / "outputs" / "figures" / (FIGURE_FIELD + "_by_" + GROUP_BY + ".png")
+    bar_by_group(study, FIGURE_FIELD, GROUP_BY, figure)
+    print("Wrote outputs/figures/" + figure.name)
+'''
+
 README_TEMPLATE = """# Analysis: <study name>
 
 ## Study
@@ -137,6 +220,9 @@ README_TEMPLATE = """# Analysis: <study name>
 ## Analysis tools on this computer
 {TOOLS}
 
+## What this toolkit can do
+{REGISTRY}
+
 ## Analysis plan
 <numbered list of planned analyses; each maps to a script in scripts/>
 1.
@@ -144,6 +230,8 @@ README_TEMPLATE = """# Analysis: <study name>
 ## How to reproduce
 Run scripts in order from this directory, e.g. `{PYTHON} scripts/00_explore.py`.
 Every output in `outputs/` is produced by exactly one script in `scripts/`.
+`lib/` is a copy of the ARGO analysis library — the scripts import from it, so this
+folder runs on its own, without the ARGO plugins installed.
 """
 
 LOG_TEMPLATE = """# Analysis log
@@ -176,6 +264,202 @@ TOOLS_UNKNOWN = (
     "  to see which of Python, R and Stata this computer can run, and always call them by\n"
     "  their full path — a session's PATH often leaves installed programs out."
 )
+
+
+LIB_SOURCE = Path(__file__).resolve().parent / "lib"
+ANALYSES_SOURCE = Path(__file__).resolve().parent / "analyses"
+
+# What goes in README.md when the registry couldn't be read (a stray copy of this
+# script, run away from the skill). Never guesses a list of analyses.
+REGISTRY_UNKNOWN = (
+    "- Not listed — the analysis registry wasn't readable from here. Ask your\n"
+    "  assistant what the ARGO analysis toolkit can do before assuming anything."
+)
+
+
+# What a Table 1 row can be made of. Coded fields have levels to count; a text
+# field only has a number in it if REDCap validated it as one. Everything else --
+# free text, notes, dates, uploads, section headers -- is left out here rather
+# than passed to the library for it to warn about, field by field, on every run.
+CATEGORICAL_TYPES = ("radio", "dropdown", "checkbox", "yesno", "truefalse")
+NUMERIC_TYPES = ("calc", "slider")
+NUMERIC_VALIDATIONS = ("number", "integer")
+
+
+def _summarisable(kind: str, validation: str) -> bool:
+    """Can this field be a Table 1 row at all?"""
+    if kind in CATEGORICAL_TYPES or kind in NUMERIC_TYPES:
+        return True
+    if kind == "text":
+        return validation.startswith(NUMERIC_VALIDATIONS)
+    return False
+
+
+def _dd_cell(row: dict, *names: str) -> str:
+    """One cell, whichever header style the dictionary uses (website or API export)."""
+    for name in names:
+        if name in row and row[name]:
+            return str(row[name]).strip()
+    return ""
+
+
+def demographics_variables(dictionary_csv: Path, group_by: "str | None" = None) -> list:
+    """The default Table 1 variable list: the fields on the demographics form.
+
+    Resolved HERE, once, and written into the generated script as an explicit list —
+    not left to a library default. A Table 1 should say on its face which variables
+    it counted, and the analyst should be able to edit that list without reading the
+    library. Returns [] rather than guessing if the dictionary can't be read.
+    """
+    try:
+        with open(dictionary_csv, newline="", encoding="utf-8-sig") as handle:
+            rows = [r for r in csv.DictReader(handle) if r]
+    except (OSError, csv.Error, UnicodeDecodeError, ValueError):
+        return []
+    if not rows:
+        return []
+
+    id_field = _dd_cell(rows[0], "field_name", "Variable / Field Name")
+    forms = []
+    for row in rows:
+        form = _dd_cell(row, "form_name", "Form Name")
+        if form and form not in forms:
+            forms.append(form)
+    if not forms:
+        return []
+    target = next((f for f in forms if "demograph" in f.lower()), forms[0])
+
+    chosen = []
+    for row in rows:
+        name = _dd_cell(row, "field_name", "Variable / Field Name")
+        form = _dd_cell(row, "form_name", "Form Name")
+        kind = _dd_cell(row, "field_type", "Field Type").lower()
+        validation = _dd_cell(row, "text_validation_type_or_show_slider_number",
+                              "Text Validation Type OR Show Slider Number").lower()
+        if not name or form != target:
+            continue
+        if name == id_field or (group_by and name == group_by):
+            continue
+        if not _summarisable(kind, validation):
+            continue
+        chosen.append(name)
+    return chosen
+
+
+def figure_field(dictionary_csv: Path, variables: list) -> str:
+    """The variable the starter figure charts: the first one that HAS bars to draw.
+
+    A coded field with a choice list, or a yes/no — anything else (a free-text
+    field, a data access group) has no levels and the figure helper rightly refuses.
+    Returns "" when nothing qualifies, and the generated script then writes the
+    table without a figure rather than failing.
+    """
+    if not variables:
+        return ""
+    try:
+        with open(dictionary_csv, newline="", encoding="utf-8-sig") as handle:
+            rows = [r for r in csv.DictReader(handle) if r]
+    except (OSError, csv.Error, UnicodeDecodeError, ValueError):
+        return ""
+    meta = {}
+    for row in rows:
+        name = _dd_cell(row, "field_name", "Variable / Field Name")
+        if name:
+            meta[name] = (
+                _dd_cell(row, "field_type", "Field Type").lower(),
+                _dd_cell(row, "select_choices_or_calculations",
+                         "Choices, Calculations, OR Slider Labels"),
+            )
+    # A real choice list first — it makes the more informative chart than a yes/no.
+    for name in variables:
+        kind, choices = meta.get(name, ("", ""))
+        if kind in ("radio", "dropdown", "checkbox") and choices:
+            return name
+    for name in variables:
+        kind, _ = meta.get(name, ("", ""))
+        if kind in ("yesno", "truefalse"):
+            return name
+    return ""
+
+
+def render_variables(names: list) -> str:
+    """The VARIABLES literal, wrapped so the generated script stays readable."""
+    if not names:
+        return "[]  # ← empty: list the fields Table 1 should describe"
+    body = ", ".join(f'"{n}"' for n in names)
+    lines = textwrap.wrap(body, width=76, break_long_words=False, break_on_hyphens=False)
+    if len(lines) == 1:
+        return f"[{lines[0]}]"
+    return "[\n" + "\n".join(f"    {line}" for line in lines) + "\n]"
+
+
+def parse_front_matter(path: Path) -> dict:
+    """The `key: value` block between the first two `---` lines. Stdlib only."""
+    fields = {}
+    try:
+        text = path.read_text()
+    except OSError:
+        return fields
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return fields
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        if ":" in line:
+            key, value = line.split(":", 1)
+            fields[key.strip()] = value.strip()
+    return fields
+
+
+def read_registry(folder: "Path | None" = None) -> list:
+    """Every analyses/*.md as {name, status, summary, ...}, ready ones first.
+
+    The registry is the ONE place that says what the toolkit can do. This function
+    reads it; nothing anywhere hand-maintains a second list of analyses.
+    """
+    folder = Path(folder) if folder else ANALYSES_SOURCE
+    if not folder.is_dir():
+        return []
+    entries = []
+    for path in sorted(folder.glob("*.md")):
+        entry = parse_front_matter(path)
+        entry.setdefault("name", path.stem)
+        entry.setdefault("status", "planned")
+        entries.append(entry)
+    entries.sort(key=lambda e: (e.get("status") != "ready", e.get("name", "")))
+    return entries
+
+
+def registry_block(entries: list) -> str:
+    """The README section listing each analysis as ready or planned."""
+    if not entries:
+        return REGISTRY_UNKNOWN
+    lines = []
+    for entry in entries:
+        ready = entry.get("status") == "ready"
+        state = "**ready**" if ready else "**planned — not built yet**"
+        summary = entry.get("summary", "").strip()
+        lines.append(f"- **{entry.get('name')}** — {state}. {summary}".rstrip())
+    lines.append("")
+    lines.append("A ready analysis is written as a short script of calls into `lib/`. A planned "
+                 "one does not exist: no script here can run it, and nothing should import it.")
+    return "\n".join(lines)
+
+
+def copy_library(root: Path) -> bool:
+    """Copy the skill's analysis library (Python + R) into <study>/lib/.
+
+    Copied rather than imported from the plugin, so the study folder stands alone:
+    it can be moved, shared or reopened later and the scripts still run.
+    """
+    if not LIB_SOURCE.is_dir():
+        return False
+    shutil.copytree(
+        LIB_SOURCE, root / "lib", dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"),
+    )
+    return True
 
 
 def load_tools(explicit: "str | None" = None):
@@ -277,6 +561,16 @@ def main():
     ap.add_argument("--export", required=True, help="Path to the REDCap record export CSV")
     ap.add_argument("--dictionary", required=True, help="Path to the data dictionary CSV")
     ap.add_argument("--force", action="store_true", help="Overwrite existing README/log/starter")
+    ap.add_argument("--variables", default=None, metavar="F1,F2,…",
+                    help="The fields Table 1 describes, comma-separated. Defaults to the "
+                         "demographics form, read from the data dictionary. Whatever is "
+                         "used is written into the generated script as an explicit list.")
+    ap.add_argument("--group-by", default=None, metavar="FIELD",
+                    help="The variable Table 1 is grouped by, spelled as in the data "
+                         "dictionary. Table 1 cannot guess it — 'by site' and 'by district' "
+                         "are different tables — so ask the user once and pass the answer "
+                         "here. Without it the generated script carries a marked placeholder "
+                         "and stops with a plain instruction until it is filled in.")
     ap.add_argument("--tools", default=None, metavar="ARGO_TOOLS.PY",
                     help="Path to argo_tools.py (the Python/R/Stata check in argo-core). The "
                          "skill finds it for you; the detected full paths are written into "
@@ -305,6 +599,12 @@ def main():
     shutil.copy2(export, data / "export.csv")
     shutil.copy2(dictionary, data / "data_dictionary.csv")
 
+    # Copy the analysis library in, so the scripts below run from this folder alone.
+    library_copied = copy_library(root)
+
+    # What the library can do, read from the skill's registry — never hand-listed.
+    registry = read_registry()
+
     # Which languages this computer can run, and where they live. Recorded in the folder
     # so every script that gets written here is invoked by a full path.
     tools_module = load_tools(args.tools)
@@ -312,11 +612,21 @@ def main():
     tools_block, tools_log = describe_tools(tools_module, tools_found)
 
     # Write docs + starter, refusing to clobber unless --force.
+    group_by = args.group_by or "<FILL IN — the variable to group Table 1 by>"
+    if args.variables:
+        variables = [v.strip() for v in args.variables.split(",") if v.strip()]
+    else:
+        variables = demographics_variables(data / "data_dictionary.csv", args.group_by)
+    charted = figure_field(data / "data_dictionary.csv", variables)
     targets = {
         root / "README.md": (README_TEMPLATE.replace("{TOOLS}", tools_block)
+                             .replace("{REGISTRY}", registry_block(registry))
                              .replace("{PYTHON}", tools_python(tools_found))),
         root / "ANALYSIS_LOG.md": LOG_TEMPLATE.replace("{TOOLS}", tools_log),
         scripts / "00_explore.py": EXPLORE_TEMPLATE,
+        scripts / "01_table1.py": (TABLE1_TEMPLATE.replace("{GROUP_BY}", group_by)
+                                   .replace("{VARIABLES}", render_variables(variables))
+                                   .replace("{FIGURE_FIELD}", charted)),
     }
     for path, content in targets.items():
         if path.exists() and not args.force:
@@ -326,6 +636,30 @@ def main():
         print(f"wrote: {path}")
 
     print(f"\nScaffolded: {root}")
+    if library_copied:
+        print(f"Analysis library copied to: {root / 'lib'} (Python + R)")
+    else:
+        print("NOTE: the analysis library wasn't found next to this script, so lib/ is "
+              "empty and scripts/01_table1.py has nothing to import yet.")
+    if registry:
+        ready = [e["name"] for e in registry if e.get("status") == "ready"]
+        planned = [e["name"] for e in registry if e.get("status") != "ready"]
+        print("What this toolkit can do: "
+              + "; ".join([f"{n} — ready" for n in ready] + [f"{n} — planned" for n in planned]))
+    if variables:
+        print(f"Table 1 variables ({len(variables)}, from the demographics form): "
+              + ", ".join(variables[:8]) + ("…" if len(variables) > 8 else ""))
+    else:
+        print("NOTE: no variables could be read from the data dictionary — list them in "
+              "VARIABLES at the top of scripts/01_table1.py.")
+    if charted:
+        print(f"Table 1 figure: {charted} by the grouping variable.")
+    else:
+        print("NOTE: no variable on that form can be charted as bars — 01_table1.py will "
+              "write the table only. Set FIGURE_FIELD to chart one.")
+    if not args.group_by:
+        print("No --group-by given: scripts/01_table1.py will stop and ask for the grouping "
+              "variable until it is filled in.")
     print("\nAnalysis tools on this computer:")
     if tools_found is None:
         print("  Not checked — pass --tools /path/to/argo_tools.py to have this filled in.")

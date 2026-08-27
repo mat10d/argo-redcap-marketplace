@@ -543,17 +543,24 @@ class TestTheSkillTellsAgentsToUseIt(unittest.TestCase):
         self.assertIn("Never try to install R itself", text,
                       "nothing stops the next session repeating the failed R install")
 
-    def test_the_skill_records_the_roadmap_as_not_yet_built(self):
-        """NITS 50: the roadmap must never read as a description of shipped features."""
+    def test_the_skill_describes_the_library_as_a_registry_not_a_roadmap(self):
+        """NITS 50, after 0.20: the roadmap became a real library, so it must now
+        describe what EXISTS and mark what does not. The old "none of this exists yet"
+        wording would now under-claim; a bare feature list would over-claim. The
+        registry (analyses/, ready vs planned) is what settles it — see
+        tests/test_analysis_registry.py for the per-entry drift guard."""
         text = self.SKILL.read_text()
-        self.assertIn("Where this is heading", text, "the roadmap note is missing")
-        roadmap = text.split("Where this is heading", 1)[1].split("## See also")[0]
-        self.assertIn("None of this exists yet", roadmap,
-                      "the roadmap must be marked as not-yet-built, explicitly")
-        for promised in ("formatting", "survival", "statistical comparisons"):
-            self.assertIn(promised, roadmap.lower(), f"the roadmap never mentions {promised}")
+        self.assertIn("## The analysis library", text, "the library section is missing")
+        section = text.split("## The analysis library", 1)[1].split("## See also")[0]
+        self.assertNotIn("None of this exists yet", section,
+                         "the library exists now — that line described the old roadmap")
+        for shipped in ("table1", "excel", "figures", "core"):
+            self.assertIn(shipped, section.lower(), f"the library section never mentions {shipped}")
+        self.assertIn("planned", section.lower(), "survival must still be marked planned")
+        self.assertIn("not built", section.lower(),
+                      "a planned analysis must be marked as not built, explicitly")
         for language in ("R", "Python"):
-            self.assertIn(language, roadmap, "the roadmap is R *and* Python libraries")
+            self.assertIn(language, section, "the library is R *and* Python")
 
 
 if __name__ == "__main__":

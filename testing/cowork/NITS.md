@@ -240,3 +240,11 @@ Round verdicts from the same review: export-from-API "perfect"; returning-after-
 53. qa-worklists: "round notes" referenced but undefined — pin `<round>/ROUND_NOTES.md` (what
     went out, which variant, when). build_worklists.py should print a per-field yellow/amber
     tally per site at the end of a run so the specialist can sanity-check without a manifest.
+
+## 0.20 analysis library — known parity gaps (documented, not blocking)
+54. Sparse r×c tables: R computes an exact Fisher; Python (stdlib, no scipy) simulates a seeded
+    chi-square — both correct and reproducible, but they print different p-values on the same
+    table (pregnancy_status by site: 0.7663 vs 0.6962). Decide: accept (documented in Notes) or
+    add scipy to Python for exact r×c Fisher.
+55. Checkbox parent fields: Python table1 describes them (levels = options); R excludes them
+    with a warning. Add to both or neither — together.
