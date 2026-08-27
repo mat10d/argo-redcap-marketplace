@@ -227,3 +227,13 @@ Ranked. The top two are silent-data-loss class.
     analysis vs statistical comparisons as future modules.
 
 Round verdicts from the same review: export-from-API "perfect"; returning-after-keys "perfect".
+51. ingest_response.py still hardcodes two ID columns / scans from column 3 (same silent-drop
+    shape as NITS 1, fixed in review_responses via the frozen pane). Migration-only path; fix
+    the same way when next touched.
+52. **ENVIRONMENT FACT (verified 2026-08-26 from Matteo's R chat): Cowork executes scripts in
+    a Linux aarch64 sandbox with the Mac's filesystem mounted in.** Mac binaries (Rscript,
+    Stata) are VISIBLE through the mount but cannot run there (Exec format error); no root,
+    ~3-minute command cap, so R cannot be installed either. Consequence: inside Cowork only
+    Python runs. R/Stata = the session WRITES the script and hands it to the user to run on
+    their own machine (RStudio / one command), parity checked on their output. Record in
+    access-tiers "Running in Cowork" + SETUP.md analyst section + run-analysis hand-off step.
