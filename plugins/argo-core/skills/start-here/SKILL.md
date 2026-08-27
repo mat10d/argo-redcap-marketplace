@@ -35,6 +35,8 @@ python3 "$D/argo_setup.py" --ensure; python3 "$D/argo_redcap_client.py" --check
 Both run regardless of each other's exit code — a scaffold that couldn't write still leaves a
 useful key report, and vice versa. Read the **toolkit version stamp** in the output
 (`ARGO toolkit X.Y.Z`); if someone is chasing a bug, that number is the first thing to check.
+Read `ARGO_ROLES` out of the same settings file while you're here — the confirmation line
+depends on it.
 
 Fold the result into your ONE confirmation line:
 
@@ -79,7 +81,7 @@ the full skill list. One question, phrased in their role's words:
 | `data-analyst` | "Point me at your export and tell me what you want out of it." |
 
 Holds several roles → one question naming their roles, not a menu of tasks: "You're down as
-database manager and QA — your weekly check, or a study's worklists?"
+database manager and QA — I'll start with your weekly check unless you'd rather go to a study."
 
 ### ARGO_ROLES is not set → ask, once
 
@@ -168,8 +170,8 @@ Present the picture in a few lines, then ask **one** question: which one to take
 | Linking request / "match these two studies" | [[link-data]] |
 | Personnel request / "add someone to a project" | the REDCap UI — the study's **User Rights** page. There is no add-users skill; [[weekly-check]] says what to do. |
 
-Keys: the five trackers, plus a study key where one exists — but every one of these has a
-files-and-UI path that needs no key, and that path is the mainline, not the fallback.
+Keys: the five trackers, plus a study key where one exists — and none of these routes is ever
+blocked for want of a key; every one has a files-and-UI path.
 
 ### Data analyst → point me at your export
 

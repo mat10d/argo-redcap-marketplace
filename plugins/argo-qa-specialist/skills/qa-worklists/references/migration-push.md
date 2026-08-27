@@ -15,7 +15,8 @@ patient data) before using any of it.
 
 ```
 qa-specialist/<study>/
-├── config/{fields.yaml, scope_ids.csv}
+├── config/scope_ids.csv        # optional record-ID scope list
+├── worklists/qa_fields.yaml    # the workbook plan, one level above the rounds
 ├── worklists/<round>/          # original worklists (build_worklists.py)
 ├── RA_response/                # files dropped here by RAs (flat — RA naming)
 ├── push_drafts/<round>/        # one CSV per (site, workbook) — staged updates
@@ -39,6 +40,20 @@ values:
   `field____999=0` AND `field____888=1`.
 - Blank cells = "leave alone" under `overwriteBehavior=normal`. So only the named fields get
   touched.
+
+`ingest_response.py` writes exactly that file from the RA's returned workbook, so this is
+rarely hand-built: it maps the labels RAs type ("Yes", "M1", a date) back to the codes REDCap
+expects, and anything it can't map confidently goes to a markdown report instead of being
+guessed. With `--original`, only the cells the RA actually changed are translated.
+
+```bash
+python3 .../argo-qa-specialist/skills/qa-worklists/ingest_response.py \
+    --url "$REDCAP_URL" --token-env CRC_TOKEN \
+    --response "qa-specialist/<study>/RA_response/<RA-filename>.xlsx" \
+    --original qa-specialist/<study>/worklists/<round>/with_MDC/<workbook>_<site>.xlsx \
+    --out qa-specialist/<study>/push_drafts/<round>/<site>_<workbook>.csv \
+    --report qa-specialist/<study>/push_drafts/<round>/<site>_<workbook>_unmapped.md
+```
 
 They go in `qa-specialist/<study>/push_drafts/<round>/`.
 

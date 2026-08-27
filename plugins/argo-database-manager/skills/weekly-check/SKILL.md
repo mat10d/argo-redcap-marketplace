@@ -36,10 +36,12 @@ rules below, item by item, rather than repeating them as a count in this half.
 ### Reading a study's row
 
 ```
-[study_status]  PID 242  6/7  Hepatectomy — PI: Alatise
+[Building/Pending] PID  242  6/7 — Hepatectomy — PI: Alatise
 ```
 
-- `study_status` — the current state (Building / In Production / Completed / Paused / Closed)
+- the bracketed value is `study_status` — the current state (Building/Pending · Open to
+  accrual · Closed to accrual; In analysis · Published · Closed – locked · Inactive · Closed;
+  will not be published)
 - `PID` — the new project's number in REDCap
 - `6/7` — steps done across the **7** canonical build flags: `project_created`, `dd_uploaded`,
   `user_rights_complete`, `data_imported`, `review_internal`, `review_pi`, `study_production`
@@ -61,7 +63,8 @@ P=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name portfoli
 python3 "$P" --check
 ```
 
-One line per tracker — its title, its record-ID column, and whether the key works. Never a key.
+One line per tracker — its title, its record-ID column, and whether the key works. Never a
+whole key — only the last four characters, so you can tell two keys apart.
 
 ## Part 2 — What's waiting for you
 
@@ -110,7 +113,7 @@ The columns that must be there:
 | Queue | Columns |
 |---|---|
 | Studies to build (SIR) | record, short name, PI, progress (`N/7`), next step |
-| People requests (SPR) | record, first name, last name, email, the role being asked for |
+| People requests (SPR) | record, first name, last name, email, the study, the role being asked for |
 | Data requests · Linking requests | record, then the summary fields the line carries |
 
 **Next step** for a build is the first of the seven canonical flags (listed under "Reading a
@@ -132,10 +135,10 @@ and two people requests:
 
 **People requests — 2 open**
 
-| Record | Given name | Family name | Work email address | Role being requested |
-|---|---|---|---|---|
-| 1 | Cleo | Sampleton | c.sampleton@example.org | Data manager |
-| 4 | Ime | Synthetica | i.synthetica@example.org | Data entry |
+| Record | Given name | Family name | Work email address | Study | Role being requested |
+|---|---|---|---|---|---|
+| 1 | Cleo | Sampleton | c.sampleton@example.org | Hepatectomy | Data manager |
+| 4 | Ime | Synthetica | i.synthetica@example.org | Colorectal | Data entry |
 
 and, in the same message, the two empty ones — one line each, no table:
 
@@ -164,9 +167,8 @@ Open the study's project in REDCap → **User Rights** (the *Users & Roles* page
   four standard ARGO roles ([[standard-roles]]).
 - **The roles don't exist on the project yet** → [[build-study]] step 4 makes the upload-ready
   roles CSV; upload it at **User Rights → User Roles → Upload user roles (CSV)** first.
-- **The person has no REDCap account yet** → only an administrator can create one. Record the
-  request in the **Study Personnel Request** tracker (PID 221), one record per person, and say
-  which record you created.
+- **The person has no REDCap account yet** → only an administrator can create one. Leave the
+  SPR record open, say so plainly, and tell the user which administrator to ask.
 - Site isolation is Data Access Groups, on the same page.
 
 We don't know anyone's real REDCap username, so present who→role as a **table** for the user to
@@ -174,9 +176,10 @@ work from — never generate an assignment file.
 
 ### Closing a request
 
-When a request is fulfilled, tick its `completed` box in that tracker **on the REDCap website** —
-that's what drains the queue. (The 222/223 keys don't carry import rights, so this is a UI step
-by design, not an oversight.)
+**Data, people, linking and support requests:** tick `completed` in the REDCap UI — you are
+already on that page for a people request, and the 222/223/225 keys don't carry import rights
+anyway. **Studies to build:** the queue drains when `study_production` is marked —
+[[build-study]] does that with `sir_update.py --mark-step`, no UI step.
 
 ## Where it saves
 
@@ -185,7 +188,7 @@ by design, not an oversight.)
 | Snapshots | `database-manager/weekly-check/snapshot-<ISO timestamp>/` — a **directory**, not a single file |
 | ↳ the snapshot itself | `snapshot-<ISO timestamp>/summary.json` |
 | ↳ per-project raw exports | `snapshot-<ISO timestamp>/<ENV_VAR>.csv` (Excel-friendly, one per tracker) |
-| Per-ticket working dirs | `database-manager/tickets/<ticket-id>/` (created by [[build-study]]) |
+| Per-study build folders | `database-manager/<study>/` (created by [[build-study]] step 1b) |
 | Your access keys | the settings file in your ARGO folder — never shared, never pasted into chat |
 
 Snapshots land in `database-manager/weekly-check/` inside your ARGO folder. `ARGO_PM_ROOT` in

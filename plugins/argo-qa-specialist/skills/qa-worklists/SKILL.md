@@ -10,9 +10,10 @@ Two jobs: build the per-site worklists of missing data, and audit what the RAs s
 
 ## Before you start
 
-**Keys.** You already hold the five ARGO tracker keys. For QA you also need one key for the
-study you're assigned to; the administrator issues it, on a right-scoped account. It goes in
-your settings file. See [[access-tiers]].
+**Keys.** You already hold the five ARGO tracker keys. For QA, a key for the study you're
+assigned to makes the pull direct — the administrator issues it, on a right-scoped account, and
+it goes in your settings file. It's never required: without one I work from the two files you
+download. See [[access-tiers]].
 
 **How I get the data.** If the study's access key is in your settings file, I pull straight from
 REDCap. If it isn't, I use the two files you download from REDCap (Data Export + Designer →
@@ -112,14 +113,19 @@ workbooks:
 ### Run it
 
 ```bash
-python3 .../argo-qa-specialist/skills/qa-worklists/build_worklists.py \
+W="$(dirname "$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name build_worklists.py 2>/dev/null | head -1)")"
+
+python3 "$W/build_worklists.py" \
     --token-env CRC_TOKEN \
-    --fields qa_fields.yaml \
+    --fields qa-specialist/<study>/worklists/qa_fields.yaml \
     --out qa-specialist/<study>/worklists \
     --id-field research_number \
     --extra-id-cols collaboration_identifier \
     --scope-ids cohort_ids.csv         # optional
 ```
+
+`$W` is the folder this skill's scripts are in. Shell variables don't survive between commands,
+so keep that first line in front of every block below, or set it once in the same command.
 
 `--token-env` takes the *name* of the setting that holds your access key, never the key itself.
 `--fields` points at the `qa_fields.yaml` I wrote and you confirmed. The script finds and reads
@@ -174,7 +180,8 @@ this skill assumes: the RAs revisit cells already holding a coded-missing value 
 a code someone stood behind. `no_MDC/` is the exception, and it needs a decision from you as the
 QA specialist: send it only when you have decided the coded-missing cells are settled and should
 not be revisited this round. Say which variant you sent, in the covering message and in the round
-notes — a site that received one and is asked about the other has no way to tell.
+notes — `qa-specialist/<study>/worklists/<round>/ROUND_NOTES.md`, which records what went out,
+which variant, and when. A site that received one and is asked about the other has no way to tell.
 
 Send each site its own workbook, and tell them:
 
@@ -203,7 +210,7 @@ name them however they name them).
 For each returned file:
 
 ```bash
-python3 .../argo-qa-specialist/skills/qa-worklists/review_responses.py \
+python3 "$W/review_responses.py" \
     qa-specialist/<study>/worklists/<round>/with_MDC/<workbook>_<site>.xlsx \
     "qa-specialist/<study>/RA_response/<RA-filename>.xlsx"
 ```
@@ -287,7 +294,7 @@ The round closes on the next pull, when the rebuild shows the cells gone.
 ### Send each RA their summary
 
 ```bash
-python3 .../argo-qa-specialist/skills/qa-worklists/summarize_for_ra.py \
+python3 "$W/summarize_for_ra.py" \
     --metadata-csv data_dictionary.csv \
     --questions qa-specialist/<study>/RA_questions.md \
     --out qa-specialist/<study>/RA_summaries/ --round-label "<today>"

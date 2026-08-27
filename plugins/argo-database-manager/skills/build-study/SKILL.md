@@ -7,8 +7,8 @@ allowed-tools: Read, Bash, Write, Glob, Edit, Grep
 # build-study
 
 One skill for the whole build pipeline: **SIR record → live study.** It merges what used to be two
-skills (intake triage + DD build). The spine is a feedback loop — **every pipeline step you finish
-lets you flip one `build_tracking` flag on the Study Tracker, so the portfolio gets more accurate
+skills (intake triage + DD build). The spine is a feedback loop — **most pipeline steps you finish
+let you flip one `build_tracking` flag on the Study Tracker, so the portfolio gets more accurate
 in real time.** Mark as you go; never batch at the end.
 
 ## Which access this skill needs (read first)
@@ -20,7 +20,8 @@ Two different things get confused here, so be precise ([[access-tiers]]):
   no per-study permission from anyone. `sir_update.py --mark-step` is **the** way to mark
   progress; do not offer the user a choice about it.
 - **Anything against the new study's own project** (creating it, uploading the DD) is done in the
-  REDCap website regardless, because OAU has no Super Token ([[project-no-super-token]]).
+  REDCap website regardless, because OAU has no super access key — REDCap's Super API Token, the
+  one that could create projects for us ([[project-no-super-token]]).
 
 If the Study Tracker key genuinely isn't configured on this machine, fall back to setting the same
 `build_tracking` yes/no fields by hand in the Study Tracker — but say that's what you're doing and
@@ -36,7 +37,7 @@ why. That's a fallback for a broken setup, not an equal option to present each t
 | 3 | **Build DD** | Construct (Path A) or audit (Path B) → upload | `dd_builder.py`, `validate_dd.py` | `dd_uploaded` |
 | 4 | **Roles & users** | Roles CSV + assign users | `make_roles_csv.py` | `user_rights_complete` |
 | 5 | **Data import** | Map + import, or mark prospective | `validate_import.py` | `data_imported` (1 / 2) |
-| 6 | **Setup** | File Repository, weekly reports, DAGs | *(MANUAL_SETUP_BRIEF)* | *(part of setup)* |
+| 6 | **Setup** | File Repository, weekly reports, DAGs | `setup_brief.py` | *(part of setup)* |
 | 7 | **Review** | Internal QA, then PI sign-off | — | `review_internal`, `review_pi` |
 | 8 | **Production** | Move project to Production | — | `study_production` |
 
@@ -62,7 +63,6 @@ honest between runs.
 
 ## Step 1 — Triage (is there enough to build?)
 ```bash
-set -a; source ~/.argo/.env; set +a
 S=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name sir_update.py 2>/dev/null | head -1)
 python3 "$S" <RID> --pull > intake.json
 ```
@@ -253,7 +253,8 @@ Mark `user_rights_complete` as soon as the roles are uploaded and users assigned
 ## Step 5 — Data import → `data_imported`
 Prospective study (`data_collection` = prospective) → no historical data: `--set data_imported=2`.
 Retrospective data exists → map source → `import_ready.csv`, validate with `validate_import.py`
-(branching-aware), import via `content=record`, then `--set data_imported=1`.
+(branching-aware), then the user imports it in the REDCap UI (Data Import Tool → review changes
+before saving), then `--set data_imported=1`.
 
 ## Step 6 — Setup: File Repository, weekly reports, DAGs (the MANUAL_SETUP_BRIEF)
 Generate the per-study UI checklist with `setup_brief.py`:
@@ -297,8 +298,12 @@ responsible person before flipping each; never auto-mark them.
 ---
 
 ## sir_update.py — the Study Tracker tool
-All build-state writes go through it (confirms the project is the Study Tracker before writing;
-shows a diff and pauses). Dates are `YYYY-MM-DD` on import ([[redcap-date-import]]).
+All build-state writes go through it (confirms the project is the Study Tracker before writing).
+Dates are `YYYY-MM-DD` on import ([[redcap-date-import]]).
+
+It shows the diff and pauses for a yes. In a session with no keyboard on the prompt, show the
+user the proposed change yourself, get their OK, then re-run with `--yes` (or
+`ARGO_ASSUME_YES=1`).
 
 ```bash
 S=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name sir_update.py 2>/dev/null | head -1)
@@ -328,9 +333,9 @@ go, which is exactly why none of them is a routine close-out path:
 |---|---|---|
 | `--mark-built` | Retro-recording a build that was completed outside ARGO | It flips the human sign-off gates (`review_internal`, `review_pi`, `study_production`) in one shot. Run it only when the responsible person has confirmed all three |
 | `--close` | A study going live whose build was already marked complete | Sets production + open to accrual. Same rule: confirm with the responsible person first |
-| `--set F=V` | Fixing one wrong value after the fact | Bypasses the step-by-step record the tracker exists to keep |
+| `--set F=V` | Two uses: `data_imported=2` for a prospective study (Step 5 — the documented path), and fixing one wrong value after the fact | Outside those, it bypasses the step-by-step record the tracker exists to keep |
 
-Other flags: `--pull`, `--pid`, `--status`, `--irb-number/--irb-expires`, `--reopen`.
+Other flags: `--pull`, `--pid`, `--status`, `--irb-number/--irb-expires`, `--reopen`, `--yes`.
 
 If the Study Tracker key isn't configured, set the same `build_tracking` fields by hand in the
 Study Tracker and say so — see the access note at the top of this skill.
@@ -341,7 +346,7 @@ Study Tracker and say so — see the access note at the top of this skill.
 `validate_import.py` (Step 5) · `setup_brief.py` (Step 6 MANUAL_SETUP_BRIEF generator) ·
 `sir_update.py` (the tracker tool) ·
 `backfill_sir_from_csv.py` (bulk SIR loads from a spreadsheet — not part of the per-study loop;
-requires an explicit `--record-id-range` before it will write anything).
+requires both `--commit` and an explicit `--record-id-range` before it will write anything).
 
 ## Not here
 - **Adding people to a live project** → the REDCap UI, on the study's User Rights page. There

@@ -21,8 +21,7 @@ A teammate says any of: "analyze this export," "make a Table 1," "summarize the 
 
 If they haven't downloaded the data yet, walk them through getting it off the REDCap website:
 [[getting-files-from-redcap]] has the click-by-click steps, written for someone who doesn't know
-REDCap's menus. (If you're a database manager with an access key for the study, [[export-data]]
-does the download for you — but never send an analyst off to get a key.)
+REDCap's menus.
 
 ## Inputs (assumed already on disk)
 
@@ -150,13 +149,11 @@ locked, and commands are capped at a couple of minutes — an R install cannot f
 attempting it burns the session for nothing. This is the normal state of affairs, not a broken
 machine: say so in one line, write the R script anyway, and hand the user the exact command to
 run it on their own computer (or the RStudio steps), then compare their output with the Python
-table for parity. If R isn't runnable where you execute, say so in
-one line and offer the two real options: do it in Python here, or hand the user the exact
-command to run the R script on their own computer.
+table for parity.
 
 ### 1. Orient on the data
-- Locate `export.csv` and `data_dictionary.csv`. Read the **data dictionary first**: list the
-  forms, field types, the record-ID field (it is often NOT `record_id` — see
+- Open the two files `scaffold.py` copied into `data/`. Read the **data dictionary first**:
+  list the forms, field types, the record-ID field (it is often NOT `record_id` — see
   [[record-id-safety]]), coded choice maps, validation ranges, and branching logic.
 - Load the export and report shape: N records, N fields, key variables, obvious grouping/outcome
   candidates. Note missing-data codes present ([[mdc-rules]]: `-666/-777/-888/-999`, and `666`

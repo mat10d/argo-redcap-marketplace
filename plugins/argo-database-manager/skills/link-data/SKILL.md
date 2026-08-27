@@ -1,6 +1,6 @@
 ---
 name: link-data
-description: Fulfil a linking request, or merge more than one database for analysis — work out which column identifies the same person in two studies, join them, and produce the hard-link file that records each participant's number from the other study. Also builds one merged table for analysis and reports the gaps, duplicates and conflicts. Works entirely from downloaded files and needs no access key. Writing values back into REDCap is a separate, confirmed, fill-blanks-only step for the database manager. Use for link, join, match, reconcile, cross-reference or de-duplicate across two or more studies or sources (REDCap to REDCap, or REDCap to a spreadsheet, cBioPortal export, CSV or TSV).
+description: Fulfil a linking request, or merge more than one database for analysis — work out which column identifies the same person in two studies, join them, and produce the hard-link file that records each participant's number from the other study. Also builds one merged table for analysis and reports the gaps, duplicates and conflicts. Works entirely from downloaded files and needs no access key. Writing values back into REDCap is a separate, confirmed, fill-blanks-only step for the database manager. Use for link, join, match, reconcile, cross-reference or de-duplicate across two or more studies or sources (REDCap to REDCap, or REDCap to a spreadsheet saved as CSV, cBioPortal export, CSV or TSV).
 allowed-tools: Read, Bash, Write, Edit, Glob, Grep
 ---
 
@@ -42,7 +42,7 @@ several exports that all look plausible. **If the user hasn't attached or named 
 where they are — one question.** If you have looked and found likely candidates, don't assume:
 name what you found and confirm in the same one question.
 
-> I can see `crc_records_2026-08-12.csv` and `r01_export.xlsx` in your folder — is that the pair
+> I can see `crc_records_2026-08-12.csv` and `r01_export.csv` in your folder — is that the pair
 > you want linked, and is the R01 the study that should end up holding the CRC number?
 
 **Parent and child.** The *parent* is the study whose number gets carried (the cohort, the
@@ -55,7 +55,10 @@ test export as the study.
 
 **Where the files come from.** Either side can be a CSV downloaded from the REDCap website
 ([[getting-files-from-redcap]]) or pulled with a key via [[export-data]]. The whole read side
-works the same either way — a linkage never needs a key.
+works the same either way — a linkage never needs a key. **Both sides must be CSV or TSV** —
+comma- and tab-separated files (a cBioPortal export, say) are read as they are. An Excel
+workbook has to be saved as CSV first — the tool will tell the user so, but it's faster to say
+it up front.
 
 ## Step 1 — derive the join key, out loud
 
@@ -137,6 +140,10 @@ is the reverse. Both carry the patient's **name and surname** (and the hospital 
 is one), because the way these get resolved is somebody reading down the list and recognising
 people.
 
+A record whose key column is blank can never link to anything, so it lands in its own side's
+missing-link file too, and the run says how many — a record that vanished from every report
+would look like one that had been handled.
+
 Say both counts out loud, always. "312 linked" on its own is not the truth about a linkage;
 "312 linked, 28 R01 records with no CRC match, 604 CRC records with no R01 record" is.
 
@@ -148,7 +155,11 @@ the link is fine; two unrelated names on the same number mean the ID was reused 
 that pair needs a human before the hard link is uploaded. If the run reports discrepancies, show
 this table before handing over the hard link.
 
-If only one of the two files carries names, the run says so rather than skipping quietly.
+If names are missing from one file or from both, the run says which case it is rather than
+skipping quietly — an empty review table and an unchecked join look identical otherwise.
+
+Name columns are found automatically from the usual headings; if a file names them something
+else, pass `--parent-names "first_name,surname"` / `--child-names …`.
 
 ### When the run refuses
 
@@ -211,8 +222,8 @@ printed about pushing — because nobody is pushing anything.
 python3 "$L/build_master_linkage.py" \
     --left  cohort_records.csv --left-name  cohort \
     --right pathology.csv      --right-name pathology \
-    --diff-dir data-analyst/<study>/ --diff-prefix pathology \
-    --id-field syn_id --out data-analyst/<study>/master_linkage.csv
+    --diff-dir database-manager/linkage/r01-crc/ --diff-prefix pathology \
+    --id-field syn_id --out database-manager/linkage/r01-crc/master_linkage.csv
 ```
 
 `--left` is whatever you gave `--current`, `--right` whatever you gave `--computed`; the script
