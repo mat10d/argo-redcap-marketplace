@@ -240,7 +240,7 @@ def scaffold(work_dir: Path, creds_dir: "Path | None" = None, say=print) -> "Pat
     if not gitignore.exists():
         gitignore.write_text(
             ".env\n*.env\nAdd keys here.command\n"
-            "qa-specialist/\ndatabase-manager/\ndata-analyst/\n")
+            "project-manager/\nqa-specialist/\ndatabase-manager/\ndata-analyst/\n")
     return env_path
 
 
@@ -267,8 +267,6 @@ def open_settings_file(env_path: Path, connected: bool = False) -> None:
     never end silently — the user is holding a key with nowhere to put it. ARGO_SETUP_NO_OPEN=1
     disables entirely (test suites use it).
     """
-    if os.environ.get("ARGO_SETUP_NO_OPEN"):
-        return
     import shutil
     import subprocess
 
@@ -285,8 +283,8 @@ def open_settings_file(env_path: Path, connected: bool = False) -> None:
     in_session_runtime = (Path("/mnt/skills").is_dir() or Path("/mnt/.remote-plugins").is_dir()
                           or (Path.home() / "mnt").is_dir() or str(Path.home()).startswith("/sessions"))
     try:
-        if in_session_runtime:
-            explain()
+        if in_session_runtime or os.environ.get("ARGO_SETUP_NO_OPEN"):
+            explain()   # never silent: with no editor to open, the instructions ARE the card
             return
         if sys.platform == "darwin":
             subprocess.run(["open", "-t", str(env_path)], check=False, timeout=10,
@@ -376,7 +374,12 @@ def ensure(work_dir: "Path | None" = None) -> int:
     Already set up → one quiet line, nothing touched. Not set up → create the scaffold and say
     so LOUDLY, because the very next thing the user must do is paste their keys in.
     """
-    existing = find_existing_settings()
+    explicit = os.environ.get("ARGO_ENV_FILE")
+    if explicit and not Path(explicit).expanduser().is_file() and work_dir is None:
+        # An explicit settings path that doesn't exist yet is an instruction, not a search hint:
+        # scaffold THERE rather than falling through to some other machine-wide file.
+        work_dir = Path(explicit).expanduser().parent
+    existing = None if (explicit and work_dir is not None) else find_existing_settings()
     if existing:
         print(f"Settings found at {existing} — setup skipped. (ARGO toolkit {TOOLKIT_VERSION})")
         return 0
@@ -410,9 +413,11 @@ def ensure(work_dir: "Path | None" = None) -> int:
     print(" issues them. Nothing is blocked without them: every ARGO task also")
     print(" works from files downloaded off the REDCap website.")
     print()
-    if connected:
-        print(" This is inside the folder you connected, so it lives on YOUR")
-        print(" computer and keeps your keys between sessions.")
+    ephemeral = (str(Path.home()).startswith("/sessions")
+                 and str(env_path.resolve()).startswith(str(Path.home().resolve()))
+                 and "/mnt/" not in str(env_path.resolve()))
+    if connected or not ephemeral:
+        print(" This lives on YOUR computer and keeps your keys between sessions.")
     else:
         print(" NOTE — this session may be temporary, and this file would then")
         print(" disappear when it ends. The ARGO way to keep your keys: create")
@@ -442,6 +447,9 @@ def main() -> int:
                     help="The default first step of any ARGO task: if a settings file exists "
                          "anywhere the tools look, do nothing; otherwise create one and say so "
                          "loudly. Safe to run every time.")
+    ap.add_argument("--show-settings", action="store_true",
+                    help="Put the settings file in front of the user (opens it, or prints the "
+                         "exact instructions) — the same thing setup does when it finishes")
     ap.add_argument("--set-roles", default=None, metavar="ROLES",
                     help="Record who this person is on ARGO, comma-separated: "
                          "project-manager, qa-specialist, database-manager, data-analyst. "
@@ -451,6 +459,16 @@ def main() -> int:
 
     if args.ensure:
         return ensure(Path(args.dir).expanduser() if args.dir else None)
+
+    if args.show_settings:
+        found = (Path(args.dir).expanduser() / ".env") if args.dir else find_existing_settings()
+        if not found or not found.is_file():
+            print("There's no ARGO settings file yet — run this first:\n"
+                  f"    python3 {Path(__file__).name} --ensure")
+            return 1
+        print(f"Your settings file: {found}")
+        open_settings_file(found)
+        return 0
 
     if args.set_roles is not None:
         return set_roles(args.set_roles,

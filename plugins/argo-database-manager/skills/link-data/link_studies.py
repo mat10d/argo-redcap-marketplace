@@ -98,11 +98,19 @@ def is_structural(column: str) -> bool:
     return column in STRUCTURAL_COLUMNS or column.endswith("_complete")
 
 
-def read_csv(path: Path):
-    """(rows, column names), with a plain message when the file isn't there."""
+def read_table(path: Path):
+    """(rows, column names) from a comma- or tab-separated file.
+
+    cBioPortal and several lab systems export tabs, and reading one of those as commas
+    gives a single column with the whole header inside it — a confusing failure a long way
+    from its cause. The delimiter is decided from the header line and nothing else.
+    """
     try:
         with open(path, newline="") as fh:
-            reader = csv.DictReader(fh)
+            header = fh.readline()
+            delimiter = "\t" if ("\t" in header and "," not in header) else ","
+            fh.seek(0)
+            reader = csv.DictReader(fh, delimiter=delimiter)
             columns = [c for c in (reader.fieldnames or [])]
             rows = [dict(r) for r in reader]
     except FileNotFoundError:
@@ -110,6 +118,11 @@ def read_csv(path: Path):
             f"I couldn't find this file:\n    {path}\n\n"
             "Check the name and the folder. If the name has spaces in it, put quotation marks\n"
             'around it, like "my export.csv".')
+    except UnicodeDecodeError:
+        raise SystemExit(
+            f"I couldn't read {path.name} as text.\n\n"
+            "It looks like an Excel workbook or another binary file. Open it and save it as\n"
+            "CSV, then run this again on the CSV.")
     if not columns:
         raise SystemExit(f"{path} has no column headings in it, so there is nothing to join on.")
     return rows, columns
@@ -281,11 +294,17 @@ def norm_name(value) -> str:
 
 
 def index_by_key(rows, key_column, side, path):
-    """{normalised key: row}, refusing to guess when a key value repeats."""
-    index, repeated = {}, {}
+    """({normalised key: row}, rows with no key at all).
+
+    Refuses to guess when a key value repeats. A row with a BLANK key is handed back
+    rather than dropped: it can never link to anything, and a record that vanishes from
+    every report is the worst outcome here — it looks like it was handled.
+    """
+    index, repeated, blank = {}, {}, []
     for row in rows:
         k = norm(row.get(key_column, ""))
         if k == "":
+            blank.append(row)
             continue
         if k in index:
             repeated.setdefault(k, 1)
@@ -300,7 +319,7 @@ def index_by_key(rows, key_column, side, path):
             "pick one of them. Either the export has repeating rows in it (one row per visit or\n"
             "per sample), in which case export one row per person, or two records are genuinely\n"
             "duplicates and need merging in REDCap first.")
-    return index
+    return index, blank
 
 
 def write_csv_rows(path: Path, header, rows):
@@ -351,8 +370,8 @@ def main() -> int:
     args = ap.parse_args()
 
     parent_path, child_path = Path(args.parent).expanduser(), Path(args.child).expanduser()
-    parent_rows, parent_cols = read_csv(parent_path)
-    child_rows, child_cols = read_csv(child_path)
+    parent_rows, parent_cols = read_table(parent_path)
+    child_rows, child_cols = read_table(child_path)
     args.parent_name = (args.parent_name or parent_path.stem).strip()
     args.child_name = (args.child_name or child_path.stem).strip()
     if args.parent_name == args.child_name:
@@ -388,10 +407,15 @@ def main() -> int:
         raise SystemExit(
             f"The hard-link file would have two columns both called {child_id!r}.\n\n"
             f"Its two columns are the child study's record ID and the field in the child\n"
-            f"project that holds the parent's number. Name the second one with --link-field.")
+            f"project that holds the parent's number. Two possible reasons:\n"
+            f"  - the child export's first column IS the parent's number (a cut-down export):\n"
+            f"    then this export can't be linked — ask for the child project's full export,\n"
+            f"    the one whose first column is its OWN record number;\n"
+            f"  - the child project really does hold the parent's number under this same name:\n"
+            f"    then name the child's own record-ID column with --child-id.")
 
-    parent = index_by_key(parent_rows, parent_key, "parent", parent_path)
-    child = index_by_key(child_rows, child_key, "child", child_path)
+    parent, parent_blank = index_by_key(parent_rows, parent_key, "parent", parent_path)
+    child, child_blank = index_by_key(child_rows, child_key, "child", child_path)
     matched = [k for k in child if k in parent]
     child_only = [k for k in child if k not in parent]
     parent_only = [k for k in parent if k not in child]
@@ -418,10 +442,12 @@ def main() -> int:
     # -- 2. the two missing-link reports, each with names to review by eye ---
     c_review = review_columns(child_cols, child_key, child_id, c_first, c_sur)
     p_review = review_columns(parent_cols, parent_key, parent_cols[0], p_first, p_sur)
+    # A row with no key at all belongs here too: it links to nothing, and leaving it out
+    # of both reports would make it disappear from the linkage entirely.
     p_child_missing = write_csv_rows(out / f"{args.child_name}_missing_link.csv", c_review,
-                                     [child[k] for k in child_only])
+                                     [child[k] for k in child_only] + child_blank)
     p_parent_missing = write_csv_rows(out / f"{args.parent_name}_missing_link.csv", p_review,
-                                      [parent[k] for k in parent_only])
+                                      [parent[k] for k in parent_only] + parent_blank)
 
     # -- 3. the name-discrepancy review table -------------------------------
     name_rows, name_note = [], ""
@@ -466,10 +492,16 @@ def main() -> int:
     print(f"Joined {args.child_name} to {args.parent_name} on {join}.")
     print()
     print(f"  matched                 {len(matched):>5}  found in both studies")
-    print(f"  only in {args.child_name:<16}{len(child_only):>5}  no {args.parent_name} record "
-          f"-> {p_child_missing.name}")
-    print(f"  only in {args.parent_name:<16}{len(parent_only):>5}  no {args.child_name} record "
-          f"-> {p_parent_missing.name}")
+    print(f"  only in {args.child_name:<16}{len(child_only) + len(child_blank):>5}  "
+          f"no {args.parent_name} record -> {p_child_missing.name}")
+    print(f"  only in {args.parent_name:<16}{len(parent_only) + len(parent_blank):>5}  "
+          f"no {args.child_name} record -> {p_parent_missing.name}")
+    for side, blank, key, report in ((args.child_name, child_blank, child_key, p_child_missing),
+                                     (args.parent_name, parent_blank, parent_key,
+                                      p_parent_missing)):
+        if blank:
+            print(f"        of those, {len(blank)} {side} rows have no {key} recorded at all, "
+                  f"so nothing could be looked up for them ({report.name})")
     print()
     if name_note:
         print(f"Names   : not checked — {name_note}.")

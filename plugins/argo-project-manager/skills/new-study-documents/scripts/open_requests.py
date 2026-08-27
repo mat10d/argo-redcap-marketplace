@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from argo_trackers import ADMIN_TRACKERS, SOURCE_FORMS, sir_progress  # noqa: E402
+from argo_trackers import ADMIN_TRACKERS, SOURCE_FORMS, SIR_BUILD_STEPS, PROGRESS_NOT_DONE, sir_progress  # noqa: E402
 from argo_redcap_client import RedcapClient, RedcapError  # noqa: E402
 
 # The queues a database manager fulfils. Support tickets (225) are PM triage, so they are
@@ -143,6 +143,10 @@ def _study_label(rec: dict) -> str:
     dropped when the record doesn't carry it — a half-filled request still gets a useful line.
     """
     short = str(rec.get("shortened_study_name") or "").strip()
+    if not short:
+        # A freshly submitted request has no short name yet — the portfolio falls back to the
+        # full title, so the two halves of the weekly check name the study the same way.
+        short = str(rec.get("project_title") or "").strip()
     pi = str(rec.get("pi_surname") or "").strip()
     bits = []
     if short:
@@ -166,6 +170,14 @@ def _sir_progress(rec: dict) -> str:
     return f"{done}/{total}"
 
 
+def _next_step(rec: dict) -> str:
+    """The first canonical build step not yet settled — what the build would pick up at."""
+    for step in SIR_BUILD_STEPS:
+        if str(rec.get(step) or "").strip().lower() in PROGRESS_NOT_DONE:
+            return step
+    return ""
+
+
 def show_queue(key: str, expand: bool = True) -> "int | None":
     """Print one queue. Returns the open count, or None when the queue is unavailable."""
     env_var, heading = QUEUES[key]
@@ -187,7 +199,10 @@ def show_queue(key: str, expand: bool = True) -> "int | None":
             rid = rec.get(id_field, "?")
             study = _study_label(rec) if key == "builds" else ""
             lead = f"{study} — " if study else ""
-            extra = f"  [{_sir_progress(rec)} build steps done]" if key == "builds" else ""
+            extra = ""
+            if key == "builds":
+                nxt = _next_step(rec)
+                extra = f"  [{_sir_progress(rec)} build steps done" + (f"; next: {nxt}]" if nxt else "]")
             print(f"  {rid}: {lead}{_detail_line(key, rec, fields, id_field)}{extra}")
         print(f"  -> fulfilled in {ROUTE[key]}; when done, mark the record's"
               f" '{done_marker}' box in the {title} project on the REDCap website.")
@@ -210,7 +225,10 @@ def show_record(key: str, record_id: str) -> int:
     print(f"{heading} — record {record_id} ({title}):")
     for name, val in records[0].items():
         val = str(val).strip()
-        if val and not name.endswith("_complete"):
+        # Hide REDCap's per-form status fields (<form>_complete) — but never a canonical build
+        # step: user_rights_complete ends the same way and was being hidden, so --record showed
+        # 3 flags on a study the queue counted 4/7 and the next step came out wrong.
+        if val and (name in SIR_BUILD_STEPS or not name.endswith("_complete")):
             print(f"  {_clean_label(labels.get(name, name), width=None)}: {val}")
     return 0
 

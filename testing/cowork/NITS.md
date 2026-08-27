@@ -237,3 +237,6 @@ Round verdicts from the same review: export-from-API "perfect"; returning-after-
     Python runs. R/Stata = the session WRITES the script and hands it to the user to run on
     their own machine (RStudio / one command), parity checked on their output. Record in
     access-tiers "Running in Cowork" + SETUP.md analyst section + run-analysis hand-off step.
+53. qa-worklists: "round notes" referenced but undefined — pin `<round>/ROUND_NOTES.md` (what
+    went out, which variant, when). build_worklists.py should print a per-field yellow/amber
+    tally per site at the end of a run so the specialist can sanity-check without a manifest.

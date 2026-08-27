@@ -932,6 +932,42 @@ class TestLinkStudiesRefusesRatherThanGuesses(unittest.TestCase):
         self.assertIn("--suggest", out)
         self.assertNotIn("Traceback", out)
 
+    def test_a_row_with_no_key_at_all_is_still_reported(self):
+        """A record that vanishes from every report looks like one that was handled."""
+        parent = self.write("parent.csv", ["record_id", "hosp", "first_name", "surname"],
+                            [["1", "H1", "Ada", "Eze"], ["2", "H2", "Bode", "Kalu"]])
+        child = self.write("child.csv", ["child_id", "hosp", "first_name", "surname"],
+                           [["c1", "H1", "Ada", "Eze"], ["c2", "", "Chidi", "Nwosu"]])
+        out = self.tmp / "out"
+        proc = subprocess.run(
+            [sys.executable, str(LINK_STUDIES), "--parent", str(parent), "--child", str(child),
+             "--parent-name", "p", "--child-name", "c", "--key", "hosp",
+             "--child-id", "child_id", "--link-field", "parent_no", "--out-dir", str(out)],
+            capture_output=True, text=True, timeout=300)
+        self.assertEqual(proc.returncode, 0, proc.stderr[-800:])
+        hard = read_csv(out / "c_hard_link.csv")
+        self.assertEqual([r["child_id"] for r in hard], ["c1"],
+                         "a row with no key can never be hard-linked")
+        missing = read_csv(out / "c_missing_link.csv")
+        self.assertEqual({r["child_id"] for r in missing}, {"c2"})
+        self.assertEqual(missing[0]["surname"], "Nwosu")
+        self.assertIn("no hosp recorded at all", proc.stdout)
+
+    def test_a_tab_separated_export_is_read_as_a_table_not_one_column(self):
+        """cBioPortal ships TSV, and the skill advertises it — reading it as commas gives
+        one column holding the whole header, which fails a long way from its cause."""
+        parent = self.tmp / "parent.tsv"
+        parent.write_text("record_id\thosp\n1\tH1\n2\tH2\n")
+        child = self.write("child.csv", ["child_id", "hosp"], [["c1", "H1"]])
+        proc = subprocess.run(
+            [sys.executable, str(LINK_STUDIES), "--parent", str(parent), "--child", str(child),
+             "--parent-name", "p", "--child-name", "c", "--key", "hosp",
+             "--child-id", "child_id", "--link-field", "parent_no",
+             "--out-dir", str(self.tmp / "out")],
+            capture_output=True, text=True, timeout=300)
+        self.assertEqual(proc.returncode, 0, (proc.stdout + proc.stderr)[-800:])
+        self.assertEqual(len(read_csv(self.tmp / "out" / "c_hard_link.csv")), 1)
+
     def test_a_key_that_is_not_a_column_names_the_columns_that_are(self):
         proc = run_link("--key", "not_a_column", "--out-dir", str(self.tmp / "out"),
                         parent_name="syn", child_name="synb")
@@ -945,8 +981,13 @@ class TestLinkStudiesRefusesRatherThanGuesses(unittest.TestCase):
                         "--out-dir", str(self.tmp / "out"),
                         parent_name="syn", child_name="synb")
         self.assertNotEqual(proc.returncode, 0)
-        self.assertIn("--link-field", proc.stdout + proc.stderr)
-        self.assertNotIn("Traceback", proc.stdout + proc.stderr)
+        out = proc.stdout + proc.stderr
+        # The refusal must name BOTH possible causes: a cut-down child export whose first
+        # column is already the parent's number (→ ask for the full export), or a child that
+        # genuinely stores the parent number under that name (→ point at --child-id).
+        self.assertIn("full export", out)
+        self.assertIn("--child-id", out)
+        self.assertNotIn("Traceback", out)
 
     def test_it_asks_for_the_key_rather_than_guessing_one(self):
         proc = run_link("--out-dir", str(self.tmp / "out"),

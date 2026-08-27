@@ -43,7 +43,7 @@ TASKS = {
     },
     "linkage": {
         "skill": "plugins/argo-database-manager/skills/link-data/SKILL.md",
-        "inputs": ["records.csv", "datadictionary.csv", "study-b"],
+        "inputs": ["study-b"],
         "prompt": "Merge these two studies for analysis and show me the matches, conflicts and orphans.",
         "roles": "database-manager,data-analyst",
     },
