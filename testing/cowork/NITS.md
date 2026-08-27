@@ -175,3 +175,13 @@ Ranked. The top two are silent-data-loss class.
     dictionary marks Identifier?=y dropped, both encodings or at least raw), named so it's
     obvious which is safe to share; README says which fields were removed. Checkbox-column
     collapsing is a nice-to-have extra file, never a replacement.
+
+## Found in the 0.18.0 Cowork rounds (2026-08-24/26)
+41. **build_worklists.py crashes on duplicate field labels** (real CRC round): line ~469 looks
+    fields up by LABEL; the live CRC DD has 44 labels shared across 160 fields. Reproducible;
+    masked only because the colliding fields are @HIDDEN. Look up by field NAME everywhere;
+    labels are display-only.
+42. **review_responses.py must recognise the legacy rose fill (FFC7CE) as flagged** alongside
+    the new yellow — worklists sent to RAs before the 0.18 colour change come back rose, and the
+    audit silently reported 5/36 answers. Accept both hexes (qa_colours.py: LEGACY_FLAG_HEXES),
+    and warn when a workbook's flags are all legacy-coloured.

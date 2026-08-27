@@ -17,22 +17,29 @@ status; PLAN keeps the history and the spec.
 11. Tier 1: 371 automated checks; Tier 1.5: 8/8 subagent walkthroughs
 12. NITS defects 1–40: all fixed, released (0.17.2 → 0.18.0)
 
-## Ran 2026-08-24 evening, grading pending (transcripts on disk)
-- C RA worklists · D audit returns · F two-study merge · G study documents
+## Graded complete 2026-08-26 (the five continued chats)
+- B Table 1 — pass (district grouping per in-chat answer; self-verified, fixed 2 own-script bugs)
+- C+L QA worklists on the REAL CRC study, live key — pass; 3,784 cells verified; found NITS 41
+  (label-collision crash) + 2 live-CRC data-quality issues (staging branching, duplicate labels)
+- D audit — pass after detecting the legacy-colour drift itself (36/9 exact); found NITS 42
+- F merge — pass, every count exact; systematic-conflict insight
+- G documents — pass; official templates fetched/used; 2 template findings (memo is a flattened
+  image; official questionnaire is a design guide)
 - naqiya's study session (real work — unexamined)
-- NOT seen in the store: B (Table 1) — presumed not run
 
 ## Outstanding tests
-- B  Table 1 (Python), 0.18.0
-- K  Export with no key (solicitation path; comment out CRC line first)
-- L  QA from the live CRC key
-- M  Table 1 in R (in B's chat)
-- O  Repeat A + B once each (demo reproducibility)
-- Q  Audit round 2 on a matching layout (generate returns from C's worklists)
+- K  Export with no key (solicitation path; Claude comments out the CRC line first)
+- M  Table 1 in R (continue B's chat: "Redo the Table 1 in R.")
+- O  Repeat weekly-check + Table 1 once each (demo reproducibility)
+- Q  Audit on the regenerated kit (new colours; fresh chat, same audit prompt)
 - P  WINDOWS probe (friend's machine; ARGO-test-data/WINDOWS-PROBE.md) — the last real unknown
 
 ## Outstanding non-test
 - Study 17 user_rights_complete: REDCap admin (User Rights on 7436) or UI by hand
+- Live CRC data quality (from round C+L): 5 staging fields missing branching logic; 44
+  duplicate field labels — a report for the database manager / study team
+- Official templates: activation memo is a flattened image (can't be filled); questionnaire
+  template is a design guide — flag to the PM/collaborator
 - Collaborator review of the PM document package
 - OAU batch tracker-key request (longest lead time)
 - Team handout + demo script (delivery pieces)
