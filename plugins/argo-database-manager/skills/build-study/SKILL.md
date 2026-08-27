@@ -31,6 +31,7 @@ why. That's a fallback for a broken setup, not an equal option to present each t
 | # | Step | Do this | Script | → flip `build_tracking` |
 |---|---|---|---|---|
 | 1 | **Triage** | Pull the SIR; is there enough to build? | `sir_update.py --pull` | *(gate — no flag)* |
+| 1b | **Port the documents** | Make the build folder, pull the attached documents in, then read them | *(files)* | *(no flag)* |
 | 2 | **Create project** | Paste sheet → create in UI | `fill_new_project.py` | `project_created` (+ `--pid`) |
 | 3 | **Build DD** | Construct (Path A) or audit (Path B) → upload | `dd_builder.py`, `validate_dd.py` | `dd_uploaded` |
 | 4 | **Roles & users** | Roles CSV + assign users | `make_roles_csv.py` | `user_rights_complete` |
@@ -77,6 +78,40 @@ already captured. Key fields drive later steps:
 | `num_institutions`, `inst_name_*`, `irb_file_*`, `consent_file_*`, `sop`, `eligibility_checklist` | Step 6 File Repository + DAGs |
 | `weekly_stat`, `category` | Step 6 weekly reports |
 | `pm_*`, `ra_*`, `pi_user_*`, `addl_users` | Step 4 user roles |
+
+## Step 1b — Port the documents into the build folder (before any analysis)
+
+The first thing you do after triage passes is **collect the request's attached documents**. Not
+after the DD is designed, not while you build — first, as a single act, so the rest of the build
+reads from a folder instead of hunting for files. In order:
+
+1. **Make the folder.**
+   ```bash
+   mkdir -p database-manager/<study>/questionnaires database-manager/<study>/protocol \
+            database-manager/<study>/ethics
+   ```
+   (`<study>` is the study moniker you'll use everywhere else. Skip a subfolder if the SIR
+   attaches nothing for it.)
+2. **Pull the documents in.** `sir_update.py --pull` (Step 1) already gave you the filenames — the
+   SIR's file fields sort straight into the folders:
+
+   | SIR field(s) | → folder |
+   |---|---|
+   | `quest_univ_file`, `quest_site_1..10` | `questionnaires/` |
+   | `sop`, `eligibility_checklist`, plus the proposal/protocol if the study has one | `protocol/` |
+   | `irb_file_*`, `consent_file_*`, `consent_prof_*` | `ethics/` |
+
+   Look for each named file in the workspace first (`Glob`). Ask for whatever isn't there **in one
+   message, listing every missing file at once** — the user downloads them from the SIR record in
+   REDCap (open the record → the file field → Download) or from the study's File Repository and
+   drops them into the folder you just made. One ask, not one question per file.
+3. **Then read them.** Extract the text (`textutil -convert txt -stdout "file.docx"`) and read the
+   questionnaire and the protocol before designing anything. This is the folder Step 3 builds the
+   DD from and the folder Step 6 renames for File Repository upload — so the copies live here from
+   the start, and nothing gets built from a half-remembered attachment.
+
+If the questionnaire turns out to be missing entirely, that's the Step 1 gate failing — go back to
+the PM rather than building around it.
 
 ## Step 2 — Create project → `project_created`
 ```bash
@@ -129,19 +164,49 @@ questionnaire across all → flag possible resubmission before building N copies
 > ### The questionnaire is IRB-approved — mirror it, don't improve it
 > Only critically essential changes to a questionnaire are allowed (IRB amendments). So the
 > data dictionary matches the **printed form exactly**: spelling errors, numbering quirks, and
-> answer wordings are reproduced as-is, never fixed and never flagged. A column printed with
-> **no answer options** becomes free text as printed — not a proposed coded list. What you DO
-> surface: substantive defects — skip instructions pointing at sections that don't exist,
-> questions the SIR commits the study to that the form lacks, structural contradictions — as a
-> **QUESTIONNAIRE_CHANGELOG.md** in the build folder, each item marked "needs IRB amendment:
-> yes/no", for the database manager and PI to decide. Surfaced, never applied.
+> answer wordings are reproduced as-is, never fixed. A column printed with **no answer options**
+> becomes free text as printed — not a proposed coded list. None of these — typos, numbering,
+> wordings, a missing option list — is a change to propose or a question to ask: they are built as
+> printed and appear in **neither** of the two deliverables below.
+>
+> ### The build always makes headway — best guess in, question out
+> Never stall on an ambiguity and never drop a field because the form is unclear. Where the form
+> can't be parsed cleanly — branching you can't resolve, an enumeration that isn't spelled out, an
+> implicit unit or range — put your **best guess in the DD** and keep building. Then log every
+> guess in **`OPEN_QUESTIONS.md`** in the build folder, one entry each, phrased as a question about
+> what you assumed and pointing at the field — *"Q7 / `pain_score`: the printed skip is ambiguous,
+> we assumed it only fires on Yes — accurate?"*
+> These are **questions about the build's assumptions, never proposed edits to the form**. Write
+> the file even when you guessed nothing — one line saying so.
+
+> ### Changes the QUESTIONNAIRE itself needs → tracked changes on the original document
+> Substantive defects in the form are a different kind of thing: skip instructions pointing at
+> sections that don't exist, questions the SIR commits the study to that the form lacks,
+> structural contradictions. Those aren't assumptions you made — they're changes the
+> **questionnaire** needs, so they're delivered *on the questionnaire*:
+> - **Word original** → the original document with **tracked changes**, saved beside it as
+>   `<name>_redcap_changes.docx`. Use the **docx skill's tracked-changes support** (real
+>   insertions/deletions, plus a comment on each one saying why and whether it needs an IRB
+>   amendment). Never retype the questionnaire — edit a copy of the original, so the reviewer sees
+>   their own document and accepts or rejects each change in place. **The document is the review
+>   vehicle**; whoever holds the questionnaire reviews it there.
+> - **PDF original** (tracked changes aren't possible) → `<name>_redcap_changes.md` beside it,
+>   listing each change: where it is, what it says now, what it should say, why, and whether it
+>   needs an IRB amendment.
+>
+> The DD you build still mirrors the form **as printed** — you propose the change on the document,
+> you don't pre-apply it to the dictionary. Surfaced, never applied.
 
 **Path A workflow:**
-1. `Glob *.docx`; extract: `textutil -convert txt -stdout "file.docx"`.
+1. Work from the questionnaires you ported in Step 1b
+   (`database-manager/<study>/questionnaires/`); extract with
+   `textutil -convert txt -stdout "file.docx"`.
 2. Parse into a field list (instruments → forms; bullets → fields; sub-bullets → choices). Labels
    must match the Word text **EXACTLY**; but normalize broken choice **codes** (duplicate/non-
-   sequential numbers, `99` for Other) and flag those per [[decision-protocol]]. Grids of same-scale
-   items → a REDCap **matrix group** (shared `Matrix Group Name` + identical choices).
+   sequential numbers, `99` for Other) — that's a DD mechanic, not a change to the form: say so in
+   the run per [[decision-protocol]], and put it in `OPEN_QUESTIONS.md` if you had to guess what
+   the code was meant to be. Grids of same-scale items → a REDCap **matrix group** (shared
+   `Matrix Group Name` + identical choices).
 3. Emit with `dd_builder.py` (do NOT hand-write the CSV) — import its `DD` class or feed a JSON spec:
    ```bash
    B=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name dd_builder.py 2>/dev/null | head -1)
@@ -213,10 +278,11 @@ copy-paste-and-click. (Works without an access key too: add `--from-json rec.jso
   what the questionnaire contains — see Step 3's over-materialize note.)
 Flag anything the SIR leaves blank (PM not named, roles for co-investigators, etc.) as TODO.
 
-The study's folder under `database-manager/` should end up self-contained for handoff: the DD CSV,
-the roles CSV, the `CREATE_NEW_PROJECT_<RID>.txt` paste sheet, the renamed File Repository docs,
-the `QUESTIONNAIRE_CHANGELOG.md` (Step 3 — "none found" if there was nothing to raise), and the
-`MANUAL_SETUP_BRIEF.md`.
+The study's folder under `database-manager/` should end up self-contained for handoff: the ported
+document folders from Step 1b, the DD CSV, the roles CSV, the `CREATE_NEW_PROJECT_<RID>.txt` paste
+sheet, the renamed File Repository docs, `OPEN_QUESTIONS.md` (Step 3 — written even if you guessed
+nothing), any `<name>_redcap_changes.docx` / `.md` beside the questionnaire it marks up (Step 3 —
+absent when the form needs no changes), and the `MANUAL_SETUP_BRIEF.md`.
 
 ## Steps 7–8 — Review → Production
 These are **human sign-off / go-live gates** (see the flag note above) — confirm with the
@@ -287,3 +353,6 @@ requires an explicit `--record-id-range` before it will write anything).
 [[build-pitfalls]] (READ FIRST) · [[mdc-rules]] · [[dd-column-spec]] · [[token-optional]] ·
 [[token-confirmation]] · [[record-id-safety]] · [[redcap-date-import]] · [[redcap-api-gotchas]] ·
 [[standard-roles]] · [[decision-protocol]]
+
+The **docx skill** produces the Step 3 `<name>_redcap_changes.docx` — it is the thing that can put
+real tracked changes into a Word document. Don't hand-roll that file.

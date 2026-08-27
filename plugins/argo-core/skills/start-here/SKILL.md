@@ -47,8 +47,13 @@ Fold the result into your ONE confirmation line:
 - **Settings found but no keys configured** → one line confirming setup, then **one sentence**
   offering the keys ("I can put your settings file on screen whenever you want to add your
   access keys"), then the role question. Do not lecture, and do not turn it into a menu item.
-- **The FIRST-TIME SETUP banner** → do **not** relay its contents. One line ("You're set up —
-  everything lives in your ARGO folder"), the one-sentence keys offer, then the role question.
+  This is the *returning* user — they have been through setup before and can be offered rather
+  than pushed. **Unless `ARGO_ROLES` is blank too**, which means they haven't: drop the offer,
+  because Step 1 puts the file on screen the moment they name a role, and offering first only
+  to do it anyway is two asks for one act.
+- **The FIRST-TIME SETUP banner** → do **not** relay its contents, and do **not** offer the
+  keys here. One line ("You're set up — everything lives in your ARGO folder"), then the role
+  question. The keys are Step 1's job, and Step 1 doesn't ask — it puts the file on screen.
 - In Cowork the rule is: the user connects a folder from their own computer for ARGO work, and
   setup lands in it automatically. If the banner warns the file may disappear with the session,
   no folder is connected — have them connect one and run setup again.
@@ -93,18 +98,30 @@ python3 "$D/argo_setup.py" --set-roles "qa-specialist,data-analyst"
 Valid values, comma-separated, exactly these spellings: `project-manager`, `qa-specialist`,
 `database-manager`, `data-analyst`. Don't announce that you saved it.
 
-**Then, before the role landing — the keys, actively.** Anyone naming a role is a core team
-member, and every core member should hold the five tracker keys. If none are configured yet,
-your next message is the solicitation, and it is one line + one question:
+**Then, before the role landing — put the settings file on screen.** Anyone naming a **core
+role** (project manager, QA specialist, database manager) is a core team member, and every core
+member should hold the five tracker keys. If none are configured yet, **your next message is the
+file itself.** Don't declare setup complete and ask whether they'd like to add keys — putting
+the file in front of them *is* the completing act of setup. Present it **unprompted**, by the
+ladder in "Putting the settings file on screen" below (file card first, then the fallbacks in
+order), with one instruction line and one question:
 
-> Everyone on the team keeps five tracker access keys in their settings file — they power the
-> shared study dashboard. **Want me to put the file on screen so you can paste yours in now?**
+> Here's your settings file. **Paste each key after its = sign, save, and tell me when you're
+> done** — or say "later" and I'll carry on without them.
 
-Yes → the walk-them-to-the-settings-file steps below (file card first), then verify, then
-their role landing. No, or they don't have keys yet → tell them the REDCap administrator
-issues them, carry on to the role landing, and don't raise it again this session — nothing
-is blocked without them. A QA specialist also gets one line noting their study's key can go
-in the same file.
+That is the whole message: the file, one instruction line, one question. The question is no
+longer "want me to show you the file?" — the file is already there. Don't explain the five
+trackers first, don't list what each key is for, and don't wait for permission to present it.
+
+- **They say they've saved it** → verify (the client `--check`), relay the result in one line
+  ("all five keys work" / exactly which one doesn't), then their role landing.
+- **"Later", "I don't have them yet", or any other decline** → one line saying the REDCap
+  administrator issues them, then straight on to the role landing. **Don't raise it again this
+  session.** Nothing is blocked without keys.
+- A **QA specialist** gets one extra line: their study's key goes in the same file.
+- **Data analysts are the exception — skip this entirely.** If every role they hold is data
+  analyst, present nothing and say nothing about keys; go straight to the analyst landing,
+  whose "no key talk" rule wins here as it does in Step 0.
 
 If they name a task instead of a role ("I need Table 1 from this export"), **don't re-ask**:
 infer the role, do the task, and save the role once it's clear.
@@ -197,7 +214,11 @@ this chat to make one.
 
 Full decision record for who holds which key: [[access-tiers]].
 
-## Walking them to the settings file, when they want to add keys
+## Putting the settings file on screen
+
+The ladder Step 1 uses after setup, and the same one to use whenever keys need to go in later.
+Work down it and stop at the first rung that works — you are **presenting** the file, not asking
+whether to.
 
 0. **Best: put the file itself into the chat.** Cowork sessions have a file-presenting tool
    (`present_files` on the cowork tool server) — present the settings file with it, unprompted.
@@ -205,13 +226,15 @@ Full decision record for who holds which key: [[access-tiers]].
    is the whole journey in one click. Only if no such tool exists: try
    `open -t "<full path to the .env>"` (opens on-screen on some setups; errors harmlessly on
    others), then fall back to the double-click below.
-1. Easiest: tell them to open the ARGO folder on their computer and **double-click
+1. Next best: tell them to open the ARGO folder on their computer and **double-click
    'Add keys here'** — the settings file opens in a text editor. Fallback: give the exact path
    (the scaffold prints it); on a Mac, Finder → Cmd+Shift+G → paste the path.
-2. Tell them which line each key goes on (the variable names are already in the file, one per
-   tracker) and to save when done.
+2. **One instruction line, whichever rung you landed on**: "paste each key after its = sign,
+   save, and tell me when you're done." The variable names are already in the file, one per
+   tracker, so there is nothing else to explain.
 3. **Wait.** Then verify for them: run the client `--check` and relay the result — "all five
-   keys work" or exactly which one doesn't.
+   keys work" or exactly which one doesn't. They say "later" instead → carry on, and don't
+   raise it again this session.
 4. If they start typing a key into the chat, stop them and point back at the file. A key pasted
    here lands in the transcript permanently.
 

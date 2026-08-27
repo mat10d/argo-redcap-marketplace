@@ -121,6 +121,7 @@ the below was verified empirically, not assumed.
 
 | | **Claude Code** (local) | **Cowork** (sandboxed VM) |
 |---|---|---|
+| **Where scripts EXECUTE** (verified 2026-08-26) | on the user's own machine | in a **Linux aarch64 sandbox** with the Mac's disk mounted in. Mac programs (Rscript, Stata) are *visible* through the mount but **cannot run** there (`Exec format error`); no root, `apt` locked, commands capped at ~3 min — so R can't be installed either. Inside Cowork only Python runs; R/Stata scripts are written by the session and run by the user on their own machine. |
 | Where plugins live | `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/` | `/mnt/.remote-plugins/plugin_<opaque-id>/` — the plugin **name appears only inside `.claude-plugin/plugin.json`**, never in the directory name |
 
 A **third layout** exists: plain chat containers mount skills at `/mnt/skills/plugins/<name>/`,

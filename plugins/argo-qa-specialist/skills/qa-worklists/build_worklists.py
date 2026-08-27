@@ -300,8 +300,43 @@ def format_branching_logic(logic: str, meta_by: dict) -> str:
     return " ".join(out)
 
 
+def display_headers(fields: list, label_map: dict, taken=()) -> list:
+    """Human column headings for `fields`, guaranteed distinct — display only, never a key.
+
+    A field's LABEL is what the RA reads; the field NAME is what identifies it. REDCap only
+    requires names to be unique, and shared labels are completely ordinary: a real 160-field
+    colorectal data dictionary had 44 labels used by more than one field ("Date", "Other,
+    specify", "Result"). The builder used to rename the dataframe's columns to labels and then
+    read each cell back BY LABEL — with a shared label pandas returned a two-row Series instead
+    of a value, openpyxl refused it ("Cannot convert ... to Excel"), and the build died outright.
+    Every lookup keys on the field name now.
+
+    This function exists for the other half of that problem: two columns under one heading are
+    unreadable for the RA even when the machinery copes. The first field to use a label keeps it
+    plain; anything after it gets its field name in parentheses, so the heading says which field
+    it is. `taken` seeds the used-headings set (the ID columns sit to the left of these).
+    """
+    used = {str(t) for t in taken}
+    out = []
+    for f in fields:
+        label = str(label_map.get(f, f))
+        header = label if label not in used else f"{label} ({f})"
+        n = 2
+        while header in used:            # pathological: a plain label already reads like that
+            header = f"{label} ({f} #{n})"
+            n += 1
+        used.add(header)
+        out.append(header)
+    return out
+
+
 def labelize(df: pd.DataFrame, metadata: list, fields: list) -> tuple[pd.DataFrame, dict]:
-    """Return (labeled_df, label_map: raw_field -> human header)."""
+    """Return (labeled_df, label_map: raw_field -> human header).
+
+    The dataframe's COLUMNS keep their field names. Only the values are turned into labels
+    (choice codes into choice text, ticked checkbox options into a joined list); the label map
+    is handed to the writer for the header row and used nowhere else.
+    """
     meta_by = {m["field_name"]: m for m in metadata}
     out = df.copy()
     bases, seen = [], set()
@@ -444,7 +479,7 @@ def build_workbook(labeled: pd.DataFrame, raw_by_id: dict, meta_by: dict,
     ws = wb.active
     ws.title = title[:31]
 
-    header = id_cols + [label_map.get(f, f) for f in display_fields] + ["RESPONSE"]
+    header = id_cols + display_headers(display_fields, label_map, taken=id_cols) + ["RESPONSE"]
     prereq_row = (
         [""] * len(id_cols)
         + [prereq_text(meta_by.get(f, {}).get("branching_logic") or "", meta_by)
@@ -465,7 +500,9 @@ def build_workbook(labeled: pd.DataFrame, raw_by_id: dict, meta_by: dict,
     for lrow, rrow, missing, uncertain in rows_with_work:
         out = [lrow.get(c, "") for c in id_cols]
         for f in display_fields:
-            out.append(lrow.get(label_map.get(f, f), ""))
+            # By field NAME. Reading the cell back by its label is what crashed the builder on
+            # every data dictionary that reuses a label — see display_headers().
+            out.append(lrow.get(f, ""))
         out.append("")  # empty RESPONSE cell for the RA
         ws.append(out)
         row_idx = ws.max_row
@@ -646,9 +683,10 @@ def main():
         keep_cols = [c for c in id_cols if c in raw.columns] + ["redcap_data_access_group"] + \
                     [c for c in expanded if c not in id_cols]
         sub_raw = raw[keep_cols].copy()
+        # Values become human-readable; COLUMN NAMES stay field names. They used to be renamed
+        # to labels here, which quietly made the label the row's key — and two fields sharing a
+        # label then produced two columns with the same name and a crash downstream.
         labeled, label_map = labelize(sub_raw, metadata, augmented)
-        # rename labeled headers to human labels
-        labeled = labeled.rename(columns=label_map)
 
         for dag in dags:
             sub = labeled[labeled["redcap_data_access_group"] == dag]

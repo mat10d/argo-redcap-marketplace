@@ -51,7 +51,7 @@ SUMMARIZER = QA_SKILL / "summarize_for_ra.py"
 # The highlight colours come from the skill's own single definition, never retyped here: a test
 # that hunts for a hex the builder stopped painting finds nothing and asserts nothing.
 sys.path.insert(0, str(QA_SKILL))
-from qa_colours import AMBER_HEX, YELLOW_HEX  # noqa: E402
+from qa_colours import AMBER_HEX, LEGACY_FLAG_HEXES, YELLOW_HEX  # noqa: E402
 
 try:
     import openpyxl  # noqa: F401
@@ -513,7 +513,31 @@ class TestHighlightColoursHaveOneDefinition(unittest.TestCase):
                 self.assertIn("from qa_colours import", text,
                               f"{name} must import the colours, not define its own")
                 self.assertNotIn(f'"{YELLOW_HEX}"', text, f"{name} retypes the yellow hex")
-                self.assertNotIn("FFC7CE", text, f"{name} still carries the old rose fill")
+                self.assertNotIn("FFC7CE", text,
+                                 f"{name} hardcodes the old rose fill — the reader gets it from "
+                                 "qa_colours.LEGACY_FLAG_HEXES and nothing paints it any more")
+
+    def test_the_retired_rose_is_readable_and_defined_once(self):
+        """0.19 #42: retired, not forgotten. Returns painted before 0.18 still arrive."""
+        import review_responses  # noqa: E402
+        self.assertIn("FFC7CE", LEGACY_FLAG_HEXES,
+                      "the rose 'yellow' shipped for months; it can never stop being readable")
+        self.assertIn("LEGACY_FLAG_HEXES", (QA_SKILL / "review_responses.py").read_text(),
+                      "the reader must take the retired colours from qa_colours")
+        self.assertEqual(review_responses.LEGACY_FLAG_HEXES, LEGACY_FLAG_HEXES)
+        for hexv in LEGACY_FLAG_HEXES:
+            self.assertEqual(review_responses.FLAG_KINDS[hexv], "yellow",
+                             "a retired flag asked the yellow question, not the amber one")
+
+    @unittest.skipIf(not DEPS, "pandas/openpyxl/yaml not installed")
+    def test_a_retired_colour_is_never_a_live_one(self):
+        """If a live fill ever landed in the retired tuple the two would be indistinguishable."""
+        import build_worklists  # noqa: E402
+        painted = {str(build_worklists.YELLOW.start_color.rgb)[-6:],
+                   str(build_worklists.UNCERTAIN.start_color.rgb)[-6:]}
+        for hexv in LEGACY_FLAG_HEXES:
+            self.assertNotIn(hexv, (YELLOW_HEX, AMBER_HEX))
+            self.assertNotIn(hexv, painted, "the builder must not paint a retired colour")
 
     def test_all_four_readers_agree_on_both_colours(self):
         """Loaded, not grepped: the values the running code actually holds."""
@@ -553,6 +577,127 @@ class TestHighlightColoursHaveOneDefinition(unittest.TestCase):
             self.assertNotIn("FFC7CE", fills)
         finally:
             shutil.rmtree(out, ignore_errors=True)
+
+
+@unittest.skipIf(not DEPS, "pandas/openpyxl/yaml not installed")
+class TestLegacyRoseWorklistsStillAudit(unittest.TestCase):
+    """0.19 #42: a worklist painted the OLD rose must audit exactly like a yellow one.
+
+    "Yellow" was `FFC7CE` — a pale rose — until 0.18 made it an actual yellow. Worklists don't
+    come back the day they're sent: a site that received one before the change returns it weeks
+    later, still rose, with the work done. The reader matched only the current yellow, so a live
+    round reported 5 of 36 answers and said nothing whatever about the other 31 — the exact
+    silent-data-loss shape this suite exists to catch.
+
+    The same build, the same RA edits, painted two ways. The audits must be identical, and the
+    rose one must say ONE line about why it's reading a colour nothing paints any more.
+    """
+
+    ROSE = LEGACY_FLAG_HEXES[0]
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp())
+        cfg = cls.tmp / "one.yaml"
+        cfg.write_text("workbooks:\n  - name: onefield\n    title: One Field\n"
+                       "    fields: [histology_grade]\n")
+        proc = subprocess.run(
+            [sys.executable, str(BUILDER),
+             "--records-csv", str(FIXTURE / "records.csv"),
+             "--metadata-csv", str(FIXTURE / "datadictionary.csv"),
+             "--fields", str(cfg), "--out", str(cls.tmp / "build"),
+             "--id-field", "syn_id", "--round="],
+            capture_output=True, text=True, timeout=300)
+        if proc.returncode != 0:                       # pragma: no cover - setup failure
+            raise RuntimeError(proc.stderr[-1000:])
+        cls.modern = cls.tmp / "build" / "with_MDC" / "onefield_site_alpha.xlsx"
+        cls.rr = _load_reviewer()
+        cls.legacy, cls.filled = cls._repaint_and_answer()
+
+    @classmethod
+    def _repaint_and_answer(cls):
+        """A rose copy of the original, plus a return for each — same answers in both."""
+        from openpyxl.styles import PatternFill
+        rose = PatternFill(start_color=cls.ROSE, end_color=cls.ROSE, fill_type="solid")
+
+        legacy_orig = cls.tmp / "legacy_original.xlsx"
+        wb = openpyxl.load_workbook(cls.modern)
+        ws = wb.active
+        painted = []
+        for r in range(3, ws.max_row + 1):
+            cell = ws.cell(row=r, column=2)
+            if str(cell.fill.fgColor.rgb or "").upper().endswith(YELLOW_HEX):
+                cell.fill = rose
+                painted.append(r)
+        wb.save(legacy_orig)
+
+        for src, dst in ((cls.modern, cls.tmp / "modern_RETURNED.xlsx"),
+                         (legacy_orig, cls.tmp / "legacy_RETURNED.xlsx")):
+            wb = openpyxl.load_workbook(src)
+            ws = wb.active
+            for r in painted:
+                ws.cell(row=r, column=2).value = "Poorly differentiated"
+                ws.cell(row=r, column=ws.max_column).value = "Entered in REDCap."
+            wb.save(dst)
+        return legacy_orig, painted
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def test_the_fixture_really_is_painted_two_different_colours(self):
+        """Guard the guard: if both files were yellow this test would prove nothing."""
+        self.assertTrue(self.filled, "no cell was flagged, so there is nothing to audit")
+        for path, hexv in ((self.modern, YELLOW_HEX), (self.legacy, self.ROSE)):
+            ws = openpyxl.load_workbook(path).active
+            fills = {str(ws.cell(row=r, column=2).fill.fgColor.rgb or "").upper()[-6:]
+                     for r in self.filled}
+            self.assertEqual(fills, {hexv}, path.name)
+
+    def test_the_rose_workbook_audits_to_the_same_counts_as_the_yellow_one(self):
+        modern = self.rr.diff(str(self.modern), str(self.tmp / "modern_RETURNED.xlsx"))
+        legacy = self.rr.diff(str(self.legacy), str(self.tmp / "legacy_RETURNED.xlsx"))
+        self.assertEqual(len(legacy.by_record), len(modern.by_record))
+        self.assertEqual(sum(len(v) for v in legacy.by_record.values()),
+                         sum(len(v) for v in modern.by_record.values()))
+        self.assertEqual(len(self.filled), sum(len(v) for v in legacy.by_record.values()),
+                         "every answer in the rose workbook must be recovered")
+        self.assertEqual(legacy.out_of_scope, modern.out_of_scope, [])
+        self.assertEqual(sorted(legacy.notes), sorted(modern.notes))
+
+    def test_a_rose_flag_is_reported_as_yellow_not_amber(self):
+        """The old rose MEANT "this applies and is blank" — the yellow question, not the amber
+        one. Reporting it as amber would tell the specialist to go and check a condition that
+        was never in doubt."""
+        legacy = self.rr.diff(str(self.legacy), str(self.tmp / "legacy_RETURNED.xlsx"))
+        kinds = {a.kind for cells in legacy.by_record.values() for a in cells}
+        self.assertEqual(kinds, {"yellow"})
+
+    def test_one_warning_line_when_the_flags_are_mostly_legacy(self):
+        proc = subprocess.run(
+            [sys.executable, str(REVIEWER), str(self.legacy),
+             str(self.tmp / "legacy_RETURNED.xlsx")],
+            capture_output=True, text=True, timeout=300)
+        self.assertEqual(proc.returncode, 0, proc.stderr[-800:])
+        hits = [ln for ln in proc.stdout.splitlines() if "older version" in ln]
+        self.assertEqual(len(hits), 1, f"expected exactly one warning line, got {hits}")
+        self.assertIn("reading the old", hits[0].lower())
+
+    def test_a_normal_workbook_says_nothing_about_old_colours(self):
+        proc = subprocess.run(
+            [sys.executable, str(REVIEWER), str(self.modern),
+             str(self.tmp / "modern_RETURNED.xlsx")],
+            capture_output=True, text=True, timeout=300)
+        self.assertEqual(proc.returncode, 0, proc.stderr[-800:])
+        self.assertNotIn("older version", proc.stdout)
+
+    def test_a_single_recoloured_cell_is_not_worth_a_warning(self):
+        """Somebody hand-shading one cell isn't an old build, and shouldn't read like one."""
+        note = self.rr.legacy_flag_note
+        self.assertEqual(note(20, 1), "")
+        self.assertEqual(note(20, 10), "", "exactly half is not 'predominantly'")
+        self.assertIn("older version", note(20, 11))
+        self.assertEqual(note(0, 0), "", "a workbook with no flags at all says nothing")
 
 
 class TestSiteHeadersAreWholeHeaders(unittest.TestCase):

@@ -102,7 +102,9 @@ T=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name argo_too
 python3 "$T"
 ```
 
-It prints Python, R and Stata with a ✓ or ✗ and the **full path** to each. Then:
+It prints Python, R and Stata with a ✓ or ✗ and the **full path** to each. For R it also
+runs a trivial script, so R comes back in one of three states — `R 4.4.0 ✓ (runs)`,
+`R found but couldn't run a test script: <error>`, or `R ✗ not found`. Then:
 
 - Tell the user in **one line** which languages are usable ("Python and R are both ready here;
   Stata isn't installed on this computer") — and nothing more unless they ask.
@@ -111,8 +113,46 @@ It prints Python, R and Stata with a ✓ or ✗ and the **full path** to each. T
 - If the language they want is missing, say how to get it (R is free: https://cran.r-project.org;
   Stata is licensed — their IT installs it) and offer the same analysis in a language they do
   have. Never leave them stuck.
+- **The check describes the computer it ran on.** If someone says they have R and the check
+  says they don't, the check ran somewhere other than their machine — say that plainly instead
+  of insisting. Never write "not installed on this computer" into a study folder you can't
+  stand behind.
 - Then scaffold, passing the check through so the paths land in the study folder — see
   [Scaffolding](#scaffolding) below.
+
+#### If the analysis is going to be in R
+
+R is the one language that fails *after* you've written the script. Two extra beats, both
+before you write anything:
+
+1. **Confirm R runs**, not just that it exists — that's the `(runs)` above. If it reports
+   *found but couldn't run a test script*, R is broken on that machine: give the user the one
+   command to see it for themselves (the check prints it), and offer the analysis in Python
+   meanwhile. Don't write R against an R that can't execute.
+2. **Check the packages the script needs, before writing it.** Prefer **base R** — a base-R
+   script needs nothing installed and runs on any clean R. If a package is genuinely needed
+   (`openxlsx` for styled Excel, say), test for it first, using the Rscript path the check
+   reported:
+
+   ```bash
+   /usr/local/bin/Rscript -e 'requireNamespace("openxlsx", quietly=TRUE)'
+   ```
+
+   If it's missing, **tell the user the exact line to run once, plainly** — "R needs one
+   package for this. Run `install.packages("openxlsx")` in R once, and I'll carry on" — and
+   wait. **Never install packages silently**, and never hand over a script hoping the package
+   is there.
+
+**Never try to install R itself.** In Cowork, scripts execute in a Linux sandbox with the
+user's disk mounted in: the R (or Stata) on their Mac is *visible* but **cannot run there**
+(`Exec format error` — a macOS program inside a Linux VM). There is also no root, `apt` is
+locked, and commands are capped at a couple of minutes — an R install cannot finish, and
+attempting it burns the session for nothing. This is the normal state of affairs, not a broken
+machine: say so in one line, write the R script anyway, and hand the user the exact command to
+run it on their own computer (or the RStudio steps), then compare their output with the Python
+table for parity. If R isn't runnable where you execute, say so in
+one line and offer the two real options: do it in Python here, or hand the user the exact
+command to run the R script on their own computer.
 
 ### 1. Orient on the data
 - Locate `export.csv` and `data_dictionary.csv`. Read the **data dictionary first**: list the
@@ -161,9 +201,13 @@ should stand alone: someone with only this directory can rerun every script and 
   seaborn). Python 3.9+.
 - **R / Stata** when the user prefers them or when adapting an existing R/Stata script. Keep the
   same contract (header block, reads `data/`, writes `outputs/`).
+- **In R, default to base R.** Base R needs nothing installed, so a base-R script runs on any
+  machine that has R at all. Reach for a package only when base R genuinely can't do the job,
+  and then get it installed by the user first (step 0) rather than discovering it at run time.
 - **Which of the three are actually available is settled by step 0's check, not by `command -v`,
-  and never by guessing.** If the language they want isn't installed, say so with how to get it,
-  and offer the analysis in one they have — don't switch silently.
+  and never by guessing.** For R, "available" means it **ran a test script** — not that the file
+  exists. If the language they want isn't installed, say so with how to get it, and offer the
+  analysis in one they have — don't switch silently.
 
 ## Data-handling rules (don't skip)
 
@@ -237,6 +281,24 @@ data and prints a structured summary).
 `--tools` runs the same language check as step 0 and writes the **full path** to each usable
 language into `README.md` and the first `ANALYSIS_LOG.md` line, so anyone re-running the folder
 later (including you, in a session with a different PATH) has the commands that work.
+
+## Where this is heading
+
+**None of this exists yet. Do not import it, look for it, or tell a user it is available.**
+It is recorded here so that scripts written now are shaped in a way that will fit later.
+
+The plan is parallel **R and Python analysis libraries** — the same capabilities in both
+languages — that an analysis composes rather than reimplements:
+
+- **Formatting modules** — Excel styling and figure styling, so every study's tables and plots
+  come out looking the same without each script rebuilding that itself.
+- **Statistics modules** — statistical comparisons first (the tests behind a Table 1), with
+  survival analysis as the next one after that.
+
+Until they are built, analyses stay self-contained: each script does its own formatting and its
+own statistics, in base R or the ARGO Python stack. Writing scripts in clean, separable steps
+(load → clean → compute → format → write) is what will make them easy to move onto the
+libraries when they arrive.
 
 ## See also
 

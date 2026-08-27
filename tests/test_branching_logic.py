@@ -212,5 +212,63 @@ class TestPrerequisiteRowWording(unittest.TestCase):
             self.assertFalse(certain, expr)
 
 
+@unittest.skipIf(bw is None, "optional dependencies not installed")
+class TestLabelsAreDisplayOnly(unittest.TestCase):
+    """0.19 #41: a field's LABEL is what the RA reads; its NAME is what identifies it.
+
+    `labelize` used to be paired with a `df.rename(columns=label_map)` in the caller, which made
+    the label the row's key. REDCap only requires field NAMES to be unique — a live 160-field
+    dictionary had 44 labels shared by more than one field — so two columns then carried the
+    same name, pandas returned a Series where a value was expected, and the build died with
+    `ValueError: Cannot convert ... to Excel`.
+
+    The invariant the fix rests on, pinned here at unit level: labelize translates VALUES and
+    never column names.
+    """
+
+    METADATA = [
+        {"field_name": "record_id", "field_type": "text", "field_label": "Record ID",
+         "select_choices_or_calculations": ""},
+        {"field_name": "first_date", "field_type": "text", "field_label": "Date of procedure",
+         "select_choices_or_calculations": ""},
+        {"field_name": "second_date", "field_type": "text", "field_label": "Date of procedure",
+         "select_choices_or_calculations": ""},
+        {"field_name": "sex", "field_type": "radio", "field_label": "Sex ",
+         "select_choices_or_calculations": "1, Male | 2, Female"},
+    ]
+
+    def frame(self):
+        import pandas as pd
+        return pd.DataFrame([{"record_id": "1", "first_date": "2024-01-01",
+                              "second_date": "2024-02-02", "sex": "2"}], dtype=str)
+
+    def test_column_names_stay_field_names(self):
+        out, label_map = bw.labelize(self.frame(), self.METADATA,
+                                     ["first_date", "second_date", "sex"])
+        self.assertEqual(list(out.columns), ["record_id", "first_date", "second_date", "sex"])
+        self.assertEqual(len(out.columns), len(set(out.columns)))
+
+    def test_the_label_map_is_keyed_by_field_name(self):
+        _out, label_map = bw.labelize(self.frame(), self.METADATA,
+                                      ["first_date", "second_date", "sex"])
+        self.assertEqual(label_map["first_date"], "Date of procedure")
+        self.assertEqual(label_map["second_date"], "Date of procedure")
+        self.assertEqual(label_map["sex"], "Sex", "labels are cleaned for display")
+
+    def test_values_are_still_turned_into_labels(self):
+        """Translating the values is the whole job — only the headers were the problem."""
+        out, _label_map = bw.labelize(self.frame(), self.METADATA, ["sex"])
+        self.assertEqual(out.iloc[0]["sex"], "Female")
+
+    def test_two_fields_sharing_a_label_keep_their_own_values(self):
+        out, label_map = bw.labelize(self.frame(), self.METADATA,
+                                     ["first_date", "second_date"])
+        row = out.iloc[0]
+        self.assertEqual(row["first_date"], "2024-01-01")
+        self.assertEqual(row["second_date"], "2024-02-02")
+        headers = bw.display_headers(["first_date", "second_date"], label_map)
+        self.assertEqual(headers, ["Date of procedure", "Date of procedure (second_date)"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

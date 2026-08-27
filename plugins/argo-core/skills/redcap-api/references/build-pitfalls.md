@@ -107,12 +107,15 @@ SIR's `pi_first_name` may contain "DR." or "PROF." — strip before deriving the
 ### 19. Sub-category derivation needs the right keyword pool
 "Retrospective" / "retroactive review" → Epidemiology. "Database" alone → ambiguous. Patterns in `fill_new_project.py` evolve as new studies surface words we haven't seen.
 
+### 20. An unclear questionnaire never stalls the build — and never gets silently "fixed"
+Two different things get merged and both go wrong. An **ambiguity in the form** (branching you can't parse, an enumeration that isn't spelled out) is not a reason to stop or to drop the field: the best guess goes into the DD and the guess is recorded as a question in `OPEN_QUESTIONS.md` ("we assumed X — accurate?"). A **defect in the form itself** (a skip pointing at a section that doesn't exist, a question the SIR commits the study to that the form lacks) is a change the *questionnaire* needs, delivered as the original document with tracked changes — `<name>_redcap_changes.docx`, or a `<name>_redcap_changes.md` list when the original is a PDF — never applied to the DD. Typos, numbering quirks and columns printed with no options are reproduced as printed and appear in neither. Full rules in `build-study` Step 3.
+
 ## Where this doc lives in the workflow
 
 | Skill | When to consult |
 |---|---|
-| `argo-database-manager/build-study` Path A | Before starting a new DD construction — items 1, 2, 3, 4, 5 |
-| `argo-database-manager/build-study` Path B | Before auditing an existing DD — items 1-5 plus 8, 11 |
+| `argo-database-manager/build-study` Path A | Before starting a new DD construction — items 1, 2, 3, 4, 5, 20 |
+| `argo-database-manager/build-study` Path B | Before auditing an existing DD — items 1-5 plus 8, 11, 20 |
 | Importing external/historical data | Before designing an import pass — items 6-11 |
 | `argo-database-manager/build-study` (triage) | Before generating a paste box / triaging a SIR — items 12, 13, 14, 17, 18, 19 |
 | Any live-project write (roles, rights, records) | Before touching a project with real data — items 12, 13, 14 |

@@ -12,7 +12,7 @@ it can't be trusted.** It writes the two files link-data has always promised:
                           sentence saying what it means for the analysis.
 
 It reads the diff engine's own output rather than comparing the two files again. The
-fill/conflict/orphan rule is a safety rule that lives in one place (`argo_diff.py`, via
+fill/conflict/no-record rule is a safety rule that lives in one place (`argo_diff.py`, via
 `diff_payload.py`); a second implementation here would be a second thing to keep identical, and
 the moment they disagreed neither would be trustworthy.
 
@@ -132,12 +132,13 @@ def main() -> int:
     p_fills = diff_file(diff_dir, args.diff_prefix, "fills", "update")
     p_disagree = diff_file(diff_dir, args.diff_prefix, "disagreements", "overwrite")
     p_conflicts = diff_file(diff_dir, args.diff_prefix, "conflicts")
-    p_orphans = diff_file(diff_dir, args.diff_prefix, "orphans")
+    # `_orphans` was this file's name before 0.19; accept it so an older run still merges.
+    p_right_only = diff_file(diff_dir, args.diff_prefix, "no_record_to_fill", "orphans")
     p_nolink = diff_file(diff_dir, args.diff_prefix, "missing_link")
 
     fill_ids = read_ids(p_fills, idf)
     conflict_ids = read_ids(p_disagree, idf)
-    orphan_ids = read_ids(p_orphans, idf)      # ids only the RIGHT source has
+    right_only_ids = read_ids(p_right_only, idf)   # ids only the RIGHT source has
     nolink_ids = read_ids(p_nolink, idf)       # ids only the LEFT source has
 
     conflicts_by_id: dict = {}
@@ -149,12 +150,12 @@ def main() -> int:
     with open(p_fills, newline="") as fh:
         compared = [c for c in (next(csv.reader(fh), []) or []) if c != idf]
 
-    # Sanity: the diff's orphans are ids only the right file has, its missing-link ids only the
-    # left. If that isn't true, --left and --right are the wrong way round and every flag below
-    # would be inverted — a merged table that is quietly, completely wrong.
-    if orphan_ids and not orphan_ids <= (set(right) - set(left)):
+    # Sanity: the diff's no-record rows are ids only the right file has, its missing-link ids
+    # only the left. If that isn't true, --left and --right are the wrong way round and every
+    # flag below would be inverted — a merged table that is quietly, completely wrong.
+    if right_only_ids and not right_only_ids <= (set(right) - set(left)):
         raise SystemExit(
-            f"The ids in {p_orphans.name} aren't the ones only {args.right} has, which means\n"
+            f"The ids in {p_right_only.name} aren't the ones only {args.right} has, which means\n"
             "--left and --right are probably swapped.\n\n"
             "--left is the file diff_payload.py was given as --current; --right is the one it\n"
             "was given as --computed. Swap them and run this again.")
@@ -168,7 +169,7 @@ def main() -> int:
               + [right_out[c] for c in right_cols if c != idf])
 
     def classify(rid: str) -> str:
-        if rid in orphan_ids:
+        if rid in right_only_ids:
             return f"{right_name}_only"    # no record on the left at all — never a fill
         if rid in nolink_ids:
             return f"{left_name}_only"
@@ -211,19 +212,20 @@ def main() -> int:
     site_disagree = [rid for rid in set(left) & set(right)
                      if str(left[rid].get(dag, "")).strip()
                      != str(right[rid].get(dag, "")).strip()]
-    orphan_sites = sorted({str(right[rid].get(dag, "")).strip()
-                           for rid in orphan_ids if rid in right} - {""})
+    right_only_sites = sorted({str(right[rid].get(dag, "")).strip()
+                               for rid in right_only_ids if rid in right} - {""})
     n_conflict_values = sum(len(v) for v in conflicts_by_id.values())
     matched = len(set(left) & set(right))
     compared_text = ", ".join(compared) if compared else "the compared fields"
-    orphan_from = f"They come from: {', '.join(orphan_sites)}. " if orphan_sites else ""
+    right_only_from = (f"They come from: {', '.join(right_only_sites)}. "
+                       if right_only_sites else "")
 
     issues = [
         ("high", f"{right_name} records with no matching {left_name} record", right_name,
          n(f"{right_name}_only"),
-         orphan_from
+         right_only_from
          + "Nothing can be filled for them — decide whether they belong in this analysis at "
-           f"all. See {p_orphans.name}."),
+           f"all. See {p_right_only.name}."),
         ("high", "Records where the two sources disagree on a value", "both",
          n("matched_conflict"),
          f"{n_conflict_values} disagreeing values across {compared_text}. Both values are "

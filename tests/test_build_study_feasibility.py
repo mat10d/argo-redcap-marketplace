@@ -502,9 +502,19 @@ class TestSetupBriefDerivesSitesFromTheRecord(unittest.TestCase):
         self.assertIn("Korle Bu Teaching Hospital", dag_line)
         self.assertLess(dag_line.index("Korle Bu"), dag_line.index("Muhimbili"))
 
-    def test_brief_names_the_questionnaire_changelog_deliverable(self):
-        """NITS 12: the changelog is a build deliverable — the brief has to say so."""
-        self.assertIn("QUESTIONNAIRE_CHANGELOG.md", self.brief)
+    def test_brief_names_both_questionnaire_deliverables(self):
+        """NITS 48: the single changelog split into two deliverables by KIND — assumptions the
+        build made (`OPEN_QUESTIONS.md`) vs changes the questionnaire itself needs (the original
+        with tracked changes). The brief promises both, and no longer the retired name."""
+        self.assertIn("OPEN_QUESTIONS.md", self.brief)
+        self.assertIn("_redcap_changes.docx", self.brief)
+        self.assertIn("_redcap_changes.md", self.brief, "the PDF fallback has to be named too")
+        self.assertNotIn("QUESTIONNAIRE_CHANGELOG", self.brief)
+
+    def test_brief_keeps_typos_out_of_both_deliverables(self):
+        """NITS 48 + the IRB minimal-change rule: cosmetic quirks are built as printed and go in
+        neither deliverable. The brief must not read as an invitation to raise them."""
+        self.assertRegex(self.brief, r"(?i)typos[^\n]*neither|neither[^\n]*typos")
 
 
 if __name__ == "__main__":

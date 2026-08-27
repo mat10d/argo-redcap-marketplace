@@ -11,6 +11,10 @@ Reports, grouped by record:
     a different kind of event: nobody asked for them, and they may be corrections, may be
     accidents, and are never safe to treat as an answer to a question we asked.
 
+A worklist built by an older version of ARGO highlighted its gaps in a rose fill rather than
+yellow. Those cells are read exactly like yellow ones — the RA answered the same question — and
+a workbook mostly painted that way gets one line saying so.
+
 Per-cell output: record id, field (human label), original value, new value.
 
 Usage:
@@ -91,13 +95,24 @@ def _row_to_dict(ws, header_row=1, prereq_row=2):
     return rows, headers
 
 
-# The two fills the builder paints, from the one place they're defined. Retyping them here is
+# The fills the builder paints, from the one place they're defined. Retyping them here is
 # how a returned workbook stops being recognised at all — every RA answer in it silently
 # discarded — so this imports rather than copies. See qa_colours.py.
-from qa_colours import AMBER_HEX, YELLOW_HEX  # noqa: E402
+from qa_colours import AMBER_HEX, LEGACY_FLAG_HEXES, YELLOW_HEX  # noqa: E402
 
 # Fill colour -> what the worklist was asking the RA to do.
+#
+# LEGACY_FLAG_HEXES read as "yellow" — the same question, asked in the colour an older release
+# painted. A site that received a worklist before the colour changed sends it back in the old
+# rose months later; the RA did the work either way. Reading only the current yellow made one
+# live round report 5 of 36 answers and say nothing about the other 31.
 FLAG_KINDS = {YELLOW_HEX: "yellow", AMBER_HEX: "amber"}
+FLAG_KINDS.update({h: "yellow" for h in LEGACY_FLAG_HEXES})
+LEGACY_HEXES = frozenset(LEGACY_FLAG_HEXES)
+
+# Warn about the old colour once, when it's how the workbook was mostly painted — not on a
+# stray cell somebody recoloured by hand. Strictly more than half.
+LEGACY_WARNING_SHARE = 0.5
 
 # Substrings (lowercased) that mark a column as an RA-comment / response column.
 # Use substring match so variants like "RA COMMENT", "Comments", "Notes from RA",
@@ -128,18 +143,38 @@ class Audit(NamedTuple):
     id_field: str              # header of column 1
     has_response_col: bool
     out_of_scope: list         # [OutOfScopeEdit, ...]
+    flags_total: int = 0       # cells the ORIGINAL worklist highlighted, any colour
+    legacy_flags: int = 0      # of those, ones painted in a retired colour
 
 
-def _fill_kind(cell) -> str:
-    """"yellow" / "amber" / "" for a cell, by its fill colour."""
+def _flag_hex(cell) -> str:
+    """The known flag colour this cell is painted, or "" if it isn't painted one."""
     fill = cell.fill
     if not fill or not fill.fgColor:
         return ""
     color = str(fill.fgColor.rgb or "").upper()
-    for hexv, kind in FLAG_KINDS.items():
+    for hexv in FLAG_KINDS:
         if color.endswith(hexv):
-            return kind
+            return hexv
     return ""
+
+
+def _fill_kind(cell) -> str:
+    """"yellow" / "amber" / "" for a cell, by its fill colour.
+
+    A retired fill (see qa_colours.LEGACY_FLAG_HEXES) reads as "yellow": it asked the RA the
+    same question, in the colour the builder used at the time.
+    """
+    return FLAG_KINDS.get(_flag_hex(cell), "")
+
+
+def legacy_flag_note(flags_total: int, legacy_flags: int) -> str:
+    """One line, or "" — said when a workbook's highlighting is mostly a retired colour."""
+    if not flags_total or legacy_flags <= flags_total * LEGACY_WARNING_SHARE:
+        return ""
+    return (f"Note: {legacy_flags} of the {flags_total} highlighted cells are the old rose "
+            "fill, not yellow — these worklists were built by an older version of ARGO, so "
+            "I'm reading the old colour as a flag.")
 
 
 def _cell_text(value) -> str:
@@ -186,26 +221,30 @@ def id_column_count(ws) -> int:
 
 
 def flagged_cells(orig_ws) -> tuple:
-    """(id_field, headers, {(record_id, header): (original_value, kind)}) for every flagged cell.
+    """(id_field, headers, {(record_id, header): (original_value, kind)}, legacy_count).
 
     A flagged cell is one the worklist highlighted: yellow (applies and is blank) or amber
     (we could not read its condition — please check). Both are questions we asked the RA, so
-    both count as answered when a value comes back.
+    both count as answered when a value comes back. A cell painted a retired flag colour is
+    yellow too, and `legacy_count` says how many of them there were.
     """
     headers = [c.value for c in orig_ws[1]]
     id_field = headers[0]
     first_data_col = id_column_count(orig_ws) + 1
-    out = {}
+    out, legacy = {}, 0
     for r in range(3, orig_ws.max_row + 1):
         rid = _cell_text(orig_ws.cell(row=r, column=1).value)
         if not rid:
             continue
         for c in range(first_data_col, orig_ws.max_column + 1):
             cell = orig_ws.cell(row=r, column=c)
-            kind = _fill_kind(cell)
-            if kind:
-                out[(rid, headers[c - 1])] = (_cell_text(cell.value), kind)
-    return id_field, headers, out
+            hexv = _flag_hex(cell)
+            if not hexv:
+                continue
+            out[(rid, headers[c - 1])] = (_cell_text(cell.value), FLAG_KINDS[hexv])
+            if hexv in LEGACY_HEXES:
+                legacy += 1
+    return id_field, headers, out, legacy
 
 
 def _response_column(headers) -> "int | None":
@@ -221,7 +260,7 @@ def diff(orig_path: str, resp_path: str) -> Audit:
     orig_ws = orig_wb.active
     resp_ws = resp_wb.active
 
-    id_field, orig_headers, flagged = flagged_cells(orig_ws)
+    id_field, orig_headers, flagged, legacy_flags = flagged_cells(orig_ws)
     id_cols = id_column_count(orig_ws)
     resp_headers = [c.value for c in resp_ws[1]]
 
@@ -280,7 +319,8 @@ def diff(orig_path: str, resp_path: str) -> Audit:
         out_of_scope.append(OutOfScopeEdit(rid, header, old_val, new_val,
                                            is_id_column=1 <= col <= id_cols))
 
-    return Audit(by_record, response_notes, id_field, response_col_idx is not None, out_of_scope)
+    return Audit(by_record, response_notes, id_field, response_col_idx is not None, out_of_scope,
+                 flags_total=len(flagged), legacy_flags=legacy_flags)
 
 
 def main():
@@ -302,6 +342,9 @@ def main():
     print(f"Original: {orig}")
     print(f"Response: {resp}")
     print(f"RESPONSE column present: {audit.has_response_col}")
+    legacy = legacy_flag_note(audit.flags_total, audit.legacy_flags)
+    if legacy:
+        print(legacy)
     print(f"{len(by_record)} records with proposed updates")
     if amber_total:
         print(f"{amber_total} of the answers are in amber cells "

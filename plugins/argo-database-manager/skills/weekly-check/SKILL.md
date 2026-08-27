@@ -30,6 +30,9 @@ production and how far each build has got; plus open personnel, linking and data
 support tickets. Present the shape of it in a few lines. Don't paste the whole dashboard back
 at the user unless they ask for it.
 
+The open-request counts it prints belong to Part 2, not here — present those under the queue
+rules below, item by item, rather than repeating them as a count in this half.
+
 ### Reading a study's row
 
 ```
@@ -67,9 +70,13 @@ Q=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name open_req
 python3 "$Q"
 ```
 
-Each queue's open items, one summarised line per record, built from each tracker's own data
-dictionary — no guessed field names. A queue whose key is missing or failing is reported and
-skipped; the check never blocks on one bad key.
+Each queue's open items, **one line per open record**, built from each tracker's own data
+dictionary — no guessed field names. Every line is the record number, then `Label: value` bits
+joined with `; `. The builds queue leads with the study's short name and PI and ends with its
+`N/7` progress; the people queue leads with the person's name, email and the access they are
+asking for, because a personnel request you can't put a name to is one you can't act on, and
+the form lists the role after a phone number, where a plain summary never reached it. A queue
+whose key is missing or failing is reported and skipped; the check never blocks on one bad key.
 
 Pull one request in full before you start it:
 
@@ -78,7 +85,64 @@ Q=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name open_req
 python3 "$Q" --record people 12          # queues: builds | people | data | linking
 ```
 
-Present the queues as a short list, then ask **one** question: which one to take. Then route:
+### How to present the queues — the rules
+
+These are not stylistic preferences. Collapsing open work into a count is how a request sits
+untouched for a month, and a table of nothing is how the open work gets lost in the noise.
+
+1. **A queue with nothing open gets ONE line — never a table.** "No data requests." "No linking
+   requests." That is the entire entry: no header row, no "none" row, no empty table.
+2. **Every open item gets its own row.** One record, one row, always. Never collapse several
+   into a single line — no "3 builds not started yet", no "the other four are untouched", no
+   "…and 5 more". The person reading this has to pick one to take, and a count picks nothing.
+3. **The rows go in an inline markdown table, in the message itself** — not a file, not a code
+   block, not a bulleted list.
+4. **The columns come from the line.** Each `Label: value` bit the script printed is one column,
+   headed by that label, in the order printed. The labels are the form's own, straight from its
+   data dictionary — don't rename them. If a queue's line carries more bits than read
+   comfortably, drop columns down to the ones named below. **Never drop a row.**
+5. **Head each table with the queue and its count** — `**People requests — 4 open**`.
+6. **Support tickets are the one exception to rule 2** — a count only, as the routing table
+   below says. They are triaged by hand in the Support Ticket project, not worked from here.
+
+The columns that must be there:
+
+| Queue | Columns |
+|---|---|
+| Studies to build (SIR) | record, short name, PI, progress (`N/7`), next step |
+| People requests (SPR) | record, first name, last name, email, the role being asked for |
+| Data requests · Linking requests | record, then the summary fields the line carries |
+
+**Next step** for a build is the first of the seven canonical flags (listed under "Reading a
+study's row" above) that isn't ticked — that's where [[build-study]] picks up. The `N/7`
+fraction alone doesn't name it, because the steps aren't always ticked in order, so read it off
+`--record builds <id>` when you need to be exact.
+
+The shape, with three builds open:
+
+**Studies to build — 3 open**
+
+| Record | Study | PI | Progress | Next step |
+|---|---|---|---|---|
+| 12 | Hepatectomy | Alatise | 6/7 | Move to production |
+| 14 | Colorectal | Fakeman | 2/7 | Upload the data dictionary |
+| 15 | Gastric | Mockford | 0/7 | Create the project |
+
+and two people requests:
+
+**People requests — 2 open**
+
+| Record | Given name | Family name | Work email address | Role being requested |
+|---|---|---|---|---|
+| 1 | Cleo | Sampleton | c.sampleton@example.org | Data manager |
+| 4 | Ime | Synthetica | i.synthetica@example.org | Data entry |
+
+and, in the same message, the two empty ones — one line each, no table:
+
+> No data requests.
+> No linking requests.
+
+Then ask **one** question: which one to take. Then route:
 
 | Queue | Fulfil it with |
 |---|---|

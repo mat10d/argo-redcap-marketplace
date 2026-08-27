@@ -16,15 +16,25 @@ AMBER is a different message: "we couldn't read this field's condition — pleas
 applies at all". It must stay clearly distinguishable from YELLOW, because the two ask for
 different things.
 
+LEGACY_FLAG_HEXES are colours we no longer PAINT but must still READ. Worklists sent to sites
+before the colour change come back months later still filled in the old rose — the RAs did the
+work, and the only thing standing between that work and the audit is whether the reader
+recognises the fill. One live round reported 5 of 36 answers because it didn't. Nothing is ever
+retired from this tuple; a colour once painted is a colour forever readable.
+
 Excel/openpyxl want RRGGBB with no leading '#'.
 """
 
 YELLOW_HEX = "FFFF99"   # "this applies and is blank" — the RA fills it in
 AMBER_HEX = "FFE9B8"    # "we couldn't read this field's condition — please check"
 
-__all__ = ["YELLOW_HEX", "AMBER_HEX"]
+# Fills that MEANT yellow in an older release. Read as flagged; never painted again.
+LEGACY_FLAG_HEXES = ("FFC7CE",)   # the pale rose that "yellow" used to be, pre-0.18
+
+__all__ = ["YELLOW_HEX", "AMBER_HEX", "LEGACY_FLAG_HEXES"]
 
 
 if __name__ == "__main__":
     print(__doc__)
     print(f"YELLOW_HEX = {YELLOW_HEX}\nAMBER_HEX  = {AMBER_HEX}")
+    print(f"LEGACY_FLAG_HEXES = {', '.join(LEGACY_FLAG_HEXES)}  (read-only)")

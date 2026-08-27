@@ -8,9 +8,9 @@
     "comparable_fields_note": "Same field names and same coded values as the primary study, so the two exports join with no crosswalk.",
     "forms": {
       "biobank": 6,
-      "pathology": 9
+      "pathology": 13
     },
-    "n_fields": 15
+    "n_fields": 19
   },
   "expected_diff": {
     "cells_compared": 120,
@@ -29,6 +29,45 @@
     "orphan_cells_classified_fill": 30,
     "overwrite_csv_rows": 12,
     "update_csv_rows": 28
+  },
+  "linking": {
+    "child_file": "records.csv",
+    "child_name": "synb",
+    "child_record_id_field": "synb_id",
+    "ids_hospital_no_blank": [
+      "SYN-0004",
+      "SYN-0011",
+      "SYN-0016",
+      "SYN-0022",
+      "SYN-0027"
+    ],
+    "ids_hospital_no_mistyped": [
+      "SYN-0006",
+      "SYN-0019"
+    ],
+    "ids_name_discrepancy": [
+      "SYN-0001",
+      "SYN-0013",
+      "SYN-0024"
+    ],
+    "join_key": "syn_id",
+    "n_child_only": 15,
+    "n_child_records": 60,
+    "n_hospital_no_matches": 38,
+    "n_matched": 45,
+    "n_name_discrepancies": 3,
+    "n_name_discrepancies_by_field": {
+      "first_name": 1,
+      "surname": 2
+    },
+    "n_parent_only": 155,
+    "n_parent_records": 200,
+    "name_columns": [
+      "first_name",
+      "surname"
+    ],
+    "parent_file": "parent_registry.csv",
+    "parent_name": "syn"
   },
   "overlap": {
     "ids_by_class": {
@@ -120,7 +159,8 @@
       "site_gamma": 15
     },
     "n_records": 60,
-    "record_id_field": "syn_id",
+    "parent_id_field": "syn_id",
+    "record_id_field": "synb_id",
     "shares_id_space_with": "testing/fixtures/synthetic-study",
     "title": "SYN-B \u2014 Synthetic Pathology & Biobank Sub-study (SYNTHETIC TEST STUDY)"
   },

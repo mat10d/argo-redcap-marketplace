@@ -22,6 +22,11 @@ It also records which analysis languages this computer can run — Python, R, St
 and the FULL PATH to each, into README.md and ANALYSIS_LOG.md, so every script is
 run by a path that works whatever the session's PATH happens to contain. That check
 lives in argo_tools.py (argo-core); point at it with --tools.
+
+For R the check goes further and actually RUNS a trivial script, because an Rscript
+that exists is not necessarily an Rscript that works. README.md records which of the
+three states R is in — runs, found-but-broken, or absent — so nobody writes an R
+analysis against an R that was never going to execute it.
 """
 import argparse
 import datetime
@@ -148,6 +153,23 @@ Append one line per run: date — script — what it did — headline result/not
 {TOOLS}
 """
 
+# Goes in README.md whenever R is usable here. R analyses fail at the last moment for
+# a reason Python ones don't: a package the script needs isn't installed, and only the
+# person at the keyboard can install it.
+R_PACKAGES_NOTE = (
+    "**Writing R scripts here:** prefer **base R** — it needs nothing installed and so it\n"
+    "runs everywhere. If a script genuinely needs a package, check for it BEFORE running the\n"
+    "script:\n"
+    "\n"
+    "```bash\n"
+    "<full path to Rscript> -e 'requireNamespace(\"openxlsx\", quietly=TRUE)'\n"
+    "```\n"
+    "\n"
+    "If it is missing, the person who owns this computer runs the install once, themselves:\n"
+    "`install.packages(\"openxlsx\")`. Packages are never installed on someone's behalf, and a\n"
+    "script is never handed over hoping the package happens to be there."
+)
+
 # What goes in README.md when the language check couldn't be run at all.
 TOOLS_UNKNOWN = (
     "- Not checked. Ask your assistant to run the ARGO setup check (\"help me with ARGO\")\n"
@@ -212,12 +234,25 @@ def describe_tools(module, found: "dict | None") -> "tuple[str, str]":
         return TOOLS_UNKNOWN, f"{today} — scaffold — folder created (analysis tools not checked)."
 
     lines, log_bits = [], []
+    r_usable = False
     for key, name, _names, advice in module.LANGUAGES:
         entry = found.get(key, {})
-        if entry.get("found"):
+        if entry.get("found") and entry.get("runs") is False:
+            # Present on disk but it won't run a script. Recorded as its own state:
+            # writing "R — /usr/local/bin/Rscript" here once sent an analyst off to
+            # run an R script that could never have worked.
+            error = entry.get("run_error") or "no reason given"
+            lines.append(f"- **{name}** — found at `{entry['path']}`, but it could not run a "
+                         f"test script here: {error}. Nothing R-based will run until that is "
+                         f"fixed. Check it yourself with "
+                         f"`{entry['path']} -e 'cat(\"ok\")'`.")
+            log_bits.append(f"{name} found but not runnable")
+        elif entry.get("found"):
             version = f" {entry['version']}" if entry.get("version") else ""
-            lines.append(f"- **{name}**{version} — `{entry['path']}`")
+            runs = " — runs" if entry.get("runs") else ""
+            lines.append(f"- **{name}**{version} — `{entry['path']}`{runs}")
             log_bits.append(f"{name} {entry['path']}")
+            r_usable = r_usable or (key == "r" and entry.get("runs") is not False)
         else:
             lines.append(f"- **{name}** — not installed. {advice}")
             log_bits.append(f"{name} not installed")
@@ -225,6 +260,13 @@ def describe_tools(module, found: "dict | None") -> "tuple[str, str]":
     lines.append(f"Checked {today}. **Run every script with the full path above** — for example "
                  "`/usr/local/bin/Rscript scripts/02_name.R` — because a session's PATH often "
                  "leaves installed programs out and they then look missing.")
+    lines.append("")
+    lines.append("This check describes **the computer the check ran on**. If you know you have "
+                 "a language that is listed as missing, the check ran somewhere else than you "
+                 "expected — say so rather than trusting the line above.")
+    if r_usable:
+        lines.append("")
+        lines.append(R_PACKAGES_NOTE)
     return "\n".join(lines), f"{today} — scaffold — folder created. Tools: " + "; ".join(log_bits) + "."
 
 

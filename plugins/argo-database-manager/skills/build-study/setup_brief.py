@@ -137,9 +137,17 @@ def main():
              "else tick the same fields in the Study Tracker UI.\n")
     L.append("## 1. Create project → `project_created`\nUse the paste sheet (`CREATE_NEW_PROJECT_%s.txt` / `fill_new_project.py %s`). Mark with `--pid <PID>`." % (a.rid,a.rid))
     L.append("\n## 2. Upload the data dictionary → `dd_uploaded`\nDesigner → Data Dictionary → Upload the validated DD CSV.")
-    L.append("Deliverable alongside the DD: `QUESTIONNAIRE_CHANGELOG.md` — the DD mirrors the printed "
-             "IRB-approved questionnaire exactly, so any substantive defect goes in the changelog "
-             "instead, each marked \"needs IRB amendment: yes/no\". Write \"none found\" if there are none.")
+    L.append("Two deliverables sit alongside the DD, split by kind — the DD itself mirrors the printed "
+             "IRB-approved questionnaire exactly, so neither one is ever pre-applied to it:")
+    L.append("\n- `OPEN_QUESTIONS.md` — every assumption the build made where the form was ambiguous "
+             "(\"we assumed X — accurate?\"). The build always makes headway: the best guess goes into "
+             "the DD and the question comes here. Written even if there was nothing to assume.")
+    L.append("- `<name>_redcap_changes.docx` — changes the QUESTIONNAIRE itself needs (contradictory "
+             "skips, questions the SIR commits to that the form lacks), delivered as the original "
+             "document with tracked changes; a `<name>_redcap_changes.md` list instead when the "
+             "original is a PDF. Absent if the form needs no changes.")
+    L.append("\nTypos, numbering quirks and no-option columns appear in neither: they are built as "
+             "printed and never raised.")
     L.append("\n## 3. Form vs survey\nDefault to data-entry forms unless the proposal says respondents self-complete.")
     if dags:
         L.append("\n## 4. Data Access Groups\nUser Rights → DAGs — create and assign users for: "+", ".join(dags)+".")

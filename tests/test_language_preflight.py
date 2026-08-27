@@ -48,6 +48,42 @@ def fake_bin(**programs) -> Path:
     return d
 
 
+def fake_rscript(version="4.9.9", *, runs=True, stderr="", installed=("stats",)) -> Path:
+    """A stub Rscript that answers --version, and either runs `-e` scripts or fails.
+
+    `runs=True` behaves like a working R: it evaluates the two expressions the preflight
+    actually sends — `cat("ok")`, optionally preceded by a requireNamespace filter — by
+    printing "ok" plus any package names not in `installed`.
+    """
+    d = Path(tempfile.mkdtemp())
+    exe = d / "Rscript"
+    if runs:
+        # The only double-quoted strings the preflight sends are "ok" and the package
+        # names, so pulling those out identifies the packages exactly.
+        body = '''#!/bin/sh
+if [ "$1" = "--version" ]; then echo "R scripting front-end version VERSION (fake)"; exit 0; fi
+missing=""
+for p in $(printf '%s' "$2" | grep -o '"[A-Za-z][A-Za-z0-9._]*"' | tr -d '"'); do
+  [ "$p" = "ok" ] && continue
+  case " INSTALLED " in *" $p "*) continue ;; esac
+  missing="$missing${missing:+,}$p"
+done
+printf 'ok'
+if [ -n "$missing" ]; then printf ' missing: %s' "$missing"; fi
+exit 0
+'''.replace("VERSION", version).replace("INSTALLED", " ".join(installed))
+    else:
+        body = '''#!/bin/sh
+if [ "$1" = "--version" ]; then echo "R scripting front-end version VERSION (fake)"; exit 0; fi
+echo "STDERR" >&2
+exit 1
+'''.replace("VERSION", version).replace(
+            "STDERR", stderr or "Error: unable to load the base package")
+    exe.write_text(body)
+    exe.chmod(0o755)
+    return d
+
+
 class TestDetectNeverRaises(unittest.TestCase):
     """A check that crashes is worse than one that says 'not found'."""
 
@@ -79,6 +115,166 @@ class TestDetectNeverRaises(unittest.TestCase):
         broken.chmod(0o755)
         self.assertIsNone(TOOLS.probe_version(broken, timeout=2.0))
         self.assertIsNone(TOOLS.probe_version(d / "does-not-exist", timeout=2.0))
+
+
+@unittest.skipIf(platform.system() == "Windows", "the fake programs are shell scripts")
+class TestVerifyRNeverRaises(unittest.TestCase):
+    """NITS 46: existing is not working, and the run-check must never itself explode.
+
+    The live Table-1 session asked for R, was told by a check that only looked for the
+    FILE, and ended up shipping an R script that was never executed. Whatever we hand
+    an analyst, `verify_r` has to survive it and answer in plain data.
+    """
+
+    def test_a_missing_or_absurd_path_is_a_result_not_a_crash(self):
+        for junk in (None, "", "/no/such/rscript", "/", str(Path.home()), "   "):
+            result = TOOLS.verify_r(junk, timeout=5.0)
+            self.assertFalse(result["ok"], f"{junk!r} was reported as a working R")
+            self.assertTrue(result["error"], f"{junk!r} gave no reason")
+            self.assertEqual(result["missing_packages"], [])
+
+    def test_a_file_that_is_not_a_program_does_not_raise(self):
+        d = Path(tempfile.mkdtemp())
+        broken = d / "Rscript"
+        broken.write_text("this is not a program\n")
+        broken.chmod(0o755)
+        result = TOOLS.verify_r(broken, timeout=5.0)
+        self.assertFalse(result["ok"])
+        self.assertTrue(result["error"])
+
+    def test_a_program_that_exits_nonzero_is_reported_with_its_first_error_line(self):
+        d = fake_rscript(runs=False, stderr="Error: unable to load the base package")
+        result = TOOLS.verify_r(d / "Rscript", timeout=10.0)
+        self.assertFalse(result["ok"])
+        self.assertIn("unable to load the base package", result["error"])
+
+    def test_a_program_that_succeeds_but_prints_nothing_is_not_ok(self):
+        """Exit 0 is not proof. Only "ok" coming back is."""
+        d = Path(tempfile.mkdtemp())
+        silent = d / "Rscript"
+        silent.write_text("#!/bin/sh\nexit 0\n")
+        silent.chmod(0o755)
+        self.assertFalse(TOOLS.verify_r(silent, timeout=5.0)["ok"])
+
+    def test_a_working_rscript_reports_ok(self):
+        d = fake_rscript(runs=True)
+        result = TOOLS.verify_r(d / "Rscript", timeout=10.0)
+        self.assertTrue(result["ok"], result["error"])
+        self.assertIsNone(result["error"])
+
+    def test_a_hanging_rscript_times_out_instead_of_wedging_the_session(self):
+        d = Path(tempfile.mkdtemp())
+        hang = d / "Rscript"
+        hang.write_text("#!/bin/sh\nsleep 30\n")
+        hang.chmod(0o755)
+        result = TOOLS.verify_r(hang, timeout=2.0)
+        self.assertFalse(result["ok"])
+        self.assertIn("did not finish", result["error"])
+
+    def test_missing_packages_are_named_and_installed_ones_are_not(self):
+        d = fake_rscript(runs=True, installed=("stats", "utils"))
+        result = TOOLS.verify_r(d / "Rscript", packages=("stats", "openxlsx", "survival"),
+                                timeout=10.0)
+        self.assertTrue(result["ok"], result["error"])
+        self.assertEqual(sorted(result["missing_packages"]), ["openxlsx", "survival"])
+
+    def test_package_names_cannot_smuggle_r_code_in(self):
+        """Only real R package names reach the expression; anything else is dropped."""
+        expression = TOOLS._r_expression(['openxlsx"); system("rm -rf /"); cat("', "9bad", ""])
+        self.assertNotIn("system(", expression)
+        self.assertNotIn("rm -rf", expression)
+        # Nothing survived the filter, so it falls back to the bare probe.
+        self.assertEqual(expression, TOOLS.R_PROBE)
+
+    def test_no_packages_asked_for_means_the_plain_probe(self):
+        self.assertEqual(TOOLS._r_expression(()), TOOLS.R_PROBE)
+        self.assertIn("openxlsx", TOOLS._r_expression(("openxlsx",)))
+
+
+@unittest.skipIf(platform.system() == "Windows", "the fake programs are shell scripts")
+class TestDetectCarriesTheRunResult(unittest.TestCase):
+    """detect() must expose the three R states, and only ever run-check R."""
+
+    def test_a_working_r_is_marked_as_running(self):
+        result = TOOLS.detect(path="", known_dirs=[str(fake_rscript(runs=True))],
+                              probe_versions=True)
+        self.assertTrue(result["r"]["found"])
+        self.assertTrue(result["r"]["runs"])
+        self.assertIsNone(result["r"]["run_error"])
+
+    def test_a_broken_r_is_found_but_not_running(self):
+        d = fake_rscript(runs=False, stderr="Error: cannot open file '.Rprofile'")
+        result = TOOLS.detect(path="", known_dirs=[str(d)], probe_versions=True)
+        self.assertTrue(result["r"]["found"], "the file is there, so it was found")
+        self.assertFalse(result["r"]["runs"], "but it cannot run — that is the whole point")
+        self.assertIn(".Rprofile", result["r"]["run_error"])
+
+    def test_the_fast_path_does_not_run_anything(self):
+        """probe_versions=False is the no-subprocess answer; runs stays unknown, not False."""
+        result = TOOLS.detect(path="", known_dirs=[str(fake_rscript(runs=False))],
+                              probe_versions=False)
+        self.assertTrue(result["r"]["found"])
+        self.assertIsNone(result["r"]["runs"], "an unchecked R must not be reported as broken")
+
+    def test_verify_run_can_be_asked_for_independently(self):
+        result = TOOLS.detect(path="", known_dirs=[str(fake_rscript(runs=True))],
+                              probe_versions=False, verify_run=True)
+        self.assertTrue(result["r"]["runs"])
+
+    def test_python_and_stata_are_not_run_checked(self):
+        """Python is the interpreter running this; starting Stata can take a licence seat."""
+        d = fake_bin(python3="3.11.9", stata="18.0")
+        result = TOOLS.detect(path=str(d), known_dirs=[], probe_versions=True)
+        self.assertNotIn("runs", result["python"], "Python must not be run-checked")
+        self.assertNotIn("runs", result["stata"], "Stata must not be launched to test it")
+
+    def test_a_missing_r_is_not_run_checked_and_does_not_crash(self):
+        empty = Path(tempfile.mkdtemp())
+        result = TOOLS.detect(path=str(empty), known_dirs=[str(empty)], system="Plan9",
+                              probe_versions=True)
+        self.assertFalse(result["r"]["found"])
+        self.assertIsNone(result["r"]["runs"])
+
+
+@unittest.skipIf(platform.system() == "Windows", "the fake programs are shell scripts")
+class TestTheReportCoversBothRunStates(unittest.TestCase):
+    """The wording an analyst reads has to distinguish 'works' from 'is merely present'."""
+
+    def test_a_working_r_says_it_runs(self):
+        result = TOOLS.detect(path="", known_dirs=[str(fake_rscript("4.4.0", runs=True))],
+                              probe_versions=True)
+        text = TOOLS.report(result, say=None)
+        self.assertIn("R 4.4.0 ✓ (runs)", text,
+                      "a working R must be reported as running, not just found")
+        self.assertIn("R", TOOLS.summary_line(result))
+
+    def test_a_broken_r_says_it_could_not_run_and_why(self):
+        d = fake_rscript(runs=False, stderr="Error: unable to load the base package")
+        result = TOOLS.detect(path="", known_dirs=[str(d)], probe_versions=True)
+        text = TOOLS.report(result, say=None)
+        self.assertIn("found but couldn't run a test script", text)
+        self.assertIn("unable to load the base package", text, "the reason must be shown")
+        self.assertIn(str(d / "Rscript"), text, "the full path must still be shown")
+        self.assertNotIn("✓", text.split("Stata")[0].split("\n")[1],
+                         "a broken R must never carry a tick")
+
+    def test_a_broken_r_is_not_called_usable_in_the_summary(self):
+        d = fake_rscript(runs=False)
+        result = TOOLS.detect(path="", known_dirs=[str(d)], probe_versions=True)
+        line = TOOLS.summary_line(result)
+        self.assertNotIn("R and", line)
+        self.assertIn("wouldn't run", line,
+                      "an R that cannot run must not be summarised as usable")
+        self.assertLess(len(line.splitlines()), 2, "still one line")
+
+    def test_the_repair_command_is_on_one_copyable_line(self):
+        d = fake_rscript(runs=False)
+        text = TOOLS.report(TOOLS.detect(path="", known_dirs=[str(d)], probe_versions=True),
+                            say=None)
+        wanted = f"""{d / "Rscript"} -e '{TOOLS.R_PROBE}'"""
+        self.assertTrue(any(line.strip() == wanted for line in text.splitlines()),
+                        "the command to reproduce the failure must sit unwrapped on its own "
+                        f"line so it can be pasted; looked for {wanted!r}")
 
 
 class TestKnownLocationsAreSearched(unittest.TestCase):
@@ -251,6 +447,61 @@ class TestScaffoldRecordsTheDetectedPaths(unittest.TestCase):
         self.assertNotIn("{PYTHON}", readme)
 
 
+@unittest.skipIf(platform.system() == "Windows", "the fake programs are shell scripts")
+class TestScaffoldRecordsWhetherRActuallyRuns(unittest.TestCase):
+    """NITS 46: the study folder must not tell someone to run an R that cannot run.
+
+    The scaffolder is driven through a stub argo_tools so the assertion is about the
+    wording for each R state, not about whichever R the test machine happens to have.
+    """
+
+    STATES = {
+        "runs": {"name": "R", "found": True, "path": "/fake/bin/Rscript", "version": "4.4.0",
+                 "on_path": True, "paths": ["/fake/bin/Rscript"], "advice": "install advice",
+                 "runs": True, "run_error": None},
+        "broken": {"name": "R", "found": True, "path": "/fake/bin/Rscript", "version": "4.4.0",
+                   "on_path": True, "paths": ["/fake/bin/Rscript"], "advice": "install advice",
+                   "runs": False, "run_error": "Error: unable to load the base package"},
+    }
+
+    def _describe(self, r_state):
+        """The README block scaffold.py would write for this R state."""
+        scaffold = load(SCAFFOLD, "scaffold_under_test")
+        found = {
+            "python": {"name": "Python", "found": True, "path": "/fake/bin/python3",
+                       "version": "3.12.0", "on_path": True, "paths": [], "advice": ""},
+            "r": self.STATES[r_state],
+            "stata": {"name": "Stata", "found": False, "path": None, "version": None,
+                      "on_path": False, "paths": [], "advice": "Stata is licensed software."},
+        }
+        return scaffold.describe_tools(TOOLS, found)
+
+    def test_a_working_r_is_written_with_its_path(self):
+        block, log = self._describe("runs")
+        self.assertIn("/fake/bin/Rscript", block)
+        self.assertIn("runs", block)
+        self.assertIn("/fake/bin/Rscript", log)
+
+    def test_a_broken_r_is_written_as_broken_not_as_available(self):
+        block, log = self._describe("broken")
+        self.assertIn("could not run a test script", block)
+        self.assertIn("unable to load the base package", block,
+                      "the README must carry the reason, so it can be acted on later")
+        self.assertIn("found but not runnable", log,
+                      "the analysis log must not record a broken R as a usable path")
+
+    def test_a_working_r_carries_the_package_rule(self):
+        block, _ = self._describe("runs")
+        self.assertIn("base R", block, "the folder must prefer base R")
+        self.assertIn("install.packages(", block,
+                      "the folder must show the exact install line, not a vague instruction")
+
+    def test_the_block_says_which_computer_was_checked(self):
+        """The live session wrote 'not installed on this computer' about a different machine."""
+        block, _ = self._describe("runs")
+        self.assertIn("the computer the check ran on", block)
+
+
 class TestTheSkillTellsAgentsToUseIt(unittest.TestCase):
     """Doc/code agreement: the preflight is worthless if the skill still says `command -v`."""
 
@@ -268,6 +519,41 @@ class TestTheSkillTellsAgentsToUseIt(unittest.TestCase):
         self.assertIn("cran.r-project.org", setup_md)
         for name in ("Python", "R", "Stata"):
             self.assertIn(name, setup_md)
+
+    def test_the_skill_says_r_must_be_shown_to_RUN(self):
+        """NITS 46: the preflight step is worthless if the skill treats found as working."""
+        text = self.SKILL.read_text()
+        self.assertIn("(runs)", text, "the skill never mentions R's run-check")
+        self.assertIn("couldn't run a test script", text,
+                      "the skill doesn't tell the agent what a broken R looks like")
+
+    def test_the_skill_handles_r_packages_without_silent_installs(self):
+        """NITS 46: base R preferred; a needed package becomes one plain install line."""
+        text = self.SKILL.read_text()
+        self.assertIn("requireNamespace", text, "no package check before writing an R script")
+        self.assertIn("install.packages(", text,
+                      "the user is never given the exact line to run")
+        self.assertIn("base R", text, "base-R-only analyses are not stated as the preference")
+        lowered = text.lower()
+        self.assertIn("never install packages silently", lowered)
+
+    def test_the_skill_forbids_trying_to_install_r_itself(self):
+        """Mined from the live Table-1 session: ~8 turns were burned on an impossible install."""
+        text = self.SKILL.read_text()
+        self.assertIn("Never try to install R itself", text,
+                      "nothing stops the next session repeating the failed R install")
+
+    def test_the_skill_records_the_roadmap_as_not_yet_built(self):
+        """NITS 50: the roadmap must never read as a description of shipped features."""
+        text = self.SKILL.read_text()
+        self.assertIn("Where this is heading", text, "the roadmap note is missing")
+        roadmap = text.split("Where this is heading", 1)[1].split("## See also")[0]
+        self.assertIn("None of this exists yet", roadmap,
+                      "the roadmap must be marked as not-yet-built, explicitly")
+        for promised in ("formatting", "survival", "statistical comparisons"):
+            self.assertIn(promised, roadmap.lower(), f"the roadmap never mentions {promised}")
+        for language in ("R", "Python"):
+            self.assertIn(language, roadmap, "the roadmap is R *and* Python libraries")
 
 
 if __name__ == "__main__":

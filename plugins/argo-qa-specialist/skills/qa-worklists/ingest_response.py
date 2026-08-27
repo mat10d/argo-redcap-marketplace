@@ -74,17 +74,55 @@ def load_metadata(url: str, token: str) -> dict:
 
 
 def build_label_maps(meta_by: dict):
-    """label2field: cleaned field_label -> field_name.
-       value2code[field]: normalized choice label -> code."""
-    label2field, value2code = {}, {}
+    """label2fields: cleaned field_label -> [field_name, ...] (in data-dictionary order).
+       value2code[field]: normalized choice label -> code.
+
+    A list, not a single name: labels are NOT unique in REDCap — only field names are. A live
+    160-field dictionary had 44 labels shared by more than one field. Keeping just the first
+    meant every cell under a shared heading was pushed to whichever field happened to come
+    first in the dictionary, silently and with no way to notice.
+    """
+    label2fields, value2code = {}, {}
     for fname, m in meta_by.items():
         lbl = clean_label(m.get("field_label", ""))
         if lbl:
-            label2field.setdefault(_norm(lbl), fname)
+            label2fields.setdefault(_norm(lbl), []).append(fname)
         choices = parse_choices(m.get("select_choices_or_calculations", ""))
         if choices:
             value2code[fname] = {_norm(lbl): code for code, lbl in choices.items()}
-    return label2field, value2code
+    return label2fields, value2code
+
+
+# build_worklists.display_headers writes a repeated label as "Label (field_name)".
+_DISAMBIGUATED_HEADER = re.compile(r"^(?P<label>.*)\s\((?P<field>[A-Za-z0-9_]+)(?:\s#\d+)?\)$")
+
+
+def header_to_field(header, label2fields: dict, meta_by: dict) -> "tuple[str | None, str]":
+    """Which REDCap field a worklist column belongs to: (field_name, reason_if_none).
+
+    Tried in order of how certain each answer is:
+      1. the column heading IS a field name  — a worklist written without labels;
+      2. the heading is "Label (field_name)" — how the builder disambiguates a repeated label;
+      3. the heading is a label used by exactly one field.
+    A label shared by several fields resolves to none of them. We do not pick one: writing a
+    value to the wrong REDCap field is worse than not writing it, and the unmapped report says
+    which columns need a human.
+    """
+    raw = str(header or "").strip()
+    if not raw:
+        return None, "blank column heading"
+    if raw in meta_by:
+        return raw, ""
+    m = _DISAMBIGUATED_HEADER.match(raw)
+    if m and m.group("field") in meta_by:
+        return m.group("field"), ""
+    candidates = label2fields.get(_norm(raw), [])
+    if len(candidates) == 1:
+        return candidates[0], ""
+    if len(candidates) > 1:
+        return None, ("this label is shared by " + ", ".join(candidates) +
+                      " — rebuild the worklist so the heading names the field")
+    return None, "no REDCap field has this label"
 
 
 def _is_missing_phrase(v: str) -> bool:
@@ -229,7 +267,7 @@ def main():
         aliases = {fld: {_norm(k): v for k, v in (m or {}).items()} for fld, m in raw.items()}
 
     meta_by = load_metadata(args.url, tok)
-    label2field, value2code = build_label_maps(meta_by)
+    label2fields, value2code = build_label_maps(meta_by)
 
     ws = load_workbook(args.response, data_only=True).active
     headers = [c.value for c in ws[1]]
@@ -244,7 +282,7 @@ def main():
 
     out_rows = []
     issues: list = []
-    unknown_cols = set()
+    unknown_cols = {}
     for r in range(3, ws.max_row + 1):
         rid = str(ws.cell(row=r, column=1).value or "").strip()
         if not rid:
@@ -262,9 +300,9 @@ def main():
                 prev = orig.get((rid, header))
                 if prev is not None and str(value).strip() == prev:
                     continue
-            field = label2field.get(_norm(header))
+            field, why = header_to_field(header, label2fields, meta_by)
             if not field:
-                unknown_cols.add(str(header))
+                unknown_cols[str(header)] = why
                 continue
             updates = translate_cell(field, value, meta_by, value2code, aliases, issues, rid, header)
             row_update.update(updates)
@@ -289,8 +327,8 @@ def main():
     if issues or unknown_cols:
         lines = [f"# Unmapped cells — {os.path.basename(args.response)}", ""]
         if unknown_cols:
-            lines += ["## Columns with no matching REDCap field", ""]
-            lines += [f"- {c!r}" for c in sorted(unknown_cols)] + [""]
+            lines += ["## Columns that couldn't be matched to a REDCap field", ""]
+            lines += [f"- {c!r} — {unknown_cols[c]}" for c in sorted(unknown_cols)] + [""]
         if issues:
             lines += ["## Values that couldn't be mapped to a code", "",
                        "| record | field | RA wrote | why |", "|---|---|---|---|"]

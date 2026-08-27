@@ -12,6 +12,11 @@ Field names on the request forms are deliberately NOT hardcoded (they are unveri
 live projects): each record's summary is built from the tracker's own data dictionary — the
 first few filled fields on the request form, shown by their labels. That renders correctly
 whatever the forms actually contain.
+
+Two queues lead with what the request is ABOUT before that generic summary: builds with the
+study's short name and PI, people with the person's name, email and the access they're asking
+for. Both degrade to the plain summary when a record doesn't carry those fields — nothing is
+assumed to exist.
 """
 from __future__ import annotations
 
@@ -42,6 +47,20 @@ ROUTE = {
 # Triage/bookkeeping fields that say nothing about what the request IS.
 BORING = {"assigned_to", "assignment_date", "completed", "resolution_date", "notes"}
 
+# A people request is ABOUT a person: who they are, how to reach them, and what they are asking
+# for. The Study Personnel Request form (PID 221, verified against its live data dictionary)
+# names those fields first_name / last_name / email / user_study / user_role, so the queue leads
+# with them instead of whatever the form happens to list first — which is the REDCap instance,
+# then a phone number. The weekly check puts every open request in its own table row, and a row
+# that doesn't name the person, carry their email, or say what they want is a row nobody can act
+# on. Labels still come from the tracker's own data dictionary, and any of these fields the
+# record doesn't carry is simply dropped — nothing here is assumed to be filled in.
+PERSON_FIELDS = ("first_name", "last_name", "email")
+PERSON_ASK_FIELDS = ("user_study", "user_role")
+PEOPLE_LEAD_FIELDS = PERSON_FIELDS + PERSON_ASK_FIELDS
+
+NO_DETAILS = "(no details filled in)"
+
 
 def _tracker(env_var):
     return next(t for t in ADMIN_TRACKERS if t[0] == env_var)
@@ -70,11 +89,14 @@ def _clean_label(label: str, width: "int | None" = 40) -> str:
     return (text if width is None else text[:width]).rstrip(":")
 
 
-def _summarise(rec: dict, fields: list, id_field: str) -> str:
-    """A one-line summary: the first few filled, non-triage fields, by label."""
+def _summarise(rec: dict, fields: list, id_field: str, skip=()) -> str:
+    """A one-line summary: the first few filled, non-triage fields, by label.
+
+    `skip` drops fields another part of the line already showed, so nothing is said twice.
+    """
     bits = []
     for name, label in fields:
-        if name == id_field or name in BORING or name.endswith("_complete"):
+        if name == id_field or name in BORING or name in skip or name.endswith("_complete"):
             continue
         val = str(rec.get(name, "")).strip()
         if not val:
@@ -82,7 +104,34 @@ def _summarise(rec: dict, fields: list, id_field: str) -> str:
         bits.append(f"{_clean_label(label)}: {val[:60]}")
         if len(bits) == 3:
             break
-    return "; ".join(bits) if bits else "(no details filled in)"
+    return "; ".join(bits) if bits else NO_DETAILS
+
+
+def _person_bits(rec: dict, labels: dict) -> list:
+    """The person a people request is about: name, email, and the access they're asking for.
+
+    Written as the same 'Label: value' bits the summary uses, so one splitting rule turns any
+    queue line into table columns. Fields the record doesn't carry are dropped — a half-filled
+    request still gets a usable row rather than empty columns.
+    """
+    bits = []
+    for name in PEOPLE_LEAD_FIELDS:
+        val = str(rec.get(name, "")).strip()
+        if val:
+            bits.append(f"{_clean_label(labels.get(name, name))}: {val[:60]}")
+    return bits
+
+
+def _detail_line(key: str, rec: dict, fields: list, id_field: str) -> str:
+    """The detail half of one queue line — labelled bits joined with '; '.
+
+    Every queue renders the same way; the people queue just leads with who it is about.
+    """
+    lead = _person_bits(rec, dict(fields)) if key == "people" else []
+    rest = _summarise(rec, fields, id_field, skip=PEOPLE_LEAD_FIELDS if lead else ())
+    if lead:
+        return "; ".join(lead if rest == NO_DETAILS else lead + [rest])
+    return rest
 
 
 def _study_label(rec: dict) -> str:
@@ -139,7 +188,7 @@ def show_queue(key: str, expand: bool = True) -> "int | None":
             study = _study_label(rec) if key == "builds" else ""
             lead = f"{study} — " if study else ""
             extra = f"  [{_sir_progress(rec)} build steps done]" if key == "builds" else ""
-            print(f"  {rid}: {lead}{_summarise(rec, fields, id_field)}{extra}")
+            print(f"  {rid}: {lead}{_detail_line(key, rec, fields, id_field)}{extra}")
         print(f"  -> fulfilled in {ROUTE[key]}; when done, mark the record's"
               f" '{done_marker}' box in the {title} project on the REDCap website.")
     return len(open_recs)

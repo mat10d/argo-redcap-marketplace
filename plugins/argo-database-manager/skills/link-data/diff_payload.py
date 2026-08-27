@@ -17,13 +17,17 @@ for human review, never auto-pushed:
 
 The other two are the gap report — the two ways the id spaces fail to line up:
 
-    <prefix>_orphans.csv    ids present ONLY on the computed side. There is no
-                            record to fill, so these are never in the payload:
-                            pushing them would CREATE records. A human decides
-                            whether they belong in the project at all.
+    <prefix>_no_record_to_fill.csv   ids present ONLY on the computed side.
+                            There is no record to fill, so these are never in
+                            the payload: pushing them would CREATE records. A
+                            human decides whether they belong in the project.
     <prefix>_missing_link.csv  ids present ONLY on the current side — records
                             the linkage found nothing for. Nothing is written
                             for them; they are here so the gap is visible.
+
+This script compares two sides that are ALREADY linked, field by field. Working
+out how the two studies join in the first place — and producing the hard-link
+file that formalises it — is link_studies.py's job, not this one's.
 
 Stdlib only. Compares only the fields present in BOTH files, unless --fields is
 given. By default the ID field, REDCap's structural columns
@@ -37,8 +41,8 @@ Reading the two sides for an ANALYSIS merge, with no intention of writing anythi
 `--for-analysis`. The same comparison runs, but the two payload files are named for what they
 mean to a reader rather than for a REDCap import — `<prefix>_fills.csv` (values one source has
 and the other doesn't) and `<prefix>_disagreements.csv` (values the two sources contradict each
-other on) — and nothing is printed about pushing. The conflicts, orphans and missing-link
-reports are written either way; they are the merge's gap report, not a payload.
+other on) — and nothing is printed about pushing. The conflicts and the two gap reports are
+written either way; they are the merge's gap report, not a payload.
 
 Usage:
     python3 diff_payload.py --computed computed.csv --current current.csv \\
@@ -165,7 +169,7 @@ def main():
     p_conf = write(f"{args.prefix}_conflicts.csv", conflicts,
                    [args.id_field, "field", "existing", "computed"])
     p_over = write(f"{args.prefix}_{disagree_name}.csv", overwrites, header)
-    p_orph = write(f"{args.prefix}_orphans.csv", orphans, header)
+    p_orph = write(f"{args.prefix}_no_record_to_fill.csv", orphans, header)
     p_miss = write(f"{args.prefix}_missing_link.csv", missing_link, [args.id_field])
 
     print(f"comparing  : {', '.join(fields)}")
@@ -176,7 +180,8 @@ def main():
     print(f"{fills_label}: {n_fill}  ({len(updates)} records)  -> {p_update.name}")
     print(f"conflicts  : {n_conflict}  ({len(overwrites)} records) -> {p_conf.name} / {p_over.name}")
     print(f"no-ops     : {n_noop}")
-    print(f"orphans    : {len(orphans)} records ({n_orphan_cells} values) only in the computed file -> {p_orph.name}")
+    print(f"no record  : {len(orphans)} rows ({n_orphan_cells} values) in the computed file have "
+          f"no record to fill -> {p_orph.name}")
     print(f"no link    : {len(missing_link)} records only in the current file -> {p_miss.name}")
 
     if args.for_analysis:
@@ -184,8 +189,8 @@ def main():
               f"source has a value and the other doesn't; {p_over.name} is where they disagree "
               f"and a human has to pick.")
         if orphans:
-            print(f"{p_orph.name} holds the records only the first file knows about, and "
-                  f"{p_miss.name} the ones only the second does — say both counts out loud, "
+            print(f"{p_orph.name} holds the rows only the second file knows about, and "
+                  f"{p_miss.name} the records only the first does — say both counts out loud, "
                   f"they are what the merge could NOT do.")
         return
 

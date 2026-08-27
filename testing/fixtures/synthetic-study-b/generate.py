@@ -17,23 +17,37 @@ numbers instead of eyeballing a join.
 SYN-B is a pathology/biobank sub-study recruiting *from* the SYN colorectal
 cohort. It therefore:
 
-  * uses the SAME record-ID field, `syn_id`, over the SAME SYN-#### space
-    (a sub-study carrying the parent cohort's ID is the normal real-world
-    shape, and it is what makes the two exports joinable with no crosswalk);
+  * has its OWN record ID, `synb_id` (SYNB-####), and CARRIES the parent
+    cohort's record ID in a `syn_id` column — the ported-ID shape that real
+    sub-studies have, and the thing that makes the two exports joinable with
+    no crosswalk. `syn_id` is what every linkage here joins on;
   * repeats two of the parent study's field names verbatim —
     `histology_grade` and `margin_status` — because both studies record them
     off the same pathology report. These are the two COMPARABLE FIELDS the
     linkage diff runs on;
-  * has 13 further fields of its own that the parent study does not have.
+  * carries the identifying columns a real linkage is reasoned about:
+    `hospital_no`, `first_name`, `surname`.
 
 DEPENDS ON the primary fixture: the engineered agree/conflict/fill classes are
 computed from `../synthetic-study/records.csv`, which is committed. If that
 file is regenerated, regenerate this one too and re-commit both.
 
+WHY THE PARENT REGISTRY LIVES HERE
+----------------------------------
+Establishing a link is done on IDENTITY columns — hospital number, name,
+surname — and the primary fixture predates them: it holds no names, and it is
+byte-frozen because four other suites assert against it. So this generator also
+writes `parent_registry.csv`: the SYN cohort's identity-only export, derived
+deterministically from `../synthetic-study/records.csv` (one row per SYN
+participant; no clinical data copied). It is the PARENT side of every
+hard-link test, and it is regenerated here rather than hand-maintained, so it
+can never drift from the primary it comes from.
+
 Regenerates byte-identically on every run (stdlib only, no timestamps):
 
-    datadictionary.csv   REDCap API-format metadata (15 fields, 2 forms)
-    records.csv          60 flat raw-code records, 3 DAGs
+    datadictionary.csv   REDCap API-format metadata (19 fields, 2 forms)
+    records.csv          60 flat raw-code records, 2 DAGs (the CHILD side)
+    parent_registry.csv  200 identity rows for the SYN cohort (the PARENT side)
     MANIFEST.json        every engineered count, for tests to assert exactly
 
 Run:  python3 generate.py     (writes into its own directory)
@@ -80,7 +94,49 @@ N_B_ONLY = 15       # ids in SYN-B that do not exist in the primary study at all
 # shared total = 45; SYN-B total = 60; primary-only = 200 - 45 = 155
 
 B_ONLY_ID_BASE = 8000   # SYN-8001 .. SYN-8015 (the primary study stops at SYN-0200,
-                        # and its pathology fixture's orphans use SYN-90xx)
+                        # and its pathology fixture's unmatched rows use SYN-90xx)
+
+# ---------------------------------------------------------------------------
+# Engineered IDENTITY truth — what the hard-link flow is tested against.
+#
+# The link is established on identity, so the fixture has to carry identity that
+# is mostly consistent and deliberately, countably, not always. All of it is
+# derived from the record ID with no randomness, so adding it left every
+# pre-existing value in records.csv byte-identical.
+# ---------------------------------------------------------------------------
+
+# Fabricated name pools. No real person is intended; the two lists are prime-ish
+# lengths so index arithmetic spreads them without repeating in lockstep.
+GIVEN_NAMES = [
+    "Adaeze", "Bankole", "Chidinma", "Damilola", "Ebele", "Folasade", "Gbenga",
+    "Halima", "Ifeoma", "Jumoke", "Kelechi", "Lanre", "Maryam", "Nkechi",
+    "Obiageli", "Patience", "Rukayat", "Segun", "Temitope", "Uchenna",
+    "Victoria", "Wale", "Yewande", "Zainab", "Amaka", "Bode", "Chinedu",
+    "Dayo", "Emeka",
+]
+SURNAMES = [
+    "Abiodun", "Balogun", "Chukwu", "Danjuma", "Eze", "Fashola", "Garba",
+    "Hassan", "Ibrahim", "Jibril", "Kalu", "Lawal", "Mbeki", "Nwosu",
+    "Okonkwo", "Popoola", "Quadri", "Rotimi", "Sanusi", "Tijani", "Umeh",
+    "Vaughan", "Williams", "Yusuf", "Zubairu", "Adeleke", "Bassey",
+]
+
+# Which shared records the CHILD study spells differently from the PARENT.
+# Positions into sorted(shared_ids); disjoint from the hospital-number wrinkles
+# below so each engineered defect can be counted on its own.
+NAME_MISMATCH_POSITIONS = {0: "surname_typo", 10: "surname_swap", 20: "first_name"}
+
+# Hospital number is the OTHER plausible join key, and it is deliberately the
+# weaker one: five shared child records never had it recorded and two carry a
+# transposed digit. 45 - 5 - 2 = 38 shared records match on hospital_no against
+# 45 on syn_id — which is exactly the reasoning the key survey has to surface.
+HOSPITAL_BLANK_POSITIONS = [3, 8, 13, 18, 23]
+HOSPITAL_TYPO_POSITIONS = [5, 15]
+
+# The parent side of the link: identity only. No clinical column is copied out
+# of the primary fixture — this file exists to be joined against, not analysed.
+PARENT_REGISTRY_COLUMNS = ["syn_id", "redcap_data_access_group",
+                           "hospital_no", "first_name", "surname"]
 
 
 def dd_row(name, form, ftype, label, choices="", note="", val="", vmin="", vmax="",
@@ -97,15 +153,60 @@ def dd_row(name, form, ftype, label, choices="", note="", val="", vmin="", vmax=
     }
 
 
+# ---------------------------------------------------------------------------
+# Identity: names and hospital numbers, derived from the ID with no randomness
+# ---------------------------------------------------------------------------
+
+def id_number(sid: str) -> int:
+    """The numeric part of SYN-0007 / SYNB-0007 — the seed for everything below."""
+    return int(sid.rsplit("-", 1)[1])
+
+
+def given_name_for(sid: str) -> str:
+    return GIVEN_NAMES[(id_number(sid) * 7) % len(GIVEN_NAMES)]
+
+
+def surname_for(sid: str) -> str:
+    return SURNAMES[(id_number(sid) * 11) % len(SURNAMES)]
+
+
+def hospital_no_for(sid: str) -> str:
+    """A hospital number that looks nothing like the record ID but is unique per person."""
+    return f"HOSP-{100000 + id_number(sid) * 37:06d}"
+
+
+def misspell(word: str) -> str:
+    """Swap the last two letters — a transcription slip, not a different person."""
+    if len(word) < 2 or word[-1] == word[-2]:
+        return word[:-1] + ("a" if word[-1] != "a" else "e")
+    return word[:-2] + word[-1] + word[-2]
+
+
+def transpose_digits(value: str) -> str:
+    """The same slip on a hospital number: last two digits swapped."""
+    if len(value) < 2 or value[-1] == value[-2]:
+        return value[:-1] + ("0" if value[-1] != "0" else "1")
+    return value[:-2] + value[-1] + value[-2]
+
+
 def build_data_dictionary():
-    """15 fields over 2 forms. Two of them deliberately match the primary study."""
+    """19 fields over 2 forms. Two of them deliberately match the primary study."""
     d = []
-    # ---- pathology (9 fields) ----------------------------------------------
-    d.append(dd_row("syn_id", "pathology", "text",
-                    "Participant ID — same ID as the SYN parent cohort (TEST DATA)",
-                    note="Shared identifier space with the SYN colorectal cohort. "
-                         "This is what makes the two studies linkable.",
+    # ---- pathology (13 fields) ---------------------------------------------
+    d.append(dd_row("synb_id", "pathology", "text",
+                    "SYN-B record ID (TEST DATA)",
+                    note="This study's OWN record ID. The linkage writes this back "
+                         "alongside the parent cohort's number.",
                     section="SYNTHETIC TEST STUDY — no real data"))
+    d.append(dd_row("syn_id", "pathology", "text",
+                    "Parent cohort record ID — this participant's ID in the SYN cohort",
+                    note="Ported from the SYN colorectal cohort. This is what makes the "
+                         "two studies linkable."))
+    d.append(dd_row("hospital_no", "pathology", "text", "Hospital number"))
+    d.append(dd_row("first_name", "pathology", "text", "First name"))
+    d[-1]["identifier"] = "y"
+    d.append(dd_row("surname", "pathology", "text", "Surname"))
+    d[-1]["identifier"] = "y"
     d.append(dd_row("path_lab_no", "pathology", "text", "Pathology laboratory number"))
     d.append(dd_row("accession_date", "pathology", "text", "Specimen accession date",
                     val="date_dmy"))
@@ -208,10 +309,17 @@ def other_value(field, current):
     return options[len(current) % len(options)]
 
 
-def make_record(sid, dag, grade, margin, lab_seq):
-    """One SYN-B record. The two comparable fields are passed in (they carry the
-    engineered class); everything else is seeded filler."""
-    r = {"syn_id": sid, "redcap_data_access_group": dag}
+def make_record(sid, dag, grade, margin, lab_seq, synb_id, identity):
+    """One SYN-B record. The two comparable fields and the identity columns are
+    passed in (they carry the engineered classes); everything else is seeded filler.
+
+    The identity columns are assigned WITHOUT touching `random`, so adding them
+    left every pre-existing value in records.csv byte-identical.
+    """
+    r = {"synb_id": synb_id, "syn_id": sid, "redcap_data_access_group": dag}
+    r["hospital_no"] = identity["hospital_no"]
+    r["first_name"] = identity["first_name"]
+    r["surname"] = identity["surname"]
     r["path_lab_no"] = f"BX-{7000 + lab_seq}"
     r["accession_date"] = rand_date(2024, 2025)
     # specimen_type drives margin_status's branching logic. Keep it '2'
@@ -269,7 +377,7 @@ def build_records(primary, groups):
                      p["histology_grade"], p["margin_status"]))
         classes[sid] = "agree"
     # Records that exist only in SYN-B: no counterpart in the primary study at
-    # all. On the linkage read side these are ORPHANS.
+    # all. On the linkage read side these are the records with NO PARENT MATCH.
     for k in range(1, N_B_ONLY + 1):
         sid = f"SYN-{B_ONLY_ID_BASE + k:04d}"
         plan.append((sid, "site_gamma",
@@ -278,9 +386,79 @@ def build_records(primary, groups):
         classes[sid] = "b_only"
 
     plan.sort(key=lambda t: t[0])          # emit in ID order
-    records = [make_record(sid, dag, grade, margin, i + 1)
+    parent_identity, child_identity, engineered = engineer_identity(
+        [r["syn_id"] for r in primary], [t[0] for t in plan])
+    records = [make_record(sid, dag, grade, margin, i + 1,
+                           f"SYNB-{i + 1:04d}", child_identity[sid])
                for i, (sid, dag, grade, margin) in enumerate(plan)]
-    return records, classes
+    return records, classes, parent_identity, engineered
+
+
+def engineer_identity(primary_ids, child_ids):
+    """Who each record says it is, on both sides, and where the two disagree.
+
+    Identity is derived from the participant's parent-cohort ID, so a shared
+    record is the SAME person on both sides by construction. Then three
+    engineered discrepancies are introduced on the CHILD side (a mistyped
+    surname, a wholly different surname, a mistyped first name) and seven
+    engineered hospital-number gaps (five never recorded, two transposed), so
+    the tests can assert exact numbers for the name-review table and for why
+    the hospital number is the WEAKER of the two candidate join keys.
+
+    Returns (parent_identity, child_identity, engineered_counts).
+    """
+    shared = sorted(set(child_ids) & set(primary_ids))
+
+    def identity(sid):
+        return {"hospital_no": hospital_no_for(sid),
+                "first_name": given_name_for(sid),
+                "surname": surname_for(sid)}
+
+    parent = {sid: identity(sid) for sid in sorted(set(primary_ids))}
+    child = {sid: identity(sid) for sid in sorted(set(child_ids))}
+
+    name_mismatch = {}
+    for pos, kind in sorted(NAME_MISMATCH_POSITIONS.items()):
+        sid = shared[pos]
+        if kind == "surname_typo":
+            child[sid]["surname"] = misspell(parent[sid]["surname"])
+        elif kind == "surname_swap":
+            child[sid]["surname"] = SURNAMES[
+                (SURNAMES.index(parent[sid]["surname"]) + 5) % len(SURNAMES)]
+        elif kind == "first_name":
+            child[sid]["first_name"] = misspell(parent[sid]["first_name"])
+        else:                                     # pragma: no cover - guard
+            raise RuntimeError(f"unknown name-mismatch kind {kind!r}")
+        differs = [f for f in ("first_name", "surname")
+                   if child[sid][f] != parent[sid][f]]
+        if len(differs) != 1:
+            raise RuntimeError(f"{sid}: {kind} changed {differs}, wanted exactly one field")
+        name_mismatch[sid] = differs[0]
+
+    parent_hospital_numbers = {v["hospital_no"] for v in parent.values()}
+    blanked, mistyped = [], []
+    for pos in HOSPITAL_BLANK_POSITIONS:
+        sid = shared[pos]
+        child[sid]["hospital_no"] = ""
+        blanked.append(sid)
+    for pos in HOSPITAL_TYPO_POSITIONS:
+        sid = shared[pos]
+        child[sid]["hospital_no"] = transpose_digits(parent[sid]["hospital_no"])
+        if child[sid]["hospital_no"] in parent_hospital_numbers:
+            raise RuntimeError(f"{sid}: the mistyped hospital number collides with a real one")
+        mistyped.append(sid)
+
+    matching_hospital = [sid for sid in shared
+                         if child[sid]["hospital_no"]
+                         and child[sid]["hospital_no"] == parent[sid]["hospital_no"]]
+    engineered = {
+        "name_mismatch": name_mismatch,
+        "hospital_blank": sorted(blanked),
+        "hospital_typo": sorted(mistyped),
+        "hospital_matching": matching_hospital,
+        "shared": shared,
+    }
+    return parent, child, engineered
 
 
 # ---------------------------------------------------------------------------
@@ -350,6 +528,49 @@ def expected_diff(primary, records):
 
 
 # ---------------------------------------------------------------------------
+# Expected HARD-LINK outcome (what link_studies.py must produce)
+# ---------------------------------------------------------------------------
+
+def linking_manifest(records, registry, engineered):
+    """Every number the hard-link flow is asserted against.
+
+    Computed from the finished CSVs rather than restated from the plan, so the
+    MANIFEST can never drift from the files sitting next to it.
+    """
+    child_ids = {r["syn_id"] for r in records}
+    parent_ids = {r["syn_id"] for r in registry}
+    matched = sorted(child_ids & parent_ids)
+    name_mismatch = engineered["name_mismatch"]
+    by_field = {}
+    for sid, field in name_mismatch.items():
+        by_field[field] = by_field.get(field, 0) + 1
+    return {
+        "parent_file": "parent_registry.csv",
+        "child_file": "records.csv",
+        "parent_name": "syn",
+        "child_name": "synb",
+        "join_key": "syn_id",
+        "child_record_id_field": "synb_id",
+        "n_parent_records": len(registry),
+        "n_child_records": len(records),
+        # The three join results, in the plain words the skill uses for them.
+        "n_matched": len(matched),
+        "n_child_only": len(child_ids - parent_ids),
+        "n_parent_only": len(parent_ids - child_ids),
+        # The name-review table: matched pairs whose names disagree.
+        "name_columns": ["first_name", "surname"],
+        "n_name_discrepancies": len(name_mismatch),
+        "n_name_discrepancies_by_field": dict(sorted(by_field.items())),
+        "ids_name_discrepancy": sorted(name_mismatch),
+        # Why hospital_no is the WEAKER candidate key: 38 of the 45 matched
+        # records agree on it, against 45 on syn_id.
+        "n_hospital_no_matches": len(engineered["hospital_matching"]),
+        "ids_hospital_no_blank": engineered["hospital_blank"],
+        "ids_hospital_no_mistyped": engineered["hospital_typo"],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -368,10 +589,19 @@ def main():
     write_csv(os.path.join(HERE, "datadictionary.csv"), DD_COLUMNS, dd)
 
     groups = pick_shared(primary)
-    records, classes = build_records(primary, groups)
-    rec_columns = (["syn_id", "redcap_data_access_group"]
-                   + [f["field_name"] for f in dd if f["field_name"] != "syn_id"])
+    records, classes, parent_identity, engineered = build_records(primary, groups)
+    rec_columns = (["synb_id", "redcap_data_access_group"]
+                   + [f["field_name"] for f in dd if f["field_name"] != "synb_id"])
     write_csv(os.path.join(HERE, "records.csv"), rec_columns, records)
+
+    # The PARENT side of the link: identity only, one row per SYN participant,
+    # derived from the primary fixture (see the module docstring for why it is
+    # written here rather than in synthetic-study/).
+    registry = [{"syn_id": r["syn_id"],
+                 "redcap_data_access_group": r["redcap_data_access_group"],
+                 **parent_identity[r["syn_id"]]}
+                for r in primary]
+    write_csv(os.path.join(HERE, "parent_registry.csv"), PARENT_REGISTRY_COLUMNS, registry)
 
     primary_ids = {r["syn_id"] for r in primary}
     b_ids = {r["syn_id"] for r in records}
@@ -385,7 +615,8 @@ def main():
         "synthetic": True,
         "study": {
             "title": "SYN-B — Synthetic Pathology & Biobank Sub-study (SYNTHETIC TEST STUDY)",
-            "record_id_field": "syn_id",
+            "record_id_field": "synb_id",
+            "parent_id_field": "syn_id",
             "n_records": len(records),
             "dags": dict(sorted(dags.items())),
             "shares_id_space_with": "testing/fixtures/synthetic-study",
@@ -417,6 +648,7 @@ def main():
             },
         },
         "expected_diff": expected_diff(primary, records),
+        "linking": linking_manifest(records, registry, engineered),
     }
     with open(os.path.join(HERE, "MANIFEST.json"), "w") as fh:
         json.dump(manifest, fh, indent=2, sort_keys=True)

@@ -212,6 +212,112 @@ class TestWeeklyCheckSelfLoadsAndExplainsItself(unittest.TestCase):
         self.assertNotIn("First snapshot", proc.stdout)
 
 
+class TestWeeklyCheckQueuePresentationRules(unittest.TestCase):
+    """0.19 #44: the queues came back as prose — empty ones got tables, open ones got collapsed
+    into "the rest are untouched", and personnel requests arrived with no name on them.
+
+    The rules are the deliverable here (a SKILL.md tells an agent how to present), so this
+    guards that they are still stated, still specific, and still agree with what the script
+    actually emits.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.doc = (PORTFOLIO_DIR / "SKILL.md").read_text()
+        cls.rules = cls.doc.split("### How to present the queues")[1].split("\n## ")[0]
+
+    def test_the_rules_section_exists(self):
+        self.assertIn("### How to present the queues", self.doc)
+
+    def test_an_empty_queue_gets_one_line_and_no_table(self):
+        self.assertIn("never a table", self.rules)
+        self.assertIn("No data requests.", self.rules,
+                      "show the one-line form, don't just describe it")
+
+    def test_open_items_are_never_collapsed(self):
+        self.assertIn("One record, one row", self.rules)
+        for banned in ("Never collapse", "Never drop a row"):
+            self.assertIn(banned, self.rules)
+
+    def test_the_rows_are_an_inline_markdown_table(self):
+        self.assertIn("inline markdown table", self.rules)
+        self.assertIn("not a file", self.rules)
+
+    def test_there_is_an_example_table(self):
+        rows = [ln for ln in self.rules.splitlines() if ln.strip().startswith("|")]
+        self.assertGreaterEqual(len(rows), 8, "the rules need a worked example, not just prose")
+        self.assertTrue(any("| Record |" in ln for ln in rows),
+                        "the example table must start from the record number")
+
+    def test_the_builds_columns_are_named(self):
+        for column in ("short name", "PI", "progress", "next step"):
+            self.assertIn(column, self.rules, f"builds table is missing {column!r}")
+
+    def test_the_people_columns_are_named(self):
+        for column in ("first name", "last name", "email", "role"):
+            self.assertIn(column, self.rules, f"people table is missing {column!r}")
+
+    def test_the_people_columns_are_the_fields_the_script_emits(self):
+        """The doc promises name and email; open_requests must actually put them on the line."""
+        spec = importlib.util.spec_from_file_location(
+            "open_requests_doc",
+            PLUGINS / "argo-core/skills/redcap-api/scripts/open_requests.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.assertEqual(tuple(module.PERSON_FIELDS), ("first_name", "last_name", "email"))
+        # The doc's people table also promises the role being asked for; the form lists that
+        # AFTER the phone number, so it only reaches the line by being led with.
+        self.assertIn("user_role", module.PEOPLE_LEAD_FIELDS)
+        self.assertEqual(module.PEOPLE_LEAD_FIELDS,
+                         module.PERSON_FIELDS + module.PERSON_ASK_FIELDS)
+        # And the vendored copy the skill actually runs says the same thing.
+        vendored = (PORTFOLIO_DIR / "scripts" / "open_requests.py").read_text()
+        self.assertIn("PEOPLE_LEAD_FIELDS", vendored)
+
+    def test_the_support_ticket_exception_is_stated_where_the_rules_are(self):
+        """Rule 2 says never a count; the routing table says support tickets ARE a count."""
+        self.assertIn("Support tickets are the one exception", self.rules)
+        self.assertIn("count only", self.doc)
+
+
+class TestStartHerePushesTheSettingsFile(unittest.TestCase):
+    """0.19 #43: setup used to end by declaring itself done and ASKING whether they'd like to
+    add keys. The completing act of setup is the file being on screen."""
+
+    DOC = PLUGINS / "argo-core/skills/start-here/SKILL.md"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.doc = cls.DOC.read_text()
+        # The doc is hard-wrapped at 98 columns, so every phrase check reads the unwrapped
+        # text — otherwise a reflow breaks a test that has nothing to do with the wording.
+        cls.flat = " ".join(cls.doc.replace("*", "").split())
+
+    def test_it_no_longer_asks_permission_to_show_the_file(self):
+        self.assertNotIn("Want me to put the file on screen", self.flat,
+                         "the file goes on screen; the question is whether they've saved it")
+
+    def test_the_file_is_presented_unprompted(self):
+        self.assertIn("your next message is the file itself", self.flat)
+        self.assertIn("Present it unprompted", self.flat)
+        self.assertIn("present_files", self.flat, "the file card is still the first rung")
+
+    def test_the_instruction_line_is_the_one_the_scaffold_prints(self):
+        """Same words in the SKILL.md and in argo_setup.py, so the two don't drift apart."""
+        phrase = "paste each key after its = sign, save"
+        self.assertIn(phrase, self.flat.lower())
+        setup = (PLUGINS / "argo-core/skills/redcap-api/scripts/argo_setup.py").read_text()
+        self.assertIn(phrase, " ".join(setup.split()).lower())
+
+    def test_declining_moves_on_without_nagging(self):
+        self.assertIn('"later"', self.flat)
+        self.assertIn("Don't raise it again this session", self.flat)
+        self.assertIn("Nothing is blocked without keys", self.flat)
+
+    def test_analysts_are_still_exempt_from_key_talk(self):
+        self.assertIn("Data analysts are the exception", self.flat)
+
+
 class TestQaWorklistsDocMatchesCode(unittest.TestCase):
     """The three qa-worklists doc gaps the Tier 1.5 walkthroughs found (0.17.2 #28/#30/#31).
 
@@ -254,6 +360,89 @@ class TestQaWorklistsDocMatchesCode(unittest.TestCase):
         self.assertIn("no post-ra export", task2.lower())
         self.assertIn("fresh export", task2)
         self.assertIn("closes on the next pull", task2)
+
+
+class TestBuildStudyPromisedDeliverables(unittest.TestCase):
+    """NITS 47 + 48 (0.19): the build's document handling.
+
+    47 — the documents attached to the request get ported into the build folder as the first act
+    after triage, before any analysis. 48 — the one QUESTIONNAIRE_CHANGELOG.md deliverable split
+    in two BY KIND: assumptions the build made go in `OPEN_QUESTIONS.md` as questions; changes the
+    questionnaire itself needs come back as the original document with tracked changes. Typos and
+    numbering quirks appear in neither. These guards exist because SKILL.md and the brief generator
+    each promise deliverables by name to a live session, and a stray old name sends it to write a
+    file nothing else in the pipeline knows about.
+    """
+
+    SKILL_DIR = PLUGINS / "argo-database-manager/skills/build-study"
+    DOC = (SKILL_DIR / "SKILL.md").read_text()
+    BRIEF_CODE = (SKILL_DIR / "setup_brief.py").read_text()
+    RETIRED = "QUESTIONNAIRE_CHANGELOG"
+
+    def test_the_retired_changelog_name_is_gone_everywhere(self):
+        self.assertNotIn(self.RETIRED, self.DOC)
+        self.assertNotIn(self.RETIRED, self.BRIEF_CODE)
+
+    def test_both_deliverables_are_named_in_the_skill(self):
+        for name in ("OPEN_QUESTIONS.md", "_redcap_changes.docx", "_redcap_changes.md"):
+            self.assertIn(name, self.DOC, f"SKILL.md must name the {name} deliverable")
+
+    def test_the_skill_and_the_brief_promise_the_same_deliverables(self):
+        """Both are read by the same session; they cannot name different files."""
+        for name in ("OPEN_QUESTIONS.md", "_redcap_changes.docx", "_redcap_changes.md"):
+            self.assertIn(name, self.BRIEF_CODE,
+                          f"setup_brief.py's deliverables list must name {name} too")
+
+    def test_the_handoff_list_names_both_deliverables(self):
+        """The 'self-contained for handoff' list is what a session checks itself against."""
+        handoff = self.DOC.split("self-contained for handoff", 1)[1].split("\n## ", 1)[0]
+        self.assertIn("OPEN_QUESTIONS.md", handoff)
+        self.assertIn("_redcap_changes", handoff)
+
+    def test_the_changes_deliverable_says_tracked_changes_on_the_original(self):
+        """A rewritten-from-scratch questionnaire is not a review vehicle; the point is redlines
+        the questionnaire's owner can accept or reject in their own document."""
+        section = self.DOC.split("### Changes the QUESTIONNAIRE itself needs", 1)[1] \
+                          .split("\n**Path A workflow", 1)[0]
+        self.assertIn("tracked changes", section.lower())
+        self.assertIn("docx skill", section.lower(),
+                      "the doc must point at the skill that can actually write tracked changes")
+        self.assertRegex(section, r"(?i)pdf")
+
+    def test_the_build_always_makes_headway(self):
+        """The decided design: never stall on an ambiguity — best guess in the DD, question out."""
+        section = self.DOC.split("### The build always makes headway", 1)[1] \
+                          .split("\n> ### ", 1)[0]
+        self.assertIn("best guess", section.lower())
+        self.assertIn("OPEN_QUESTIONS.md", section)
+
+    def test_cosmetic_quirks_go_in_neither_deliverable(self):
+        """The IRB minimal-change rule survives the split — and must not read as contradicting it:
+        the mirror-it block has to say those quirks reach neither deliverable."""
+        mirror = self.DOC.split("### The questionnaire is IRB-approved", 1)[1] \
+                         .split("\n> ### ", 1)[0]
+        self.assertIn("neither", mirror.lower())
+        self.assertRegex(mirror, r"(?i)numbering")
+
+    def test_open_questions_are_questions_not_edits(self):
+        self.assertRegex(self.DOC, r"(?i)never proposed edits to the form")
+
+    def test_documents_are_ported_before_any_analysis(self):
+        """NITS 47: a numbered first step — make the folder, pull the documents in, read them."""
+        self.assertIn("## Step 1b", self.DOC, "the porting step needs its own numbered step")
+        step = self.DOC.split("## Step 1b", 1)[1].split("\n## ", 1)[0]
+        self.assertIn("mkdir -p", step, "it has to say how to make the folder")
+        self.assertIn("questionnaires", step)
+        for order in ("1. **Make the folder", "2. **Pull the documents in", "3. **Then read them"):
+            self.assertIn(order, step, f"the step is ordered; missing: {order}")
+        # and it is placed before the create-project step, not after the DD is designed
+        self.assertLess(self.DOC.index("## Step 1b"), self.DOC.index("## Step 2 —"))
+        self.assertLess(self.DOC.index("## Step 1b"), self.DOC.index("## Step 3 —"))
+
+    def test_the_pipeline_table_carries_the_porting_step(self):
+        row = [ln for ln in self.DOC.splitlines() if ln.startswith("| 1b ")]
+        self.assertTrue(row, "the pipeline table must show the document-porting step")
+        self.assertIn("no flag", row[0], "porting is not a build_tracking flag")
 
 
 class TestNoBracketEnvAccess(unittest.TestCase):

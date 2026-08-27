@@ -393,6 +393,157 @@ class TestBuildsQueueNamesTheStudy(unittest.TestCase):
         self.assertEqual(OR._study_label({"pi_surname": "Alatise"}), "PI: Alatise")
 
 
+class TestPeopleQueueNamesThePerson(unittest.TestCase):
+    """0.19 #44: a personnel request you can't put a name to is one you can't act on.
+
+    The weekly check now puts every open request in its own table row, with first name, last
+    name and email as columns. The queue line has to carry those, and carry them where the
+    row-splitting rule can find them — but only from the record's OWN data dictionary, and only
+    when the record actually holds them.
+    """
+
+    ENV = "STUDY_PERSONELL_REQUEST"
+
+    def setUp(self):
+        self.entry = entry(self.ENV)
+        self.client = FixtureClient(self.ENV)
+        self.fields = OR._form_fields(self.client, self.entry["source_form"])
+        self.labels = dict(self.fields)
+        self.open_recs, self.id_field = OR._open_records(self.client, self.entry["done_marker"])
+        self.lines = {r[self.id_field]: OR._detail_line("people", r, self.fields, self.id_field)
+                      for r in self.open_recs}
+
+    def test_the_fixture_actually_carries_name_and_email(self):
+        """If the fixture lost these fields the tests below would pass vacuously."""
+        filled = [r for r in self.open_recs if r["record_id"] != "6"]
+        self.assertTrue(filled)
+        for rec in filled:
+            for field in OR.PERSON_FIELDS:
+                self.assertTrue(str(rec.get(field, "")).strip(), f"{rec['record_id']}/{field}")
+
+    def test_every_filled_open_request_shows_name_and_email(self):
+        for rec in self.open_recs:
+            if rec["record_id"] == "6":            # the deliberately empty one
+                continue
+            line = self.lines[rec["record_id"]]
+            for field in OR.PERSON_FIELDS:
+                self.assertIn(rec[field], line, f"record {rec['record_id']}: {line!r}")
+
+    def test_the_person_comes_first_on_the_line(self):
+        """Before institution or date — the row's first columns must identify the person."""
+        for rec in self.open_recs:
+            if rec["record_id"] == "6":
+                continue
+            bits = self.lines[rec["record_id"]].split("; ")
+            self.assertEqual(len(bits[:3]), 3, rec["record_id"])
+            for i, field in enumerate(OR.PERSON_FIELDS):
+                self.assertTrue(bits[i].endswith(rec[field]),
+                                f"record {rec['record_id']} bit {i}: {bits[i]!r}")
+
+    def test_what_they_are_asking_for_comes_next(self):
+        """NITS 44 wants the role in the table. The form lists it AFTER the phone number and
+        institution, so a plain three-field summary never reached it."""
+        for rec in self.open_recs:
+            if rec["record_id"] == "6":
+                continue
+            bits = self.lines[rec["record_id"]].split("; ")
+            self.assertTrue(bits[3].endswith(rec["user_role"]),
+                            f"record {rec['record_id']}: {bits[3]!r}")
+
+    def test_the_role_beats_the_incidental_fields_onto_the_line(self):
+        """The bug this fixes: institution and date crowded the role off the end."""
+        for rid, line in self.lines.items():
+            if line == OR.NO_DETAILS:
+                continue
+            role = self.lines[rid].split("; ")[3]
+            institution = OR._clean_label(self.labels["institution"])
+            self.assertLess(line.index(role), line.index(institution), f"record {rid}")
+
+    def test_the_headings_are_the_forms_own_labels(self):
+        """Metadata-driven, not hardcoded English: the DD calls them Given/Family name."""
+        line = self.lines["1"]
+        for field in OR.PERSON_FIELDS:
+            self.assertIn(f"{OR._clean_label(self.labels[field])}:", line)
+        self.assertNotIn("first_name", line)
+        self.assertNotIn("last_name", line)
+
+    def test_nothing_is_said_twice(self):
+        """The person's fields lead the line, so the generic summary must skip them."""
+        for rid, line in self.lines.items():
+            headings = [bit.split(":")[0] for bit in line.split("; ")]
+            self.assertEqual(len(headings), len(set(headings)), f"record {rid}: {line!r}")
+
+    def test_every_bit_is_a_labelled_pair(self):
+        """The weekly check splits a line on '; ' and makes each bit a column."""
+        for rid, line in self.lines.items():
+            if line == OR.NO_DETAILS:
+                continue
+            for bit in line.split("; "):
+                self.assertIn(": ", bit, f"record {rid}: {bit!r}")
+
+    def test_a_record_with_no_person_fields_falls_back_to_the_summary(self):
+        """A tracker whose form doesn't name people this way still renders."""
+        rec = {"record_id": "99", "institution": "Example University Clinic"}
+        line = OR._detail_line("people", rec, self.fields, self.id_field)
+        self.assertEqual(line, OR._summarise(rec, self.fields, self.id_field))
+        self.assertIn("Example University Clinic", line)
+
+    def test_an_entirely_empty_request_still_says_so(self):
+        self.assertEqual(self.lines["6"], OR.NO_DETAILS)
+
+    def test_a_half_filled_person_drops_the_missing_bits(self):
+        """No empty columns: a request with a name but no email shows a name and no email."""
+        rec = {"record_id": "98", "first_name": "Cleo", "last_name": "Sampleton"}
+        line = OR._detail_line("people", rec, self.fields, self.id_field)
+        self.assertIn("Cleo", line)
+        self.assertIn("Sampleton", line)
+        self.assertNotIn(OR._clean_label(self.labels["email"]) + ":", line)
+        self.assertNotEqual(line, OR.NO_DETAILS)
+
+    def test_a_person_with_nothing_else_filled_is_not_padded(self):
+        rec = {"record_id": "97", "first_name": "Cleo", "last_name": "Sampleton",
+               "email": "c.sampleton@example.org"}
+        line = OR._detail_line("people", rec, self.fields, self.id_field)
+        self.assertNotIn(OR.NO_DETAILS, line)
+        self.assertEqual(len(line.split("; ")), 3, line)
+
+    def test_the_other_queues_are_untouched(self):
+        """Only the people queue leads with a person; everything else is the plain summary."""
+        for env_var, e in MANIFEST["trackers"].items():
+            if env_var == self.ENV:
+                continue
+            key = next((k for k, (var, _h) in OR.QUEUES.items() if var == env_var), None)
+            if key is None:                        # support tickets aren't an expanded queue
+                continue
+            client = FixtureClient(env_var)
+            fields = OR._form_fields(client, e["source_form"])
+            recs, id_field = OR._open_records(client, e["done_marker"])
+            for rec in recs:
+                self.assertEqual(OR._detail_line(key, rec, fields, id_field),
+                                 OR._summarise(rec, fields, id_field),
+                                 f"{env_var} {rec[id_field]}")
+
+    def test_the_lead_fields_are_the_ones_the_form_documents(self):
+        """Nothing here may be invented: every lead field is on the SPR form's dictionary.
+
+        `user_study` is the exception — it exists on the live PID 221 form but not in this
+        fixture, which is precisely the case the drop-if-absent rule exists for, so it is
+        asserted absent rather than present.
+        """
+        names = {n for n, _lab in self.fields}
+        for field in OR.PERSON_FIELDS + ("user_role",):
+            self.assertIn(field, names,
+                          "the people lead must name fields the Study Personnel Request form "
+                          "actually has — nothing here may be invented")
+        self.assertNotIn("user_study", names)
+        for rid, line in self.lines.items():
+            self.assertNotIn("user_study", line, f"record {rid} leaked an absent field name")
+
+    def test_the_lead_is_the_identity_trio_plus_what_is_asked_for(self):
+        self.assertEqual(OR.PEOPLE_LEAD_FIELDS, OR.PERSON_FIELDS + OR.PERSON_ASK_FIELDS)
+        self.assertEqual(OR.PERSON_FIELDS, ("first_name", "last_name", "email"))
+
+
 class TestPortfolioSummarize(unittest.TestCase):
     """portfolio.summarize reads named fields; the fixture must actually carry them."""
 

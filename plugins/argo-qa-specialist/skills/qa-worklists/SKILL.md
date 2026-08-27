@@ -1,6 +1,6 @@
 ---
 name: qa-worklists
-description: Two QA jobs for the study you're assigned to. (1) Build the worklists: one Excel workbook per site listing every cell that should have been filled but is blank, ready to hand to the RAs. (2) Audit what comes back: read the RAs' returned workbooks, sort their answers into resolved / needs-a-question / no-action, and confirm the gaps closed. Works from a downloaded export if you don't have the study's access key.
+description: Two QA jobs for the study you're assigned to. (1) Build the worklists: I ask what you want QA'd first, then one Excel workbook per site listing every cell in that scope that should have been filled but is blank, ready to hand to the RAs. (2) Audit what comes back: read the RAs' returned workbooks, sort their answers into resolved / needs-a-question / no-action, and confirm the gaps closed. Works from a downloaded export if you don't have the study's access key.
 allowed-tools: Read, Bash, Write, Edit, Glob, Grep
 ---
 
@@ -47,20 +47,50 @@ pre-lock QA before a data freeze, or to re-check after RAs have updated REDCap.
 2. (Optional) **Scope CSV** — one column of record IDs to restrict to. Use when the project has
    rows the RA cohort doesn't own (e.g. linkage to a parent study).
 
-That is the whole list. Which workbooks, and which fields go in each, is my job — next section.
+That is the whole list. *Which* fields get chased is your call and I ask you first; how they are
+split into workbooks is mine — next section.
 
-### The workbook plan — I write it, you confirm it
+### The workbook plan — scope first, then I write it and you confirm
 
-`build_worklists.py` is driven by a small YAML file naming the workbooks and the fields each
-one covers. **You are never asked to produce it, or to have one already.** I read the data
-dictionary, group the QA-relevant fields into workbooks (normally one per form), order each
-list so gate fields come *before* the fields they gate, then show you the proposal — the
-workbooks, the fields in each, the sites they'll be split across — and ask **one** question:
-is this the right set? Adjust or confirm, and I build.
+**Step 1. I ask what you want QA'd, and I wait for the answer.**
 
-It is saved as `qa_fields.yaml` beside the worklists (path below) so the next round reruns
-identically, and so you can hand-edit it if you ever want to. It is a working file the tool
-needs, not homework.
+> What exactly do you want me to QA — which fields, or which part of the study?
+
+That question comes before any proposal. Nothing is built, and no plan is shown, until scope is
+settled.
+
+The reason is size. Real study dictionaries are large — 600+ fields is ordinary, and one live
+colorectal project carries 160 fields on a single form. **"Everything blank that could be
+chased" is never the default plan.** It produces a workbook no RA will finish, buries the ten
+fields you actually needed, and turns a QA round into a wall of yellow.
+
+**Step 2. A broad answer gets narrowed, not guessed at.**
+
+If the answer is an area rather than a field list — "staging", "follow-up", "the pathology
+stuff" — I don't interpret it and start building. I read the data dictionary, list the fields
+that match, grouped so the list can be read (by form, then by the section headers the form
+itself uses), and hand it back to you to narrow:
+
+> "Staging" matches 23 fields across two forms.
+> **Pathology form** — tnm_t, tnm_n, tnm_m, histology_grade, margin_status, …
+> **Surgery form** — resection_extent, nodes_examined, nodes_positive, …
+> Which of these do you want chased this round?
+
+If the narrowed answer is still broad, I narrow it again. Scope is decided by you; I only ever
+show you what's there.
+
+**Step 3. Then the workbook plan.**
+
+With the fields agreed, the split is my job. I group them into workbooks (normally one per
+form), order each list so gate fields come *before* the fields they gate, pull in any gate field
+the branching logic needs, and show you the proposal — the workbooks, the fields in each, the
+sites they'll be split across. Then **one** question: is this the right split? Adjust or
+confirm, and I build.
+
+`build_worklists.py` is driven by a small YAML file holding that plan. **You are never asked to
+produce it, or to have one already.** It is saved as `qa_fields.yaml` beside the worklists (path
+below) so the next round reruns identically, and so you can hand-edit it if you ever want to. It
+is a working file the tool needs, not homework.
 
 ```yaml
 workbooks:
@@ -130,6 +160,10 @@ round folders, so every round shares it and a change to the plan shows up as a d
   shown because that is honestly all we have, and the wording says so rather than presenting an
   expression nobody could parse as if it were an instruction.
 - "Gate context" columns are surfaced automatically: if `surgery_intent` is flagged because `treatment_received` includes Surgery, the workbook also shows `treatment_received` so the RA can see *why*.
+- Column headings are the fields' labels. REDCap only requires field *names* to be unique, and
+  shared labels are common (one live dictionary had 44 labels used by more than one field), so
+  where two columns would carry the same heading the later one gets the field name in
+  parentheses — `Date of surgery (surgery_date_2)`. No two columns ever read the same.
 - Workbook is filtered — only patients and fields with at least one highlighted cell appear.
 
 ### Hand it to the RAs
@@ -185,6 +219,10 @@ python3 .../argo-qa-specialist/skills/qa-worklists/review_responses.py \
 - **Cells changed that were NOT on the worklist** — a gate-context column, an ID column, any
   field nobody flagged. Listed separately, at the end, because they are not answers to anything
   we asked.
+
+A worklist built before ARGO 0.18 highlighted its gaps in a pale **rose** rather than yellow.
+Those returns still audit correctly — the rose fill is read exactly like yellow — and the run
+prints one line saying it recognised the old colour. Nothing needs rebuilding to read them.
 
 Sort each answer into one of four buckets:
 

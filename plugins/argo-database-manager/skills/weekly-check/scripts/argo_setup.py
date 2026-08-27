@@ -273,12 +273,13 @@ def open_settings_file(env_path: Path, connected: bool = False) -> None:
     import subprocess
 
     def explain():
-        print("\nTo add your access keys:")
-        print(f"  1. On your computer, open the ARGO folder and double-click 'Add keys here' —")
-        print(f"     the settings file opens in a text editor. (Or open it directly:")
-        print(f"         {env_path} )")
-        print("  2. Paste each key after its = sign and save the file.")
-        print("  3. Tell your assistant you've saved it — it will check the keys work.")
+        print("\nHere is your settings file — it's the last step of setup, not an extra:")
+        print(f"     {env_path}")
+        print("  Open the ARGO folder on your computer and double-click 'Add keys here'")
+        print("  (or open that path directly) — it opens in a text editor.")
+        print("  Then: paste each key after its = sign, save, and say when you're done —")
+        print("  the keys get checked for you. No keys yet? Say so and carry on; nothing")
+        print("  is blocked without them.")
         print("  Never paste a key into the chat itself; it would be saved in the transcript.")
 
     in_session_runtime = (Path("/mnt/skills").is_dir() or Path("/mnt/.remote-plugins").is_dir()
@@ -290,11 +291,13 @@ def open_settings_file(env_path: Path, connected: bool = False) -> None:
         if sys.platform == "darwin":
             subprocess.run(["open", "-t", str(env_path)], check=False, timeout=10,
                            stderr=subprocess.DEVNULL)
-            print(f"\nOpened {env_path.name} in your text editor — paste your keys in and save.")
+            print(f"\nOpened {env_path.name} in your text editor — paste each key after its"
+                  " = sign, save, and say when you're done.")
         elif shutil.which("xdg-open"):
             subprocess.run(["xdg-open", str(env_path)], check=False, timeout=10,
                            stderr=subprocess.DEVNULL)
-            print(f"\nOpened {env_path.name} — paste your keys in and save.")
+            print(f"\nOpened {env_path.name} — paste each key after its = sign, save, and say"
+                  " when you're done.")
         else:
             explain()
     except Exception:
@@ -397,8 +400,9 @@ def ensure(work_dir: "Path | None" = None) -> int:
     print()
     print(f"     {env_path}")
     print()
-    print(" The ARGO REDCap address is already filled in. Open the file in a")
-    print(" text editor and paste your access keys after their = signs.")
+    print(" The ARGO REDCap address is already filled in. What's left is your")
+    print(" access keys: paste each one after its = sign, save, and say when")
+    print(" you're done — the keys get checked for you.")
     print(" Don't type keys as commands — commands get saved in transcripts.")
     print()
     print(" Everyone on the ARGO team should have the five tracker keys —")

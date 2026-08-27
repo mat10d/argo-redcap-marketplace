@@ -64,6 +64,12 @@ Only for **data analysts** — everyone else can skip this.
 - **Stata** is optional and **licensed software**, so it can't just be downloaded — ask whoever
   manages your computer to install it.
 
+One thing to know: **inside the Claude app, only Python actually runs.** The app executes
+scripts in its own sandbox, not on your computer directly, so it can *see* R or Stata installed
+on your machine but can't run them. For an R or Stata analysis, Claude writes the script and
+hands you the one command (or the RStudio steps) to run it yourself — then checks the numbers
+against its Python version. Python analyses run start to finish inside the app.
+
 Ask **"which analysis tools do I have?"** — or just start an analysis — and Claude reports which
 of the three it found, and where. It runs your scripts by the full path it found, so an analysis
 never fails with "R is not installed" on a computer that has R.
