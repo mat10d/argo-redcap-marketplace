@@ -185,3 +185,41 @@ Ranked. The top two are silent-data-loss class.
     the new yellow — worklists sent to RAs before the 0.18 colour change come back rose, and the
     audit silently reported 5/36 answers. Accept both hexes (qa_colours.py: LEGACY_FLAG_HEXES),
     and warn when a workbook's flags are all legacy-coloured.
+
+## Matteo's final-round review (2026-08-26) — the 0.19 cleanup list
+43. **start-here: after first-time setup, PUSH the settings file** — don't declare completion
+    and ask whether they want keys; present the .env (file card) unprompted as the completing
+    act of setup, with the one-line instruction. "Should be more explicitly pushing for opening
+    the .env after setup is complete."
+44. **weekly-check presentation rules**: (a) NO tables for queues/requests that aren't open;
+    (b) every OPEN item is its own row in an inline table (status + details) — never collapse
+    "untouched" ones into a single line; (c) people requests: open ones in a table with first
+    name, last name, email. open_requests.py should emit those fields for the people queue.
+45. **qa-worklists: scope FIRST, always** — the databases are massive, so the plan step starts
+    from "what exactly do you want me to QA (which variables)?" A vague answer ("staging") →
+    drill down: list the staging columns, let the user narrow to what they actually want.
+    Branching-logic gating stays as-is (verified working on the real CRC round).
+46. **run-analysis R setup**: R detection passed but actually RUNNING an R analysis hit a nit
+    at setup time (Matteo progressing through it — mine his chat for the specific failure).
+    The scaffold/preflight should verify R can execute a trivial script (and say which base
+    packages are needed), not just that Rscript exists.
+47. **build-study intake speed**: immediately port the request's attached documents into the
+    build folder (questionnaires etc. from the SIR) as the first act — "more quickly make a
+    folder of documents to upload".
+48. **build-study: track-changes questionnaire deliverable** (DESIGN — Q&A with Matteo before
+    writing): a Word questionnaire in the request should yield `<name>_redcap_changes.docx`
+    with TRACKED CHANGES for the edits made during the build (so it can be sent back), while
+    the changelog becomes OPEN QUESTIONS only. Must not conflict with the IRB minimal-change
+    rule — resolve via questions first.
+49. **link-data redesign around the HARD LINK** (Matteo's spec, near-complete): it's a
+    left/inner/right join; the work is DERIVING the join key (hospital number, or a ported
+    other-study record-id column) and reasoning aloud about it. Deliverables: (1) name-
+    discrepancy review table for matched pairs; (2) `<study>_missing_link.csv` — child records
+    with no parent, WITH patient name + surname for review (drop the "orphan" vocabulary);
+    (3) the culminating hard-link CSV: child record_id + parent's redcap-number column
+    (e.g. r01 record_id + crc_redcap_number) for the user to upload to formalize the link.
+50. **run-analysis roadmap (post-Windows design)**: parallel R and Python analysis LIBRARIES,
+    composable into analyses — formatting modules (excel styling, figures) now; survival
+    analysis vs statistical comparisons as future modules.
+
+Round verdicts from the same review: export-from-API "perfect"; returning-after-keys "perfect".
