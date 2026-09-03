@@ -257,3 +257,56 @@ Round verdicts from the same review: export-from-API "perfect"; returning-after-
 58. excel.R stores statistics as text ("2.50"); Python stores numbers. Write numerics as numbers
     so the two workbooks are the same shape to Excel.
 59. figures: legend overlaps the tallest bar — place it outside the plot area.
+
+## Cervical Gate-1 teaching walkthrough (2026-09-03) — drafts vs the programme's real finals
+60. **The skill's own consent keep-note example is the thing ARGO's editors reversed.** In the
+    real Cervical finals, MSKCC is removed from EVERY document: title becomes "OAUTHC in
+    collaboration with ARGO", the MOU/technical-support/comparative-analysis mentions all
+    become ARGO or Nigerian institutions, the final ICF names no foreign institution.
+    SKILL.md's keep-note gives "data will be shared with MSK for analysis" as its worked
+    EXAMPLE, so a session drafts the opposite of house practice — and then gets Gate 2's DTA
+    rule backwards (with MSKCC gone, all-Nigerian-federal → no DTA). FIX: re-cast as a Gate-1
+    QUESTION ("which institutions appear as collaborators, and does participant data leave
+    Nigeria?"), never an assumed answer. NEEDS MATTEO/RIVKA: is "ARGO studies present as
+    Nigerian-led with ARGO as the collaborator" a policy, or was this study-specific?
+61. **`ARGO Questionnaire Template.docx` is a design GUIDE, not a fillable form** (Sections 1-5
+    of drafting principles). SKILL.md + study-launch-pipeline.md list it as the template to
+    fill — an agent following that literally emits ARGO's own advice as a questionnaire. Label
+    it as the rules to build to.
+62. **`templates/protocol.md` is the IRB application skeleton, not a protocol skeleton** (its
+    title is the HREC Application for Approval of Research Plan). Following it at Gate 1
+    produces a Gate 2 document. Retitle/retire it.
+63. **Gate 1's protocol rule dead-ends on ARGO's own teaching case.** SKILL.md says "no approved
+    protocol to hand → say the gap and stop at the other two tasks", but the real finals show a
+    protocol WAS produced by keeping the proposal's structure and adding the missing sections.
+    Name that third path explicitly (draft on the PM's own proposal structure, labelled as such).
+64. **ICF official template is a legacy `.doc` and the documented fill path needs LibreOffice**
+    (`soffice` absent → FileNotFoundError). The walkthrough silently produced a RECONSTRUCTION
+    rather than the official file with letterhead. Document a fallback and require the session
+    to say which it did.
+65. **Ship ARGO's REDCap protocol boilerplate** — the largest proposal→final addition is
+    standard text every ARGO database protocol needs (REDCap PHI approval, SSL, OAUTHC as
+    administrator, permission auditing, nightly backups, de-identified exports, source
+    documentation with two identifiers, biannual PI audits + monthly QA meetings). Carry it,
+    marked for PI confirmation, instead of emitting [TODO: name the platform].
+66. **ICF conventions from the finals**: keep EVERY template heading and answer "Not applicable"
+    rather than deleting (Biological specimens, Payment of treatment costs, Clinical Trial
+    Registration, Conflict of Interest); keep-note check 2 must also catch ADDITIONS to
+    regulatory/signature blocks (the final ADDED a "Person Obtaining Consent" signature line);
+    house practice is ONE central PI contact, not a per-site contact table.
+67. **Questionnaire three-class edit policy** (from what the editors actually did): (a) mechanical
+    defects — fix and log (wrong-cancer paste, triplicated blocks, hand-derived values,
+    unanswerable items — the editors fixed exactly these; typos they left alone); (b) clinical
+    content — propose, never invent (they went far deeper: HIV block, HPV serotypes, FIGO +
+    histology lists, structured exam grids, state of origin); (c) unstructured sections may be
+    DELETED rather than repaired — ask before rebuilding (financial toxicity was rebuilt by the
+    draft and cut entirely by the programme). Standing rule: NEVER collapse co-occurring
+    clinical events into select-one for tidiness (surgery procedures, recurrence sites).
+68. **Structural validator at Gate 1, before build time**: the finals shipped an invented FIGO
+    stage (IA3), roman/arabic corruption (IB11/IB111/IIA11/IIIC11), kg/m² for mg/m², duplicated
+    questions and blocks, inconsistent third columns. Check controlled vocabularies (staging),
+    unit sanity, duplicate options/questions, consistent missing-value columns per mdc-rules —
+    plus a cross-document check (final protocol lists six sites; final proforma's hospital field
+    is one checkbox reading OAUTHC).
+69. Name the questionnaire drafting artifact: `<MONIKER>_Questionnaire_changelog.md` (what
+    changed and why + the PI's open questions) — the walkthrough had to invent it.
