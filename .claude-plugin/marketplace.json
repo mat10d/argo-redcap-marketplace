@@ -17,7 +17,7 @@
     {
       "name": "argo-project-manager",
       "source": "./plugins/argo-project-manager",
-      "description": "For the ARGO project manager. Draft the document package for a new study (protocol, SOP, questionnaire and the rest) from a concept note, and submit the study request: new-study-documents."
+      "description": "For the ARGO project manager. Walk a new study through the launch pipeline one gate at a time \u2014 the directors' approval, the stakeholder review and IRB submission, then everything ethical approval unlocks up to the REDCap build request \u2014 with each document drafted from its official ARGO template: new-study-documents."
     },
     {
       "name": "argo-database-manager",

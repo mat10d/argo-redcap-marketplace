@@ -75,7 +75,7 @@ the full skill list. One question, phrased in their role's words:
 
 | ARGO_ROLES contains | Say |
 |---|---|
-| `project-manager` | "Starting a new study? I can draft the document package from the concept note." |
+| `project-manager` | "Which study are we moving forward — and where is it: directors just approved, ready for IRB, or ethical approval received?" |
 | `qa-specialist` | "Which study are we QAing today?" |
 | `database-manager` | "Shall I run your weekly check — where the studies stand and what's waiting for you?" |
 | `data-analyst` | "Point me at your export and tell me what you want out of it." |
@@ -133,13 +133,17 @@ infer the role, do the task, and save the role once it's clear.
 Once you know the role, go there and **keep going**. Don't summarise the skill back at them,
 don't make them re-ask. This skill's job ends at the hand-off.
 
-### Project manager → the new-study document package
+### Project manager → the study-launch pipeline
 
-One task lives here: [[new-study-documents]] — mine the concept note, draft the protocol, SOP,
-questionnaire and the rest of the package; the PM then submits the study request in REDCap
-themselves. **No key is required**;
-where the Study Tracker key is configured it fetches the official Word templates, and without it
-the same documents come from the built-in skeletons. Ask which study is starting and go.
+One task lives here: [[new-study-documents]] — it walks a study from the directors' approval to
+the REDCap build request, and it is **gate-first**. So the landing *is* its one question:
+*"Which study — and where is it: (1) the directors just approved it, (2) ready for stakeholder
+review / IRB, or (3) ethical approval received?"* Ask it once (the greeting above already does
+when their role was known — then don't repeat it), and hand straight over. The skill works that
+gate's tasks one at a time, each filling its official ARGO template (consent, questionnaire, IRB
+form, CPL/ECL, study SOP, QA plan, SIV, activation memo), and ends at the study request the PM
+submits in REDCap themselves. **No key is required**; where the Study Tracker key is configured it
+fetches the official Word templates, and without it the documents come from the built-in skeletons.
 
 If they ask where things stand across the programme instead, say plainly that the weekly check
 lives with the database manager now, and run [[weekly-check]] for them — it reads the same five
@@ -196,7 +200,7 @@ you, never to be shown to the user.
 | They say something like… | Role | Route to |
 |---|---|---|
 | "status of our studies" / "weekly update" / "what's pending" / "what's waiting for me" | database manager | [[weekly-check]] |
-| "we're starting a new study" / "draft the protocol / questionnaire" | project manager | [[new-study-documents]] |
+| "we're starting a new study" / "the directors approved the study" / "draft the protocol / questionnaire" / "prepare the IRB submission" / "we got ethical approval" / "study activation" | project manager | [[new-study-documents]] |
 | "build the REDCap for study X" / "the SIR was submitted" | database manager | [[build-study]] |
 | "add someone to a project" / "set up roles / user rights" | database manager | the REDCap UI (User Rights); the roles CSV comes from [[build-study]] step 4 |
 | "get the data out" / "I need an export" | database manager | [[export-data]] |

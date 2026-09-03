@@ -318,6 +318,185 @@ class TestStartHerePushesTheSettingsFile(unittest.TestCase):
         self.assertIn("Data analysts are the exception", self.flat)
 
 
+class TestNewStudyPipelineDocMatchesTheProcedure(unittest.TestCase):
+    """new-study-documents is gate-first, and its gates are the programme's own procedure.
+
+    The procedure lives once, in `references/study-launch-pipeline.md` (verified against the live
+    File Repository). SKILL.md is what a session actually reads while working a gate, so the two
+    drift silently and expensively: the version before this one told sessions to fill an
+    `ARGO IPH Protocol Template.docx` that does not exist, and to refuse to draft the ICF, CPL,
+    ECL and DTA that the procedure puts squarely in the PM's hands.
+
+    So: every template the reference names must be named in SKILL.md, SKILL.md may not invent
+    one, and each gate must still carry the checks and the known gaps it has to say out loud.
+    """
+
+    SKILL_DIR = PLUGINS / "argo-project-manager/skills/new-study-documents"
+    REFERENCE = SKILL_DIR / "references/study-launch-pipeline.md"
+
+    # A template filename as either document writes it — bounded by a backtick, a slash, a
+    # newline or a bold marker, so `ARGO ICF Template/ARGO IPH Consent Form Template.doc` yields
+    # the basename. `docx` must come before `doc` in the alternation, or every .docx truncates to
+    # a .doc filename that exists nowhere.
+    FILENAME = re.compile(r"[^`/\n*]+\.(?:docx|pptx|doc)\b")
+
+    @staticmethod
+    def flatten(text):
+        """Both docs are hard-wrapped, so phrase checks read the unwrapped text."""
+        return " ".join(text.replace("*", "").split())
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ref = cls.REFERENCE.read_text()
+        cls.doc = (cls.SKILL_DIR / "SKILL.md").read_text()
+        cls.flat = cls.flatten(cls.doc)
+        cls.gate = {n: cls.flatten(cls.doc.split(f"## Gate {n} ", 1)[1].split("\n## ", 1)[0])
+                    for n in (1, 2, 3)}
+
+    def names(self, text):
+        return {m.group(0).strip() for m in self.FILENAME.finditer(text)}
+
+    def test_skill_names_every_template_the_procedure_names(self):
+        missing = []
+        for name in sorted(self.names(self.ref)):
+            # The reference abbreviates the second checklist variant as "..._non-NIH Funded
+            # Final.docx"; the ellipsis stands for the shared prefix, not for filename text.
+            if name.lstrip(".") not in self.doc:
+                missing.append(name)
+        self.assertFalse(
+            missing,
+            "study-launch-pipeline.md names these templates and SKILL.md doesn't, so a session "
+            f"working the gate has no filename to fetch or fill: {missing}")
+
+    def test_the_skill_invents_no_template(self):
+        """The drift that shipped: SKILL.md promised a protocol template that doesn't exist."""
+        stray = [n for n in sorted(self.names(self.doc))
+                 if "template" in n.lower() and n not in self.ref]
+        self.assertFalse(
+            stray,
+            "SKILL.md names template files the procedure doesn't have — a session will hunt the "
+            f"File Repository for something that isn't there: {stray}")
+        self.assertNotIn("ARGO IPH Protocol Template", self.doc,
+                         "there is no ARGO protocol template yet; that is Gate 1's stated gap")
+
+    def test_the_first_move_is_the_gate_question(self):
+        opener = self.flatten(self.doc.split("## Your first move", 1)[1].split("\n## ", 1)[0])
+        self.assertIn("This is your whole first message", opener)
+        self.assertIn("Where is the study right now?", opener)
+        for option in ("directors just approved it", "stakeholder review / IRB",
+                       "Ethical approval received"):
+            self.assertIn(option, opener, f"the gate question is missing its {option!r} option")
+        self.assertIn("Never dump all three gates at once", opener)
+        self.assertIn("one task at a time", opener)
+
+    def test_gate_1_says_the_protocol_template_gap_out_loud(self):
+        self.assertIn("no protocol template yet", self.gate[1])
+        self.assertIn("Never invent a house style", self.gate[1])
+        self.assertRegex(self.gate[1], r"(?i)approved.{0,60}protocol",
+                         "the fallback is drafting on an approved protocol the PM supplies")
+
+    def test_gate_1_carries_both_consent_checks(self):
+        self.assertIn("contact information", self.gate[1])
+        self.assertRegex(self.gate[1], r"(?i)collaborating site")
+        self.assertIn("shared with MSK for analysis", self.gate[1],
+                      "the worked example of a collaborating site belongs in the check")
+        self.assertRegex(self.gate[1], r"(?i)IRB template",
+                         "the second check is that required IRB template language is intact")
+        self.assertRegex(self.gate[1], r"(?i)never silently",
+                         "removed IRB language is flagged for the site to fix, never patched here")
+
+    def test_gate_2_says_the_oauthc_form_gap_out_loud(self):
+        self.assertIn("no OAUTHC submission template", self.gate[2])
+        self.assertIn("IPH HREC", self.gate[2], "the IPH HREC form is what actually exists")
+
+    def test_gate_2_carries_the_dta_skip_rule(self):
+        self.assertIn("Nigerian federal hospitals", self.gate[2])
+        self.assertRegex(self.gate[2], r"(?i)no DTA/MTA is required")
+        self.assertIn("which rule fired", self.gate[2],
+                      "applying the rule silently is the failure mode; it must be said")
+        self.assertIn("Never skip silently", self.gate[2])
+
+    def test_gate_3_checks_every_site_before_anything_else(self):
+        self.assertRegex(self.gate[3], r"(?i)every.{0,30}participating site")
+        self.assertIn("ethical clearance", self.gate[3])
+
+    def test_gate_3_names_the_two_study_start_up_sops(self):
+        self.assertIn("Study Start-Up", self.gate[3])
+        self.assertIn("NIH-funded", self.gate[3])
+        self.assertIn("non-NIH", self.gate[3])
+        self.assertRegex(self.gate[3], r"(?i)how the study is funded",
+                         "funding is what picks the SOP and the checklist variant")
+
+    def test_gate_3_says_the_unfillable_templates_out_loud(self):
+        self.assertIn("flattened image", self.gate[3])
+        self.assertRegex(self.gate[3], r"(?i)pptx skill",
+                         "the SIV deck is PowerPoint: use a pptx skill or hand the content over")
+        self.assertRegex(self.gate[3], r"(?i)slide content as text")
+
+    def test_gate_3_ends_at_the_redcap_build_request(self):
+        self.assertIn("SIR survey", self.gate[3])
+        self.assertIn("with every document above attached", self.gate[3])
+        self.assertIn("[[build-study]]", self.gate[3], "the hand-off names where it hands off to")
+        self.assertLess(self.gate[3].index("Say these out loud"),
+                        self.gate[3].index("Where the pipeline ends"),
+                        "the build request is the end of the pipeline, so it comes last")
+
+    def test_the_pm_submits_the_request_not_this_skill(self):
+        self.assertRegex(self.flat, r"(?i)PM submits the SIR survey")
+        self.assertRegex(self.flat, r"(?i)Don't submit it for them")
+
+    def test_the_template_fetch_ladder_survives(self):
+        ladder = self.flatten(self.doc.split("## The official Word templates", 1)[1]
+                                      .split("\n## ", 1)[0])
+        self.assertIn("project-manager/templates-official", ladder)
+        self.assertIn("fetch_templates.py --to", ladder)
+        self.assertRegex(ladder, r"(?i)markdown skeletons")
+        self.assertIn("Tell the user which path you took", ladder)
+        self.assertIn("Never commit or publish them", ladder)
+
+    def test_the_ladder_promises_what_the_fetcher_actually_downloads(self):
+        """The fetch reaches past ARGO Templates for the QA plan and the Study Start-Up SOPs."""
+        code = (self.SKILL_DIR / "fetch_templates.py").read_text()
+        for folder in ("ARGO Templates", "ARGO Quality Assurance (QA)",
+                       "ARGO Standard Operating Procedures (SOPs)", "Study Start-Up"):
+            self.assertIn(folder, code,
+                          f"fetch_templates.py must fetch {folder!r} — the pipeline needs it")
+        ladder = self.doc.split("## The official Word templates", 1)[1].split("\n## ", 1)[0]
+        self.assertRegex(self.flatten(ladder), r"(?i)QA plan and the two Study Start-Up SOPs",
+                         "the ladder must say what one fetch brings back")
+
+    def test_outputs_are_moniker_named_in_one_folder_per_study(self):
+        self.assertIn("project-manager/new-studies/<study>/", self.flat)
+        self.assertIn("study moniker", self.flat)
+        self.assertIn("STUDY_PROFILE.md", self.flat)
+
+    def test_it_mines_before_it_asks_and_never_invents(self):
+        self.assertRegex(self.flat, r"(?i)never re-ask what the documents already answer")
+        self.assertRegex(self.flat, r"(?i)\[TODO")
+        self.assertRegex(self.flat, r"(?i)never.{0,20}invent regulatory facts")
+
+    def test_the_retired_refusal_is_gone(self):
+        """The old skill refused to touch ICF/CPL/ECL/DTA; the procedure assigns them to the PM."""
+        self.assertNotIn("are NOT generated here", self.doc)
+        for owned in ("ARGO IPH Consent Form Template.doc",
+                      "ARGO Consenting Professional List (CPL) Template.docx",
+                      "ARGO Eligibility Checklist (ECL) Template.docx"):
+            self.assertIn(owned, self.doc)
+
+    def test_start_here_lands_the_pm_on_the_gate_question(self):
+        landing = (PLUGINS / "argo-core/skills/start-here/SKILL.md").read_text()
+        section = self.flatten(landing.split("### Project manager", 1)[1].split("\n### ", 1)[0])
+        self.assertIn("[[new-study-documents]]", section)
+        for option in ("directors just approved", "IRB", "ethical approval received"):
+            self.assertRegex(section, f"(?i){re.escape(option)}",
+                             f"the PM landing must ask the gate question ({option})")
+        row = [ln for ln in landing.splitlines()
+               if ln.startswith("| `project-manager`")]
+        self.assertTrue(row, "start-here has no project-manager greeting row")
+        self.assertRegex(row[0], r"(?i)ethical approval",
+                         "the greeting row asks the same gate question the skill opens with")
+
+
 class TestQaWorklistsDocMatchesCode(unittest.TestCase):
     """The three qa-worklists doc gaps the Tier 1.5 walkthroughs found (0.17.2 #28/#30/#31).
 

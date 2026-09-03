@@ -6,12 +6,16 @@ governance maintains them. They are deliberately NOT bundled with this skill: th
 repository is public, and the templates contain internal contact details. Fetching also means
 you always get the current official version, never a stale copy.
 
-    python3 fetch_templates.py --to <folder>            # download the ARGO Templates tree
+    python3 fetch_templates.py --to <folder>            # download the templates the pipeline needs
     python3 fetch_templates.py --to <folder> --refresh  # re-download even if already present
+
+It brings the whole ARGO Templates tree, plus two things the study-launch pipeline needs that
+live outside it: the ARGO QA Plan, and the two Study Start-Up SOPs (NIH / non-NIH).
 
 Needs the Study Tracker access key (STUDY_INITIATION_REQUEST) — one of the five tracker keys you
 already have. Without it, download the File Repository by hand instead: open the Study Tracker
-in REDCap → File Repository → ARGO Templates → download, and put the folder in your ARGO folder
+in REDCap → File Repository → ARGO Templates (and ARGO Quality Assurance (QA), and ARGO Standard
+Operating Procedures (SOPs) → Study Start-Up) → download, and put the folders in your ARGO folder
 as project-manager/templates-official so the tools can find it.
 """
 from __future__ import annotations
@@ -33,8 +37,18 @@ for _cand in (_here / "scripts",
         break
 
 
-# The File Repository folder holding the official templates.
+# What to fetch from the File Repository: (folder path from the root, where it lands under --to).
+# ARGO Templates is the bulk of it and lands at the root, so a fetched tree looks the same as a
+# hand-downloaded "ARGO Templates" folder. The other two are the study-launch pipeline's
+# documents that live OUTSIDE ARGO Templates — the QA plan and the two Study Start-Up SOPs — and
+# they keep their own folder names so the layout mirrors REDCap.
 TEMPLATES_FOLDER = "ARGO Templates"
+FETCH = [
+    ((TEMPLATES_FOLDER,), ""),
+    (("ARGO Quality Assurance (QA)",), "ARGO Quality Assurance (QA)"),
+    (("ARGO Standard Operating Procedures (SOPs)", "Study Start-Up"),
+     "ARGO Standard Operating Procedures (SOPs)/Study Start-Up"),
+]
 
 
 def main() -> int:
@@ -63,7 +77,10 @@ def main() -> int:
             fallback=(
                 "You can get them by hand instead: open the Study Tracker in REDCap, go to\n"
                 "File Repository → ARGO Templates, download the folder, and put it in your ARGO\n"
-                "folder as project-manager/templates-official. The tools find it there by name."
+                "folder as project-manager/templates-official. The tools find it there by name.\n"
+                "Two more the pipeline uses sit outside that folder — ARGO Quality Assurance (QA)\n"
+                "and ARGO Standard Operating Procedures (SOPs) → Study Start-Up. Download those\n"
+                "into the same place if you need the QA plan or the Study Start-Up SOPs."
             ),
         ))
         return 1
@@ -78,12 +95,14 @@ def main() -> int:
                     return item["folder_id"]
             return None
 
-        root = find_folder(TEMPLATES_FOLDER)
-        if root is None:
-            print(f"The Study Tracker's File Repository has no folder called {TEMPLATES_FOLDER!r}.\n"
-                  "It may have been renamed — open the File Repository in REDCap to see, and pass\n"
-                  "nothing here until this script is updated to match.")
-            return 1
+        def resolve(path):
+            """Walk a folder path from the File Repository root; None if any part is missing."""
+            folder_id = None
+            for part in path:
+                folder_id = find_folder(part, folder_id)
+                if folder_id is None:
+                    return None
+            return folder_id
 
         downloaded = skipped = 0
 
@@ -105,7 +124,20 @@ def main() -> int:
                 print(f"  downloaded {dest.relative_to(target)}")
                 downloaded += 1
 
-        walk(root, target)
+        for path, into in FETCH:
+            folder_id = resolve(path)
+            label = "/".join(path)
+            if folder_id is None:
+                if path[0] == TEMPLATES_FOLDER:
+                    print(f"The Study Tracker's File Repository has no folder called {label!r}.\n"
+                          "It may have been renamed — open the File Repository in REDCap to see, and pass\n"
+                          "nothing here until this script is updated to match.")
+                    return 1
+                # The extras are useful, not essential — say what's missing and carry on.
+                print(f"  (no {label!r} folder in the File Repository — skipped)")
+                continue
+            walk(folder_id, target / into)
+
         print(f"\nDone: {downloaded} downloaded, {skipped} already present "
               f"({'re-run with --refresh to replace them' if skipped else 'all fresh'}).")
         print(f"Templates are in: {target}")
