@@ -1,7 +1,10 @@
-<!-- ARGO Protocol — skeleton for the IPH HREC research-plan application. This is a FORMAL ethics
-application: this skeleton drafts content, but final submission should use the official IPH
-template (exact form fields, fonts, and boilerplate are required by the committee). Fill
-[PLACEHOLDERS]; render to .docx via the docx skill; flag every [TODO] for PM/PI review. -->
+<!-- ARGO IRB application — content map for the IPH HREC Application Form (GATE 2, not Gate 1).
+This is NOT a protocol skeleton: it maps the content the ethics committee's application form
+asks for. The study PROTOCOL is a separate, earlier Gate 1 document — do not draft one from this
+file. This is a FORMAL ethics application: this map drafts content, but final submission must use
+the official `ARGO IPH HREC Application Form Template.docx` (exact form fields, fonts, and
+boilerplate are required by the committee). Fill [PLACEHOLDERS]; render to .docx via the docx
+skill; flag every [TODO] for PM/PI review. -->
 
 # Health Research Ethics Committee — Application for Approval of Research Plan
 
@@ -36,7 +39,8 @@ template (exact form fields, fonts, and boilerplate are required by the committe
 - **Data management & analysis plan:** [ANALYSIS_PLAN]
 - **Ethical considerations:** informed consent process, confidentiality, data protection,
   risks/benefits, vulnerable groups: [ETHICS]
-- **Confidentiality & data storage:** [DATA_STORAGE]  (e.g. OAU REDCap; see ARGO SOPs)
+- **Confidentiality & data storage:** [DATA_STORAGE] — summarise the protocol's data-management
+  section rather than writing new text; the house wording is in [[redcap-protocol-boilerplate]]
 - **Funding source:** [FUNDING]
 - **Timeline:** [TIMELINE]
 - **References:** [REFERENCES]

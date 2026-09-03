@@ -1,6 +1,6 @@
 ---
 name: new-study-documents
-description: Walk a new ARGO study through the launch pipeline — from the directors' approval to the REDCap build request. Asks one question first (where the study is: approved, ready for IRB, or ethical approval received), then works that gate's tasks one at a time, each filling its official ARGO template. Reads whatever you already have — proposal, concept note, questionnaire draft, an email thread — asks only about what's genuinely missing, and hands you real documents to review. Use for "the directors approved the study", "prepare the IRB submission", "we got ethical approval", "study activation", "set up a new study", "draft the questionnaire for this study", "prep the new-study documents".
+description: Walk a new ARGO study through the launch pipeline — from the directors' approval to the REDCap build request. Asks one question first (where the study is: approved, ready for IRB, or ethical approval received), then works that gate's tasks one at a time, each producing one named ARGO document from its official template (or, where the template is a design guide rather than a form, built to its rules). Reads whatever you already have — proposal, concept note, questionnaire draft, an email thread — asks only about what's genuinely missing, and hands you real documents to review. Use for "the directors approved the study", "prepare the IRB submission", "we got ethical approval", "study activation", "set up a new study", "draft the questionnaire for this study", "prep the new-study documents".
 allowed-tools: Read, Bash, Write, Edit, Glob, Grep, Skill
 ---
 
@@ -8,8 +8,10 @@ allowed-tools: Read, Bash, Write, Edit, Glob, Grep, Skill
 
 The project manager's real job, from *"the directors approved it"* to the REDCap build request.
 **Three gates**, each a natural moment in a study's life, each with its own task list; every task
-fills ONE named official template. The full procedure — the programme's own, with every
-template's real filename — is [[study-launch-pipeline]]. Read it as you work the gate.
+produces ONE named document, from its official template where one exists — but several templates
+are not fill-in forms, and the protocol has no template at all; each gate says so where that
+bites. The full procedure — the programme's own, with every template's real filename — is
+[[study-launch-pipeline]]. Read it as you work the gate.
 
 Today these documents are made from scratch every time, which makes the PM the serial chokepoint
 for every new study. Here you review and finalize instead of starting from a blank page.
@@ -47,33 +49,116 @@ The study's founding documents, drafted from the proposal.
 
 | Task | Official template (in `ARGO Templates/`) | Input |
 |---|---|---|
-| Protocol | **none yet** — see below | study proposal |
-| Consent form (ICF) | `ARGO IPH Consent Form Template.doc` | study proposal |
-| Questionnaire | `ARGO Questionnaire Template.docx` | questionnaire draft |
+| Protocol | **none yet** — three paths, see below | study proposal |
+| Consent form (ICF) | `ARGO IPH Consent Form Template.doc` — legacy `.doc`, see the fill ladder | study proposal |
+| Questionnaire | `ARGO Questionnaire Template.docx` — a **design guide**, not a form to fill | questionnaire draft |
+
+**Outputs of this gate:** the protocol draft, the ICF draft, the questionnaire, and
+`<MONIKER>_Questionnaire_changelog.md` — what you changed in the questionnaire and why, plus the
+open questions for the PI. The changelog ships with the questionnaire; it is not optional.
+
+### The protocol — say the gap, then take one of three paths
 
 **Say this out loud when you reach the protocol:** ARGO has **no protocol template yet** — the
-`ARGO Protocol Template/` folder in the File Repository is empty, one is being created. So ask the
-PM for an ARGO protocol that has already been approved, and draft on **that** document's
-structure. **Never invent a house style** and never present an invented structure as ARGO's. If
-they have no approved protocol to hand, say the gap plainly and stop at the other two tasks.
+`ARGO Protocol Template/` folder in the File Repository is empty, one is being created.
+**Never invent a house style** and never present an invented structure as ARGO's. Then:
 
-**Two checks on the consent — run both, every time, and report what each found:**
+1. **Ask the PM for an ARGO protocol that has already been approved** and draft on **that**
+   document's structure.
+2. **No ARGO protocol, but a comparable approved protocol from the same programme** → draft on
+   that, and name which document you used.
+3. **Neither — no template exists and the PM has no approved protocol to model.** This is not a
+   dead end: you still deliver a protocol, rather than dropping the task and working only the
+   consent and the questionnaire. **Draft on the PM's own proposal's structure**: keep its
+   section order, add the sections a protocol needs that a proposal lacks,
+   and **label it at the top of the document** — *"Drafted on the study proposal's own structure;
+   no ARGO protocol template exists yet. To be reconciled against an approved ARGO protocol
+   before submission."* This is what ARGO's own editors did.
 
-1. **Collaborating sites and contact information.** Every collaborating site that will see the
-   data is named as needed — e.g. *"data will be shared with MSK for analysis"* — and site
-   contact information is present in the ICF. Missing site or missing contact block → a visible
-   `**[TODO: …]**`, and tell the PM.
-2. **IRB template language intact.** Compare against the ICF template: has any required IRB
-   template text been removed? If so, **flag it and ask the site to edit the consent** so all the
-   required language is present again. **Never silently restore or rewrite it** — that edit is the
-   site's to make, and a consent quietly patched by a tool is a consent nobody reviewed.
+**The data-management chapter comes from [[redcap-protocol-boilerplate]]** — the standard ARGO
+text (REDCap PHI approval, SSL, OAUTHC as database administrator, permission auditing, nightly
+backups, de-identified exports to the biostatistician, source documentation, QA cadence, paper
+records under lock and key). It is the largest thing a proposal is missing. Carry it with its
+`[TODO]`s visible, and say it needs the PI's confirmation — don't write `[TODO: name the
+platform]` and move on.
+
+### The consent (ICF) — filling a legacy `.doc`, and three checks
+
+**The official ICF is a legacy binary `.doc`.** Filling it in place may need LibreOffice
+(`soffice`) to convert it, and `soffice` is often **absent**. The ladder, and you must say which
+rung you used:
+
+1. **`soffice` available** → convert, fill in place, letterhead intact. Report:
+   **"filled the official template."**
+2. **`soffice` absent** → rebuild the template's structure in a new document and **copy its
+   required language verbatim**. Report: **"rebuilt its structure and copied its required
+   language verbatim (letterhead not preserved) — reconcile against the official file before
+   use."**
+
+**A PM must never be handed a reconstruction believing it is the official file.** Which rung
+fired is part of the deliverable.
+
+**Three checks on the consent — run all three, every time, and report what each found:**
+
+1. **Ask about collaborators before you draft — don't assume.** At Gate 1, before drafting:
+   *"Which institutions appear as collaborators on this study, and does participant data leave
+   Nigeria?"* That one answer rewrites **the protocol title, the objectives, the analysis
+   section and the ICF's data-sharing section**, and it **pre-decides Gate 2's DTA rule**. Then
+   check the ICF: contact information present, and house practice is **one central PI contact
+   block** — do **not** build a per-site contact table unless the PM asks for one. Missing
+   contact block → a visible `**[TODO: …]**`, and tell the PM.
+2. **IRB template language intact — removals *and* additions.** Compare against the ICF template:
+   has any required IRB template text been **removed**, or has anything been **added** to the
+   regulatory or signature blocks (a final ICF once gained a "Person Obtaining Consent" signature
+   line)? Either way, **flag it and ask the site to edit the consent**. **Never silently restore,
+   remove or rewrite it** — that edit is the site's to make, and a consent quietly patched by a
+   tool is a consent nobody reviewed.
+3. **Every template heading survives.** Keep all of them; where one doesn't apply, answer **"Not
+   applicable"** rather than deleting the heading. ARGO's own finals answered exactly that for
+   *Biological specimens*, *Payment of treatment costs*, *Clinical Trial Registration* and
+   *Conflict of Interest*.
+
+### The questionnaire — build to the guide, don't fill it
+
+**`ARGO Questionnaire Template.docx` is a design GUIDE, not a fillable form.** Its Sections 1–5
+are ARGO's drafting principles. **Build the questionnaire *to* its rules; never fill it in and
+never emit its advice as the instrument.** The study's own questions come from the questionnaire
+draft, the proposal and the PI.
+
+**The three-class edit policy — what ARGO's editors actually did:**
+
+- **(a) Mechanical defects — fix and log.** Wrong-cancer paste, triplicated blocks, hand-derived
+  values, unanswerable items: the editors fixed exactly these. **Typos they left alone.**
+- **(b) Clinical content — propose, never invent.** The finals went far deeper than the draft (an
+  HIV block, HPV serotypes, FIGO and histology lists, structured exam grids, state of origin) —
+  but that content came from clinicians. Propose it; the PI decides.
+- **(c) Unstructured sections may be DELETED rather than repaired — ask before rebuilding.** One
+  draft rebuilt a financial-toxicity section that the programme then cut entirely.
+
+**Standing rule: never collapse co-occurring clinical events into select-one for tidiness**
+(surgery procedures, recurrence sites — a patient can have more than one).
+
+**Structural pre-flight before the questionnaire leaves this skill.** ARGO's own finals shipped
+every one of these, so check all five:
+
+- **Controlled vocabularies**, staging above all — a real final carried an invented FIGO stage
+  (`IA3`) and roman/arabic corruption (`IB11`, `IB111`, `IIA11`, `IIIC11`).
+- **Unit sanity** — `kg/m²` written where `mg/m²` was meant.
+- **Duplicates** — repeated questions, repeated options, repeated blocks.
+- **Consistent missing-value third columns** on every question of the same type, per
+  [[mdc-rules]].
+- **Cross-document check** — do the sites named in the protocol match the site field in the
+  questionnaire? (One final protocol listed six sites while the proforma's hospital field was a
+  single checkbox reading OAUTHC.)
+
+Findings go in `<MONIKER>_Questionnaire_changelog.md` for the PI — **not** silent fixes.
 
 ## Gate 2 — "ready for stakeholder review and IRB"
 
 | Task | Official template |
 |---|---|
 | Stakeholder review email | drafted — no template |
-| IRB submission form | `ARGO IPH HREC Application Form Template.docx` |
+| IRB submission form | `ARGO IPH HREC Application Form Template.docx` — content map: `templates/irb-application.md` |
 | DTA / MTA | `OAU Data Transfer Agreement_Template.docx` (in `OAUTHC DTA Template/`) |
 
 **Stakeholder review comes BEFORE the IRB submission.** Circulate the protocol, consent and
@@ -84,8 +169,14 @@ Workers as needed; the submission goes out after that round comes back.
 repository — the IPH HREC application form is what exists. Draft on the IPH form and tell the PM
 that the OAUTHC-specific form has to come from the site.
 
+`templates/irb-application.md` is the **content map for this form** — the questions the committee
+asks, in its order. It is an IRB-application map, **not** a protocol skeleton: the protocol is
+Gate 1's separate, earlier document. The map summarises the protocol; it never replaces it.
+
 **The DTA skip rule — apply it, then say which rule fired.** List the participating sites first,
-so the rule is applied to a written-down list rather than a memory. Then:
+so the rule is applied to a written-down list rather than a memory (Gate 1's collaborator
+question — *which institutions are collaborators, and does data leave Nigeria?* — has already
+answered this; reuse the answer rather than re-asking). Then:
 
 - **All sites are Nigerian federal hospitals** → **no DTA/MTA is required.** Skip the task and say
   so: *"all sites are Nigerian federal hospitals, so no DTA is needed."*
@@ -156,11 +247,12 @@ moniker, and a short list telling them which document goes in which SIR upload f
    regulatory facts, IRB numbers, ethics statements, approval dates, PI details or site contacts.
 2. **Real documents, not markdown.** Invoke the **docx** skill to produce the `.docx`; markdown
    skeletons are the working form, never the deliverable. (The SIV deck is the `.pptx` exception
-   above.)
+   above; `<MONIKER>_Questionnaire_changelog.md` is a working note for the PI and stays markdown.)
 3. **One folder per study, moniker naming.** Everything lands in
    `project-manager/new-studies/<study>/`, and every file is named with the study moniker
-   (`<MONIKER>_ICF_draft.docx`, `<MONIKER>_CPL_<site>.docx`) — the SIR attachments and the File
-   Repository are named the same way, so a well-named draft is one drag rather than a rename.
+   (`<MONIKER>_ICF_draft.docx`, `<MONIKER>_CPL_<site>.docx`,
+   `<MONIKER>_Questionnaire_changelog.md`) — the SIR attachments and the File Repository are
+   named the same way, so a well-named draft is one drag rather than a rename.
 4. **The questionnaire is analysis-driven.** It must be buildable: one question at a time, coded
    categoricals over free text, consistent scales, sectioned, validation-friendly — fields that map
    cleanly to a REDCap data dictionary ([[dd-column-spec]], [[mdc-rules]]). [[build-study]]'s
@@ -189,23 +281,27 @@ internal contact details, so they are fetched or downloaded, never bundled. Prec
    identical; only the official styling is approximated. **Tell the user which path you took.**
 
 When an official template exists, use it as the base document and fill its placeholders (docx
-skill), keeping its formatting; the markdown skeleton then serves as the content map.
+skill), keeping its formatting; the markdown skeleton then serves as the content map. **Two Gate-1
+templates are exceptions:** `ARGO Questionnaire Template.docx` is a design guide and is never
+filled at all (build to its rules), and `ARGO IPH Consent Form Template.doc` is a legacy `.doc`
+whose in-place fill may need `soffice` — take Gate 1's ladder and **name the rung you used**.
 
 | Skeleton in `templates/` | Official file it approximates |
 |---|---|
-| `questionnaire-proforma.md` | `ARGO Questionnaire Template.docx` |
-| `protocol.md` | *(no official protocol template — Gate 1's gap; the skeleton is a content map only)* |
+| `questionnaire-proforma.md` | *(the study's instrument, built **to** the rules in `ARGO Questionnaire Template.docx` — that file is a design guide, so there is nothing to fill)* |
+| `irb-application.md` | `ARGO IPH HREC Application Form Template.docx` — **Gate 2's** content map (it was mis-filed as a protocol skeleton; it never was one) |
 | `study-guide.md` | `ARGO Study SOP Template.docx` |
 | `activation-memo.md` | `ARGO Activation Memo Template.docx` (flattened image — content only) |
 | `siv-outline.md` | `ARGO SIV Template.pptx` + `Protocol Training Attendance Log Template.docx` |
 | `lab-requisition.md` | `ARGO Lab Requisition Template.docx` |
 | `startup-checklist.md` | `New Study_New Site Checklist_NIH Funded Final.docx` / `New Study_New Site Checklist_non-NIH Funded Final.docx` |
 
-Tasks with no skeleton (ICF, IRB form, DTA, CPL, ECL, lab manual, QA plan, meeting agenda,
-accrual table) are drafted from the **fetched template** itself. If neither the template nor a
-skeleton is available, say so, draft the content from [[study-launch-pipeline]]'s description of
-that document, and mark it clearly as an approximation for the PM to reconcile against the
-official form.
+Tasks with no skeleton (ICF, DTA, CPL, ECL, lab manual, QA plan, meeting agenda, accrual table)
+are drafted from the **fetched template** itself. The **protocol** has no skeleton and no
+official template — it takes Gate 1's three paths, with [[redcap-protocol-boilerplate]] for its
+data-management chapter. If neither the template nor a skeleton is available, say so, draft the
+content from [[study-launch-pipeline]]'s description of that document, and mark it clearly as an
+approximation for the PM to reconcile against the official form.
 
 Fetched templates stay in `project-manager/templates-official` in the user's workspace.
 **Never commit or publish them.**
@@ -218,6 +314,7 @@ here yet — say so if asked, rather than improvising one.
 ## See also
 
 - [[study-launch-pipeline]] — the full procedure: every gate, every task, every real filename
+- [[redcap-protocol-boilerplate]] — the standard ARGO data-management text for the protocol
 - [[build-study]] (argo-database-manager) — what happens after the PM submits the SIR
 - [[dd-column-spec]], [[mdc-rules]] — keep the questionnaire buildable
 - docx skill — used to render the Word deliverables

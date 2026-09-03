@@ -1,7 +1,7 @@
 {
   "name": "argo-project-manager",
-  "version": "0.20.0",
-  "description": "For the ARGO project manager. Walk a new study through the launch pipeline one gate at a time — the directors' approval, the stakeholder review and IRB submission, then everything ethical approval unlocks up to the REDCap build request — with each document drafted from its official ARGO template: new-study-documents.",
+  "version": "0.21.0",
+  "description": "For the ARGO project manager. Walk a new study through the launch pipeline one gate at a time \u2014 the directors' approval, the stakeholder review and IRB submission, then everything ethical approval unlocks up to the REDCap build request \u2014 with each document drafted from its official ARGO template: new-study-documents.",
   "author": {
     "name": "ARGO"
   }

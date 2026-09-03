@@ -1,4 +1,4 @@
-# ARGO toolkit ledger — updated 2026-08-27 (0.20.0 released)
+# ARGO toolkit ledger — updated 2026-09-03 (0.21.0 released)
 
 The single answer to "what's done and what's outstanding". Supersedes PLAN.md's todo block for
 status; PLAN keeps the history and the spec.
@@ -15,7 +15,30 @@ status; PLAN keeps the history and the spec.
 9. Export with key — full set (raw/labelled/de-identified ×2/tidy/DD/README), correct counts
 10. Keys 6/6 verified in the workspace settings file
 11. Tier 1: 371 automated checks; Tier 1.5: 8/8 subagent walkthroughs
-12. NITS defects 1–40: all fixed, released (0.17.2 → 0.18.0)
+12. NITS defects 1–69: all fixed and released across 0.17.2 → 0.21.0
+13. **0.19.0** — Matteo's review round: door pushes the settings file on screen; weekly-check
+    presentation rules (open items one row each, people with name/email/role, next step on the
+    line); QA scope-first; build changes/questions split (best guess into the DD +
+    OPEN_QUESTIONS.md + tracked-changes docx); hard-link linkage (link_studies.py,
+    <study>_missing_link.csv with names, <child>_hard_link.csv); R verified to RUN.
+    Environment fact recorded: Cowork executes in a Linux sandbox, so Mac R/Stata are a
+    hand-off, not in-session. 4/4 walkthroughs + 26 whole-read findings applied. 511 tests.
+14. **0.20.0** — the analysis library: lib/python + lib/R twins (core / table1 / excel house
+    style / figures / survival stub), analyses/ registry (table1 ready, survival planned),
+    scaffold writes 01_table1.py AND 01_table1.R as library calls, grouping variable asked
+    once. Both languages reproduce the Table 1 golden (R byte-identical). 652 tests.
+    Known parity gaps logged (NITS 54–55: sparse-table p-value method; checkbox parents).
+15. **0.21.0** — the PM study-launch pipeline (the programme's own procedure):
+    new-study-documents is GATE-FIRST (directors approved / IRB-ready / ethical approval),
+    every task mapped to its verified File Repository template, Gate 3 ending at the SIR
+    submission that hands off to build-study. Taught and corrected on ARGO's own teaching
+    case — the Cervical Cancer Database originals drafted BLIND, then compared against the
+    programme's real finals (NITS 60–69, all applied). New reference:
+    redcap-protocol-boilerplate.md; fetch widened to the QA plan + both Study Start-Up SOPs.
+    682 tests.
+    **OPEN FOR MATTEO/RIVKA:** is "ARGO studies present as Nigerian-led, with ARGO as the
+    collaborator" policy, or was it study-specific? (The finals removed MSKCC from every
+    document; the skill now ASKS rather than assuming, and no policy is written.)
 
 ## Graded complete 2026-08-26 (the five continued chats)
 - B Table 1 — pass (district grouping per in-chat answer; self-verified, fixed 2 own-script bugs)
@@ -27,7 +50,7 @@ status; PLAN keeps the history and the spec.
   image; official questionnaire is a design guide)
 - naqiya's study session (real work — unexamined)
 
-## Outstanding tests (all on 0.19.0 after the org refresh)
+## Outstanding tests (all on 0.21.0 after the org refresh)
 - K  Export with no key — the CRC line is ALREADY commented out in ~/Desktop/ARGO-cowork/.env;
      fresh chat "Export the CRC study to disk." → at the solicitation, tell Claude "restore the key"
 - M  Table 1 in R — now a HAND-OFF by design (Cowork can't run Mac R): expect the R script + the

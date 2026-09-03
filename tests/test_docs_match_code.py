@@ -395,15 +395,172 @@ class TestNewStudyPipelineDocMatchesTheProcedure(unittest.TestCase):
         self.assertRegex(self.gate[1], r"(?i)approved.{0,60}protocol",
                          "the fallback is drafting on an approved protocol the PM supplies")
 
-    def test_gate_1_carries_both_consent_checks(self):
+    def test_gate_1_names_the_protocols_third_path(self):
+        """The old rule dead-ended where ARGO's own teaching case kept going.
+
+        SKILL.md used to say "no approved protocol to hand → say the gap and stop at the other
+        two tasks". The programme's real finals show a protocol WAS produced: on the proposal's
+        own structure, with the missing sections added. Both docs must name that third path.
+        """
+        for label, text in (("SKILL.md", self.gate[1]), ("the reference", self.flatten(self.ref))):
+            self.assertRegex(text, r"(?i)proposal'?s own structure",
+                             f"{label} must name the third path: draft on the PM's own proposal")
+            self.assertRegex(text, r"(?i)label(led)? it at the top|label it at the top",
+                             f"{label} must require the draft to be labelled as such at the top")
+            self.assertRegex(text, r"(?i)reconciled against an approved ARGO protocol",
+                             f"{label} must say the draft is reconciled later, not final")
+        self.assertNotIn("stop at the other two tasks", self.doc,
+                         "the dead-end is retired: path 3 draft on the proposal's structure")
+
+    def test_gate_1_points_the_protocol_at_the_redcap_boilerplate(self):
+        self.assertIn("[[redcap-protocol-boilerplate]]", self.gate[1],
+                      "the protocol's data-management chapter has house text — link it")
+        self.assertNotRegex(self.gate[1], r"(?i)\[TODO: name the platform\](?!` and move on)",
+                            "emitting a bare platform TODO is what the boilerplate replaces")
+
+    def test_gate_1_asks_about_collaborators_instead_of_assuming_them(self):
+        """The keep-note's worked example taught the opposite of ARGO's house practice.
+
+        It read "data will be shared with MSK for analysis" — but the programme's real finals
+        remove the foreign collaborator from every document, and a session that assumes one also
+        gets Gate 2's DTA rule backwards. So: a question at Gate 1, never an assumed answer.
+        """
+        self.assertNotIn("MSK", self.doc,
+                         "the worked example naming a foreign collaborator is retired — it "
+                         "taught the reverse of what ARGO's editors did")
+        self.assertNotIn("MSK", self.ref, "same in the reference")
+        self.assertRegex(self.gate[1], r"(?i)which institutions appear as collaborators")
+        self.assertRegex(self.gate[1], r"(?i)does participant data leave Nigeria")
+        self.assertRegex(self.gate[1], r"(?i)before drafting",
+                         "the question is asked at Gate 1 BEFORE anything is drafted")
+        for consequence in ("title", "objectives", "analysis", "data-sharing"):
+            self.assertIn(consequence, self.gate[1],
+                          f"the answer rewrites the {consequence} — say so")
+        self.assertRegex(self.gate[1], r"(?i)pre-decides Gate 2'?s DTA rule")
+
+    def test_the_foreign_collaborator_policy_stays_an_open_question(self):
+        """Whether ARGO studies name foreign collaborators is with Matteo and Rivka.
+
+        The skill must not invent a policy in either direction; the reference carries the note
+        that it is open.
+        """
+        flat_ref = self.flatten(self.ref)
+        self.assertRegex(flat_ref, r"(?i)open question",
+                         "the reference must record that the policy is unresolved")
+        self.assertRegex(flat_ref, r"(?i)Matteo and Rivka")
+        self.assertRegex(flat_ref, r"(?i)not settled here|unresolved")
+
+    def test_gate_1_consent_checks_cover_the_icf_conventions(self):
         self.assertIn("contact information", self.gate[1])
-        self.assertRegex(self.gate[1], r"(?i)collaborating site")
-        self.assertIn("shared with MSK for analysis", self.gate[1],
-                      "the worked example of a collaborating site belongs in the check")
+        self.assertRegex(self.gate[1], r"(?i)one central PI contact block")
+        self.assertRegex(self.gate[1], r"(?i)not build a per-site contact table",
+                         "house practice is one contact block; a per-site table is opt-in")
         self.assertRegex(self.gate[1], r"(?i)IRB template",
                          "the second check is that required IRB template language is intact")
+        self.assertRegex(self.gate[1], r"(?i)removed.{0,40}added|added.{0,40}removed",
+                         "check 2 must catch ADDITIONS to the regulatory/signature blocks too")
+        self.assertRegex(self.gate[1], r"(?i)signature block")
         self.assertRegex(self.gate[1], r"(?i)never silently",
-                         "removed IRB language is flagged for the site to fix, never patched here")
+                         "changed IRB language is flagged for the site to fix, never patched here")
+        self.assertIn('"Not applicable"', self.gate[1],
+                      "headings that don't apply are answered, not deleted")
+        for heading in ("Biological specimens", "Payment of treatment costs",
+                        "Clinical Trial Registration", "Conflict of Interest"):
+            self.assertIn(heading, self.gate[1],
+                          f"the finals answered {heading!r} 'Not applicable' — name it")
+
+    def test_gate_1_carries_the_icf_fallback_ladder(self):
+        """The ICF template is a legacy .doc; the walkthrough shipped a silent reconstruction."""
+        self.assertIn("soffice", self.gate[1], "the LibreOffice dependency is named")
+        self.assertRegex(self.gate[1], r"(?i)legacy.{0,20}\.doc")
+        self.assertIn('"filled the official template."', self.gate[1],
+                      "rung 1's report line is fixed wording, so it can't be softened")
+        self.assertRegex(self.gate[1], r"(?i)letterhead not preserved",
+                         "rung 2 must confess what was lost")
+        self.assertRegex(self.gate[1], r"(?i)never be handed a reconstruction",
+                         "the whole point: a rebuild is never passed off as the official file")
+        self.assertRegex(self.flatten(self.ref), r"(?i)soffice",
+                         "the reference carries the same ladder")
+
+    def test_the_questionnaire_template_is_a_design_guide_not_a_form(self):
+        """Following it literally emits ARGO's own drafting advice AS the questionnaire."""
+        for label, text in (("SKILL.md", self.gate[1]), ("the reference", self.flatten(self.ref))):
+            self.assertRegex(text, r"(?i)design GUIDE", f"{label} must label it a design guide")
+            self.assertRegex(text, r"(?i)not a fill(able| in) form|not a form to fill",
+                             f"{label} must say it is not a form to fill")
+            self.assertRegex(text, r"(?i)build the questionnaire\s+\**to\**\s+its rules",
+                             f"{label} must say to build TO its rules")
+
+    def test_gate_1_carries_the_three_class_questionnaire_edit_policy(self):
+        g = self.gate[1]
+        self.assertRegex(g, r"(?i)Mechanical defects — fix and log")
+        self.assertRegex(g, r"(?i)Typos they left alone",
+                         "class (a) is bounded: mechanical defects, not typos")
+        self.assertRegex(g, r"(?i)Clinical content — propose, never invent")
+        self.assertRegex(g, r"(?i)DELETED rather than repaired",
+                         "class (c): an unstructured section may be cut, so ask first")
+        self.assertRegex(g, r"(?i)ask before rebuilding")
+        self.assertRegex(g, r"(?i)never collapse co-occurring clinical events into select-one",
+                         "the standing rule that outlives the teaching case")
+
+    def test_gate_1_runs_a_structural_preflight_on_the_questionnaire(self):
+        g = self.gate[1]
+        self.assertRegex(g, r"(?i)controlled vocabular",
+                         "staging vocabularies are the first pre-flight check")
+        self.assertIn("FIGO", g)
+        self.assertIn("IA3", g, "the invented stage the finals shipped is the worked example")
+        self.assertIn("mg/m²", g, "unit sanity: mg/m² was written as kg/m²")
+        self.assertRegex(g, r"(?i)duplicat")
+        self.assertIn("[[mdc-rules]]", g, "missing-value columns are consistent per mdc-rules")
+        self.assertRegex(g, r"(?i)sites named in the protocol match the site field",
+                         "the cross-document check is part of the pre-flight")
+        self.assertRegex(g, r"(?i)not.{0,20}silent fixes",
+                         "findings are reported to the PI, never quietly fixed")
+
+    def test_the_questionnaire_changelog_is_a_named_gate_1_output(self):
+        self.assertIn("<MONIKER>_Questionnaire_changelog.md", self.gate[1],
+                      "the drafting artifact has a name so no session has to invent one")
+        self.assertRegex(self.gate[1], r"(?i)what you changed in the questionnaire and why")
+        self.assertRegex(self.gate[1], r"(?i)open questions for the PI")
+
+    def test_the_redcap_boilerplate_reference_carries_the_house_text(self):
+        """NITS 65: the largest proposal→final addition, shipped instead of a bare [TODO]."""
+        path = self.SKILL_DIR / "references/redcap-protocol-boilerplate.md"
+        self.assertTrue(path.is_file(), "the boilerplate reference must exist")
+        text = self.flatten(path.read_text())
+        for phrase in ("REDCap", "protected health information", "SSL",
+                       "database administrator", "audited", "backed up nightly",
+                       "de-identified", "biostatistician", "two participant identifiers",
+                       "scanned and uploaded into REDCap", "biannual", "monthly",
+                       "corrective action", "under lock and key"):
+            self.assertIn(phrase, text,
+                          f"the boilerplate is missing ARGO's standard {phrase!r} text")
+        self.assertIn("[TODO", text, "every study-specific fact stays a visible TODO")
+        self.assertRegex(text, r"(?i)confirmed by the PI",
+                         "it is a starting draft the PI must confirm, not settled boilerplate")
+        self.assertRegex(text, r"(?i)ARGO'?s own final protocols|final.{0,20}protocols carry",
+                         "the header must say where the text came from")
+
+    def test_the_irb_skeleton_is_not_filed_as_a_protocol(self):
+        """NITS 62: templates/protocol.md was the HREC application form, mis-filed at Gate 1."""
+        templates = self.SKILL_DIR / "templates"
+        self.assertFalse((templates / "protocol.md").exists(),
+                         "the mis-titled protocol skeleton is retired")
+        irb = templates / "irb-application.md"
+        self.assertTrue(irb.is_file(), "it lives on, honestly named, as the IRB content map")
+        self.assertRegex(self.flatten(irb.read_text()), r"(?i)NOT a protocol skeleton")
+        self.assertIn("irb-application.md", self.doc, "SKILL.md must name it")
+        self.assertNotRegex(self.flat, r"(?i)`protocol\.md`",
+                            "SKILL.md may not describe a protocol skeleton that never was one")
+        self.assertIn("irb-application.md", self.gate[2],
+                      "it belongs to Gate 2's IRB task, not Gate 1's protocol")
+
+    def test_every_markdown_skeleton_is_listed_in_the_skeleton_table(self):
+        """A skeleton nothing points at is a file a session will never find (or will misuse)."""
+        table = self.doc.split("| Skeleton in `templates/` |", 1)[1].split("\n\n", 1)[0]
+        for path in sorted((self.SKILL_DIR / "templates").glob("*.md")):
+            self.assertIn(path.name, table,
+                          f"{path.name} is not listed in SKILL.md's skeleton table")
 
     def test_gate_2_says_the_oauthc_form_gap_out_loud(self):
         self.assertIn("no OAUTHC submission template", self.gate[2])
