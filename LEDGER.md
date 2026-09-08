@@ -1,4 +1,4 @@
-# ARGO toolkit ledger — updated 2026-09-08 (0.22.0 released)
+# ARGO toolkit ledger — updated 2026-09-08 (0.23.0 released)
 
 The single answer to "what's done and what's outstanding". Supersedes PLAN.md's todo block for
 status; PLAN keeps the history and the spec.
@@ -46,6 +46,22 @@ status; PLAN keeps the history and the spec.
     (its body is a floating text box — editable in Word, invisible to tooling), and the ICF's
     companion *Consent Form Instructional Template* is referenced by the ICF but absent from
     the repository. 683 tests.
+17. **0.23.0** — build-study, from the Synoptic build (4 REDCaps, PIDs 261-264: the first real
+    survey study and the first multi-project family it has done). **Link-distributed surveys**
+    now get a proposed design rather than a list of questions: an email field (identifier, makes
+    the project PHI-bearing), one instrument per collection round read off the proposal,
+    baseline-vs-follow-up branching, and a consent question first that gates everything —
+    reconciled explicitly against the over-materialize and mirror-the-questionnaire rules, which
+    both appeared to forbid it. Same gap closed for non-survey repeat measures (round / reviewer /
+    case fields, or scores can't be paired and disagreement can't be measured).
+    **Survey-mode setup** added to the brief: Use surveys, per-instrument enablement, survey
+    settings, and Question Numbering = Custom (on auto, REDCap renumbers and the survey silently
+    stops matching the paper form). None of it is on the 7-step tracker, and the brief says so.
+    **Escalation ladder** — documents → the database manager in session → only then the PI; the
+    session's own sign-off packet went 9 → 4 → 1 decisions once it proposed designs instead of
+    asking. Plus: File Repository docs staged as a folder rather than a rename table, the
+    structure table as a standard post-DD deliverable, a document→project table for split
+    studies, and one line explaining `@MDC-EXEMPT`. NITS 78-86. 691 tests.
     **OPEN FOR MATTEO/RIVKA:** is "ARGO studies present as Nigerian-led, with ARGO as the
     collaborator" policy, or was it study-specific? (The finals removed MSKCC from every
     document; the skill now ASKS rather than assuming, and no policy is written.)

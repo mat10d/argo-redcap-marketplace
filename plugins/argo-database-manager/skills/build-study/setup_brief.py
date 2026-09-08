@@ -148,7 +148,26 @@ def main():
              "original is a PDF. Absent if the form needs no changes.")
     L.append("\nTypos, numbering quirks and no-option columns appear in neither: they are built as "
              "printed and never raised.")
+    L.append("\nIf you see **`@MDC-EXEMPT`** in the Field Annotation column, leave it: it is an ARGO "
+             "marker, not a REDCap one. REDCap treats that column as free text, so it is invisible "
+             "to respondents and changes nothing on upload — it exists only so `validate_dd.py` "
+             "knows the missing-data codes were left off on purpose (validated Likert scales). "
+             "Strip it and those fields fail ARGO validation on every future run.")
     L.append("\n## 3. Form vs survey\nDefault to data-entry forms unless the proposal says respondents self-complete.")
+    L.append("\n**If this study IS a survey**, enabling it is four clicks, not one — none of which "
+             "the data dictionary upload does for you:")
+    L.append("\n1. Project Setup → **Enable \"Use surveys in this project\"**.")
+    L.append("2. Designer → **enable each instrument as a survey** (one at a time; a disabled "
+             "instrument has no link).")
+    L.append("3. Survey Settings, per instrument → title, instructions, and the **approved consent "
+             "text as the preamble** on the baseline round.")
+    L.append("4. Survey Settings → **Question Numbering = \"Custom numbering\"**. On the default "
+             "(auto) REDCap renumbers the questions and the survey stops matching the paper form.")
+    L.append("\nThen check the build carries the four things a link-distributed survey needs and a "
+             "printed questionnaire never shows: an **email field** (no invitations without one — "
+             "and it makes the project PHI-bearing), **one instrument per collection round**, "
+             "**baseline-vs-follow-up branching**, and a **consent question first that gates "
+             "everything**. None of these is on the 7-step tracker, so none of them marks itself.")
     if dags:
         L.append("\n## 4. Data Access Groups\nUser Rights → DAGs — create and assign users for: "+", ".join(dags)+".")
     L.append("\n## 5. User rights / roles → `user_rights_complete`\nUpload the roles CSV (User Rights → User Roles → Upload), then assign:")
@@ -166,6 +185,12 @@ def main():
         for f,v in docs:
             label,site=repo_label(f,sites)
             L.append(f"| `{f}` = {v[:40]} | `{mon}_{label}` (keep ext) | {repo_folder(f)} | {site} |")
+        L.append("\n**Stage the files, don't just list them.** Put the actual documents, already "
+                 "renamed, in `file-repository/` inside this study's build folder — one folder to "
+                 "drag, in the order of the table above. Where a document went through tracked "
+                 "changes, stage the version with the changes **accepted**, and keep the "
+                 "tracked-changes copy beside it under its `_redcap_changes` name so the review "
+                 "trail survives. A rename table is a plan; the folder is the deliverable.")
     else:
         L.append("\n*(no documents attached to the SIR)*")
     dc=g("data_collection")

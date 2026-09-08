@@ -732,6 +732,119 @@ class TestNewStudyPipelineDocMatchesTheProcedure(unittest.TestCase):
                          "the greeting row asks the same gate question the skill opens with")
 
 
+class TestBuildStudySurveyAndDesignRules(unittest.TestCase):
+    """The Synoptic build (4 REDCaps, PIDs 261-264) — NITS 78-86.
+
+    First real survey study and first multi-project family the toolkit built. Three things it
+    got wrong were doctrine gaps, not slips: survey mode had one sentence and no steps; a
+    link-distributed survey needs structure the printed questionnaire never shows; and design
+    questions went to the PI that the build should have answered itself.
+    """
+
+    SKILL_DIR = PLUGINS / "argo-database-manager/skills/build-study"
+    DOC = (SKILL_DIR / "SKILL.md").read_text()
+    # The brief's prose is built from adjacent Python string literals, so a sentence that reads
+    # continuously in the generated Markdown is split by `" \n "` in the source. Rejoin them here,
+    # or every assertion has to be shorter than whatever line width the file happens to use.
+    BRIEF_CODE = re.sub(r'"\s*\n\s*"', "", (SKILL_DIR / "setup_brief.py").read_text())
+
+    @staticmethod
+    def flatten(text):
+        """Most of Step 3's doctrine is in blockquotes, so the '>' markers come out too —
+        otherwise every hard-wrapped phrase reads as broken by a stray angle bracket."""
+        text = re.sub(r"^>\s?", "", text, flags=re.M)
+        return " ".join(text.replace("*", "").split())
+
+    def test_the_survey_conventions_are_a_design_the_build_proposes(self):
+        """NITS 79: all four came from the user in session, none from the questionnaire."""
+        block = self.flatten(
+            self.DOC.split("### A link-distributed survey needs four things", 1)[1]
+                    .split("\n> ### ", 1)[0])
+        for thing in ("email field", "instrument per collection round",
+                      "baseline-versus-follow-up", "consent question first"):
+            self.assertIn(thing, block, f"the survey convention is missing {thing!r}")
+        self.assertRegex(block, r"(?i)propose all four as a design",
+                         "these are proposed, not raised as open questions")
+        self.assertRegex(block, r"(?i)don't raise them as open questions")
+        self.assertRegex(block, r"(?i)none is an IRB amendment",
+                         "adding structure changes no approved question — say so, or a session "
+                         "will refuse the whole pattern under the mirror-the-questionnaire rule")
+        self.assertRegex(block, r"(?i)contains_phi", "an email field makes the project PHI-bearing")
+        self.assertRegex(block, r"(?i)phi_confirm.{0,120}PI's to tick",
+                         "but the PHI attestations stay the PI's to tick")
+        self.assertRegex(block, r"(?i)round field.{0,80}reviewer field",
+                         "a non-survey repeat-measures study has the parallel gap")
+
+    def test_the_over_materialize_rule_names_its_one_exception(self):
+        """Step 3 forbids materializing design narrative; the survey convention requires it.
+
+        Left unreconciled, a session reads the prohibition first and refuses to build the rounds.
+        """
+        block = self.flatten(
+            self.DOC.split("### Build the instruments the questionnaire defines", 1)[1]
+                    .split("\n> ### ", 1)[0])
+        self.assertRegex(block, r"(?i)one exception, and only one",
+                         "the carve-out must be explicit and bounded")
+        self.assertRegex(block, r"(?i)link-distributed survey")
+        self.assertRegex(block, r"(?i)survey link addresses an instrument",
+                         "and it must give the mechanical reason, so it isn't read as a "
+                         "preference that generalises")
+
+    def test_the_brief_carries_the_survey_setup_clicks(self):
+        """NITS 78: 'Survey mode isn't just a checkbox... that's not in the 4/7.'"""
+        for step in ("Use surveys in this project", "enable each instrument as a survey",
+                     "Custom numbering"):
+            self.assertIn(step, self.BRIEF_CODE,
+                          f"the setup brief never tells the builder to {step!r}")
+        self.assertRegex(self.BRIEF_CODE, r"(?i)renumbers the questions",
+                         "auto numbering silently desynchronises the survey from the paper form")
+        self.assertRegex(self.BRIEF_CODE, r"(?i)none of these is on the 7-step tracker",
+                         "nothing marks survey setup for you — the brief must say so")
+
+    def test_escalation_goes_down_a_ladder_before_it_reaches_the_pi(self):
+        """NITS 81: the sign-off went 9 -> 4 -> 1 decisions once the build proposed designs."""
+        block = self.flatten(
+            self.DOC.split("Escalate down the ladder", 1)[1].split("\n> ### ", 1)[0])
+        self.assertRegex(block, r"(?i)resolve it from the documents")
+        self.assertRegex(block, r"(?i)ask the database manager, in this session")
+        self.assertRegex(block, r"(?i)only then, the PI")
+        self.assertRegex(block, r"(?i)mostly tick and return",
+                         "the target is a packet the PI signs, not one that interviews them")
+
+    def test_the_file_repository_docs_are_staged_not_just_listed(self):
+        """NITS 83: a rename table is a plan; the user asked for the files."""
+        self.assertRegex(self.BRIEF_CODE, r"(?i)Stage the files, don't just list them")
+        self.assertRegex(self.BRIEF_CODE, r"(?i)changes \*\*accepted\*\*|changes .{0,12}accepted",
+                         "tracked-changes documents get staged with the changes accepted")
+        self.assertIn("file-repository/", self.BRIEF_CODE,
+                      "the staged folder needs one name the whole pipeline uses")
+
+    def test_the_structure_table_is_a_standard_deliverable(self):
+        """NITS 85: the user had to ask for it, twice, after a rebuild."""
+        self.assertRegex(self.DOC, r"(?i)Show the structure back, unprompted")
+        self.assertRegex(self.DOC, r"(?i)validated DD says the CSV is well-formed, not that",
+                         "the reason it exists: validation can't tell you it's the right study")
+
+    def test_a_multi_project_study_maps_documents_to_projects_first(self):
+        """NITS 82: 'I need to find the files that are accurate, otherwise we are building
+        from a confusing place.' Asked three times in one session."""
+        block = self.flatten(
+            self.DOC.split("One study, several REDCaps", 1)[1].split("\n## ", 1)[0])
+        self.assertRegex(block, r"(?i)which document belongs to which project")
+        self.assertRegex(block, r"(?i)one SIR at a time",
+                         "the per-SIR pipeline is unchanged — only the mapping table is new")
+        self.assertRegex(block, r"(?i)say so and ask",
+                         "an unmappable document is asked about, never guessed")
+
+    def test_the_brief_explains_the_mdc_exempt_marker(self):
+        """NITS 86: 'not sure what that is, that isn't relevant ever.'"""
+        self.assertIn("@MDC-EXEMPT", self.BRIEF_CODE)
+        self.assertRegex(self.BRIEF_CODE, r"(?i)invisible to respondents",
+                         "say it changes nothing in REDCap, or it reads as a stray artifact")
+        self.assertRegex(self.BRIEF_CODE, r"(?i)fail ARGO validation",
+                         "and say what stripping it costs")
+
+
 class TestQaWorklistsDocMatchesCode(unittest.TestCase):
     """The three qa-worklists doc gaps the Tier 1.5 walkthroughs found (0.17.2 #28/#30/#31).
 

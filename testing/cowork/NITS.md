@@ -343,3 +343,66 @@ Round verdicts from the same review: export-from-API "perfect"; returning-after-
     simply refer to the protocol"). That is required duplication, not drafting duplication: the
     form is POPULATED from the Gate-1 protocol, never re-interviewed, and where the two disagree
     the protocol is right.
+
+## 2026-09-08 — the Synoptic build (4 REDCaps, PIDs 261–264): real-work findings
+
+Mined from the live build chat. This was the first build of a **survey** study and the first of a
+**multi-project** study family, and both exposed gaps no synthetic round reached.
+
+78. **Survey mode is one sentence and zero steps.** `setup_brief.py` §3 says only "default to
+    data-entry forms unless the proposal says respondents self-complete". When survey mode IS
+    right, nothing tells the builder what to do. The session found the steps itself: Project Setup
+    → "Use surveys" enabled, each instrument enabled as a survey, survey settings written — plus
+    **Survey Settings → Question Numbering must be set to "Custom numbering"**, or REDCap
+    renumbers and the survey stops matching the paper form. None of it is in the brief, and none
+    of it is covered by the 7 tracked steps. The session's own words: *"That's not in the 4/7."*
+79. **A survey study needs structural fields the questionnaire never prints.** Established in
+    session, from the study design rather than the instrument: an **email field** (REDCap needs
+    one to send invitations); **one instrument per collection round** (baseline / 3 / 6 / 12
+    month) rather than one instrument with a timepoint field; **branching on baseline-vs-follow-up**
+    so baseline-only questions don't reappear; and a **consent question first that gates
+    everything**, because surveys are distributed by link. build-study knows none of this.
+    *(Is this a general ARGO convention or was it specific to this study? — for Matteo.)*
+80. **Repeat-measures proformas need pairing fields.** Two independent reviewers score each report
+    across four rounds, but the proforma has no round field, no reviewer field and no case ID — so
+    the two reviews of one report can't be paired and disagreement can't be measured. Same class of
+    gap as 79: the *design* requires fields the *instrument* doesn't print.
+81. **Design questions were escalated to the PI that the build should have answered.** The
+    sign-off packet started at nine decisions; once the session proposed designs instead of asking,
+    it went to four, then to one. The user's rule, verbatim: *"We want to be as close as possible to
+    finalizing instead of going back and forth with these people"* and *"if you need more
+    confirmation of how these work you can ask me questions."* So the ladder is: **resolve from the
+    documents → ask the database manager in session → only then put it to the PI.** A question that
+    reaches the PI must be one only the PI can answer.
+82. **Multi-project study families have no first-class handling.** One study, four REDCaps, four
+    SIRs. Everything the build produces is per-SIR, so nothing is consolidated — the user asked
+    three times which documents belonged to which project ("which of the ones are we missing", "I
+    need to find the files that are accurate, otherwise we are building from a confusing place").
+    A document→project table, early, would have closed all three.
+83. **The File Repository set is a rename table, not a folder of files.** Brief §6 says what to
+    rename each document to; it does not produce the final documents, tracked changes accepted, in
+    a folder ready to drag. User: *"the final set of documents that get uploaded into the file
+    repository aren't present, with accepted changes, in the right places."*
+84. **The user→role table isn't consolidated across a study family.** Brief §5 has it per SIR, so
+    four builds give four tables. User: *"what users need to be added also aren't present in one
+    place."*
+85. **The study structure table should be a standard deliverable, not something asked for.** User:
+    *"Once you've created new data dictionaries, I want a study structure table that explains what
+    you've done, because I want to confirm it's right."* After any DD build — and especially after
+    a restructure — emit the instrument/field/branching summary unprompted.
+86. **`@MDC-EXEMPT` surfaced without explanation.** User: *"You can remove the MDC exempt tag...
+    not sure what that is, that isn't relevant ever."* The mechanism is right (an inert Field
+    Annotation; stripping it took the two survey dictionaries from clean to 47 and ~26 validation
+    errors) and the session demonstrated that before touching it. But the brief should say in one
+    line what the tag is and that REDCap ignores it, so it is never a surprise.
+
+### What went right — don't "fix" these
+
+- Asked *"did you modify the proformas?"*, the session **diffed and reported** rather than
+  asserting. Byte-identical.
+- Refused to mark `review_pi` without real sign-off, and refused to tick the two `phi_confirm`
+  attestations — those assert the protocol permits PHI storage, which is the PI's to say.
+- Flagged that uploading the surveys to the SIR questionnaire fields would **overwrite** the
+  consent forms sitting there, and asked first.
+- Caught and corrected its own error unprompted (*"the contradiction I reported was mine, not the
+  document's"*).

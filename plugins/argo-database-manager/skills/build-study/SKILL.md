@@ -79,6 +79,14 @@ already captured. Key fields drive later steps:
 | `weekly_stat`, `category` | Step 6 weekly reports |
 | `pm_*`, `ra_*`, `pi_user_*`, `addl_users` | Step 4 user roles |
 
+**One study, several REDCaps.** A study is sometimes split across several SIRs and several
+projects — different populations, or data that will be sampled and analysed separately. Build them
+**one SIR at a time**, as normal; nothing about the pipeline changes. But before you start, put
+the mapping on screen as a table: **which document belongs to which project, and which projects
+are still missing one.** Document names and project names drift apart fast, and a build that
+starts from the wrong file is a build done twice. If a document you were given doesn't map onto a
+project, say so and ask — don't guess which one it belongs to.
+
 ## Step 1b — Port the documents into the build folder (before any analysis)
 
 The first thing you do after triage passes is **collect the request's attached documents**. Not
@@ -160,6 +168,37 @@ questionnaire across all → flag possible resubmission before building N copies
 > are typically a **separate instrument from a separate source**, built separately. Read the
 > proposal to understand administration mode (form vs survey, Step 6) and design, but materialize
 > only the instrument(s) the questionnaire actually defines.
+>
+> **One exception, and only one: a link-distributed survey** — see the next block. There the
+> rounds *must* become instruments, because a REDCap survey link addresses an instrument. That is
+> a mechanical constraint, not a licence to materialize design narrative anywhere else.
+
+> ### A link-distributed survey needs four things the questionnaire never prints
+> When the proposal says respondents **self-complete via a link** (Step 6's form-vs-survey call),
+> ARGO's convention adds structure the printed instrument has no way to show. **Propose all four
+> as a design — don't raise them as open questions.** None of them changes a single approved
+> question, so none is an IRB amendment.
+>
+> 1. **An email field.** REDCap cannot send a survey invitation without one. It goes on the
+>    baseline instrument, **flagged as an identifier in the DD**, and it makes the project
+>    PHI-bearing — so `contains_phi` on the SIR is `1`, not `0`. (The two `phi_confirm`
+>    attestations assert that the protocol permits storing PHI: those are the PI's to tick,
+>    never yours.)
+> 2. **One instrument per collection round**, named for the round — baseline, 3-month, 6-month,
+>    12-month. Not one instrument with a timepoint field: a survey link addresses an instrument,
+>    so each round needs its own link and its own invitation schedule. **Read the round schedule
+>    off the proposal**, and quote the sentence you took it from.
+> 3. **Branching on baseline-versus-follow-up.** A question that only makes sense at baseline
+>    (prior experience, background, anything asked "before implementation") must not reappear at
+>    follow-up, and a question that compares against baseline cannot be asked *at* baseline.
+> 4. **A consent question first, gating everything else.** A link goes out with no one in the
+>    room, so consent is question one and every following field branches on it. Use the study's
+>    approved consent form as the preamble — it is already in the File Repository.
+>
+> A **repeat-measures study that is NOT a survey** has the parallel problem: if the design has the
+> same record scored more than once — several rounds, or two independent reviewers per case — the
+> instrument needs a **round field, a reviewer field and a case identifier**, or the scores can't
+> be paired and disagreement can't be measured. Propose these the same way.
 
 > ### The questionnaire is IRB-approved — mirror it, don't improve it
 > Only critically essential changes to a questionnaire are allowed (IRB amendments). So the
@@ -168,6 +207,11 @@ questionnaire across all → flag possible resubmission before building N copies
 > becomes free text as printed — not a proposed coded list. None of these — typos, numbering,
 > wordings, a missing option list — is a change to propose or a question to ask: they are built as
 > printed and appear in **neither** of the two deliverables below.
+>
+> This governs the **questions**, not the scaffolding around them. The survey block above adds an
+> email field, a consent gate, per-round instruments and branching — none of which alters an
+> approved question, and none of which is an amendment. Mirroring the form and giving it the
+> structure REDCap needs to collect it are different jobs.
 >
 > ### The build always makes headway — best guess in, question out
 > Never stall on an ambiguity and never drop a field because the form is unclear. Where the form
@@ -178,6 +222,21 @@ questionnaire across all → flag possible resubmission before building N copies
 > we assumed it only fires on Yes — accurate?"*
 > These are **questions about the build's assumptions, never proposed edits to the form**. Write
 > the file even when you guessed nothing — one line saying so.
+>
+> **Escalate down the ladder, not straight to the PI.** Every question costs a round trip with a
+> clinician who has a clinic to run, so a question only reaches them when nobody else could have
+> answered it:
+> 1. **Resolve it from the documents.** The proposal, the SIR record, the study SOP and the
+>    approved consent between them settle most of it — round schedules, sites, who self-completes,
+>    what the endpoint counts. Read before asking.
+> 2. **Ask the database manager, in this session.** They know ARGO's conventions and can answer in
+>    seconds what would take the PI a week. Design questions belong here — how a survey is
+>    structured, whether a study needs DAGs, what a round is called.
+> 3. **Only then, the PI.** Reserve it for what genuinely needs their authority: clinical meaning,
+>    what counts as one item to score, wording that would need an amendment, and any attestation.
+>
+> The target is a sign-off packet the PI can mostly tick and return. A packet that asks them nine
+> questions is a build that stopped early.
 
 > ### Changes the QUESTIONNAIRE itself needs → tracked changes on the original document
 > Substantive defects in the form are a different kind of thing: skip instructions pointing at
@@ -220,6 +279,11 @@ questionnaire across all → flag possible resubmission before building N copies
    V=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name validate_dd.py 2>/dev/null | head -1)
    python3 "$V" <csv>
    ```
+6. **Show the structure back, unprompted.** A validated DD says the CSV is well-formed, not that
+   it is the right study. So end every DD build — and *especially* every rebuild — with a short
+   **structure table**: instrument by instrument, how many fields, what branches on what, and any
+   field you added that isn't on the printed form (with why). It is how the database manager
+   confirms the build is right before anything is uploaded, and it costs one table.
 
 **Path B (audit):** run `validate_dd.py`, then compare field-by-field against the Word source.
 Categorize CRITICAL / ERROR / WARNING, present, fix via Edit (justify each), re-validate to clean.
