@@ -310,3 +310,36 @@ Round verdicts from the same review: export-from-API "perfect"; returning-after-
     is one checkbox reading OAUTHC).
 69. Name the questionnaire drafting artifact: `<MONIKER>_Questionnaire_changelog.md` (what
     changed and why + the PI's open questions) — the walkthrough had to invent it.
+
+## 2026-09-08 — the protocol template lands; full File Repository audit (0.22.0, all applied)
+
+70. **The ARGO Protocol Template exists** (`ARGO Templates/ARGO Protocol Template/ARGO Protocol
+    Template.docx`, ~49k chars, 17 sections, an italicised instruction under nearly every
+    heading). Gate 1's three-paths workaround and the "say the gap out loud" instruction are
+    retired — a session reading them would refuse to use the template ARGO commissioned.
+71. **Two references were made redundant by it.** The template carries ARGO's data-management,
+    source-documentation and QA text itself (14.2–14.4), so `redcap-protocol-boilerplate.md`
+    duplicated it paragraph for paragraph; and `protocol-section-map.md` (observed N=1 from the
+    Cervical final) proposed a *different* section numbering than the official template. Both
+    deleted. One replaces them: `protocol-fill-map.md` — strictly what the template cannot say
+    about itself (where each answer comes from, ARGO's standing answers, the cross-checks).
+72. **The activation memo is NOT a flattened image** — the claim shipped in 0.21.0 and was wrong.
+    Its body is a floating text box (`mc:AlternateContent` → `wps:txbx`) over the letterhead
+    image: perfectly editable in Word, invisible to docx tooling, so a fill reports success and
+    changes nothing. Same practical advice, accurate reason.
+73. **The ICF template is the only legacy `.doc` in the repository** — the other 20 files are
+    `.docx`/`.pptx`. Auto-conversion is not the fix: `textutil` (the only converter available;
+    LibreOffice absent on the dev Mac) drops all five of its bordered boxes — the guidance boxes
+    and the signature block. Needs a Word "Save As". Staged for Rivka.
+74. **The ICF references a companion that isn't in the File Repository**: "the companion 'Consent
+    Form Instructional Template'", cited four times. Either upload it or drop the references.
+75. **The collaborator question was filed under the wrong task.** It lived in Gate 1's consent
+    checks — the gate's SECOND task — while its answer rewrites the protocol, the FIRST. Asked
+    there it was always too late to matter. Moved to the head of the protocol task.
+76. **The seven branching facts** — gate, collaborators, funding, specimens, design, consent
+    scenario, sites. Everything else is the same for every study. Named once, in one table, with
+    what each decides and the rule to never re-ask across gates.
+77. The HREC application form restates the protocol by the committee's own instruction ("do not
+    simply refer to the protocol"). That is required duplication, not drafting duplication: the
+    form is POPULATED from the Gate-1 protocol, never re-interviewed, and where the two disagree
+    the protocol is right.

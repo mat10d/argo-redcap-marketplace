@@ -1,4 +1,4 @@
-# ARGO toolkit ledger — updated 2026-09-03 (0.21.0 released)
+# ARGO toolkit ledger — updated 2026-09-08 (0.22.0 released)
 
 The single answer to "what's done and what's outstanding". Supersedes PLAN.md's todo block for
 status; PLAN keeps the history and the spec.
@@ -33,9 +33,19 @@ status; PLAN keeps the history and the spec.
     every task mapped to its verified File Repository template, Gate 3 ending at the SIR
     submission that hands off to build-study. Taught and corrected on ARGO's own teaching
     case — the Cervical Cancer Database originals drafted BLIND, then compared against the
-    programme's real finals (NITS 60–69, all applied). New reference:
-    redcap-protocol-boilerplate.md; fetch widened to the QA plan + both Study Start-Up SOPs.
-    682 tests.
+    programme's real finals (NITS 60–69, all applied); fetch widened to the QA plan +
+    both Study Start-Up SOPs.
+16. **0.22.0** — the ARGO Protocol Template landed in the File Repository (2026-09-08), closing
+    the pipeline's one real gap. Gate 1's protocol task is now "fill the official template",
+    not the three-paths workaround. Two references deleted as superseded by the template
+    itself (redcap-protocol-boilerplate.md, protocol-section-map.md) and replaced by ONE:
+    protocol-fill-map.md — where each of the 17 sections gets its answer, ARGO's standing
+    answers to the recurring institutional blanks, and the cross-document checks. New:
+    **the seven branching facts**, asked once and reused across gates. Two corrections from a
+    full audit of all 21 File Repository files: the activation memo is NOT a flattened image
+    (its body is a floating text box — editable in Word, invisible to tooling), and the ICF's
+    companion *Consent Form Instructional Template* is referenced by the ICF but absent from
+    the repository. 683 tests.
     **OPEN FOR MATTEO/RIVKA:** is "ARGO studies present as Nigerian-led, with ARGO as the
     collaborator" policy, or was it study-specific? (The finals removed MSKCC from every
     document; the skill now ASKS rather than assuming, and no policy is written.)
@@ -64,8 +74,11 @@ status; PLAN keeps the history and the spec.
 - Study 17 user_rights_complete: REDCap admin (User Rights on 7436) or UI by hand
 - Live CRC data quality (from round C+L): 5 staging fields missing branching logic; 44
   duplicate field labels — a report for the database manager / study team
-- Official templates: activation memo is a flattened image (can't be filled); questionnaire
-  template is a design guide — flag to the PM/collaborator
+- File Repository fixes for Rivka — staged at ~/Desktop/ARGO-file-repo-fixes/ with a README:
+  (1) the ICF template is the only legacy .doc left; needs a Word "Save As .docx" (auto-convert
+  drops its five bordered boxes, so it must be done in Word); (2) the ICF's companion
+  *Consent Form Instructional Template* is referenced but not in the repository; (3) optional —
+  move the activation memo's body out of its text box so tooling can fill it
 - Collaborator review of the PM document package
 - OAU batch tracker-key request (longest lead time)
 - Team handout + demo script (delivery pieces)

@@ -389,34 +389,45 @@ class TestNewStudyPipelineDocMatchesTheProcedure(unittest.TestCase):
         self.assertIn("Never dump all three gates at once", opener)
         self.assertIn("one task at a time", opener)
 
-    def test_gate_1_says_the_protocol_template_gap_out_loud(self):
-        self.assertIn("no protocol template yet", self.gate[1])
-        self.assertIn("Never invent a house style", self.gate[1])
-        self.assertRegex(self.gate[1], r"(?i)approved.{0,60}protocol",
-                         "the fallback is drafting on an approved protocol the PM supplies")
+    def test_gate_1_fills_the_official_protocol_template(self):
+        """The template landed 2026-09-08 and closed the pipeline's one real gap.
 
-    def test_gate_1_names_the_protocols_third_path(self):
-        """The old rule dead-ended where ARGO's own teaching case kept going.
-
-        SKILL.md used to say "no approved protocol to hand → say the gap and stop at the other
-        two tasks". The programme's real finals show a protocol WAS produced: on the proposal's
-        own structure, with the missing sections added. Both docs must name that third path.
+        Before it existed the skill carried a three-paths workaround (an approved ARGO protocol,
+        a comparable one, or the PM's own proposal structure) and had to say the gap out loud.
+        A session reading either instruction now would refuse to use the very template ARGO
+        commissioned, so both must be gone from both documents — not merely superseded further
+        down the page.
         """
-        for label, text in (("SKILL.md", self.gate[1]), ("the reference", self.flatten(self.ref))):
-            self.assertRegex(text, r"(?i)proposal'?s own structure",
-                             f"{label} must name the third path: draft on the PM's own proposal")
-            self.assertRegex(text, r"(?i)label(led)? it at the top|label it at the top",
-                             f"{label} must require the draft to be labelled as such at the top")
-            self.assertRegex(text, r"(?i)reconciled against an approved ARGO protocol",
-                             f"{label} must say the draft is reconciled later, not final")
-        self.assertNotIn("stop at the other two tasks", self.doc,
-                         "the dead-end is retired: path 3 draft on the proposal's structure")
+        self.assertIn("ARGO Protocol Template.docx", self.gate[1],
+                      "Gate 1's protocol task must name the official template")
+        self.assertRegex(self.gate[1], r"(?i)never invent a house style",
+                         "the standing rule outlives the gap that motivated it")
+        self.assertIn("[[protocol-fill-map]]", self.gate[1],
+                      "the section-by-section source map is how the template gets filled")
+        for label, text in (("SKILL.md", self.flat), ("the reference", self.flatten(self.ref))):
+            for retired in ("no protocol template yet", "proposal's own structure",
+                            "stop at the other two tasks", "reconciled against an approved "
+                            "ARGO protocol"):
+                self.assertNotIn(retired, text,
+                                 f"{label} still carries the retired workaround {retired!r}; "
+                                 "the official template supersedes it")
 
-    def test_gate_1_points_the_protocol_at_the_redcap_boilerplate(self):
-        self.assertIn("[[redcap-protocol-boilerplate]]", self.gate[1],
-                      "the protocol's data-management chapter has house text — link it")
-        self.assertNotRegex(self.gate[1], r"(?i)\[TODO: name the platform\](?!` and move on)",
-                            "emitting a bare platform TODO is what the boilerplate replaces")
+    def test_gate_1_names_what_only_a_person_can_answer_on_the_protocol(self):
+        """The template requires a named biostatistician before it is circulated for review.
+
+        A session that fills 12.1-12.4 with plausible statistics has invented the one section
+        the template says a person must own. Both the gate and the map must say it blocks.
+        """
+        self.assertRegex(self.gate[1], r"(?i)biostatistician",
+                         "Gate 1 must say the biostatistician is required on the cover sheet")
+        self.assertRegex(self.gate[1], r"(?i)blocks?\b",
+                         "and that a missing one blocks, rather than being drafted around")
+        fill_map = self.flatten((self.SKILL_DIR / "references/protocol-fill-map.md").read_text())
+        self.assertRegex(fill_map, r"(?i)What blocks a protocol going out")
+        for blocker in ("biostatistician", "sample size", "ethics committee",
+                        "consent scenario"):
+            self.assertIn(blocker, fill_map,
+                          f"the map must list {blocker!r} among what cannot be drafted")
 
     def test_gate_1_asks_about_collaborators_instead_of_assuming_them(self):
         """The keep-note's worked example taught the opposite of ARGO's house practice.
@@ -431,12 +442,20 @@ class TestNewStudyPipelineDocMatchesTheProcedure(unittest.TestCase):
         self.assertNotIn("MSK", self.ref, "same in the reference")
         self.assertRegex(self.gate[1], r"(?i)which institutions appear as collaborators")
         self.assertRegex(self.gate[1], r"(?i)does participant data leave Nigeria")
-        self.assertRegex(self.gate[1], r"(?i)before drafting",
-                         "the question is asked at Gate 1 BEFORE anything is drafted")
         for consequence in ("title", "objectives", "analysis", "data-sharing"):
             self.assertIn(consequence, self.gate[1],
                           f"the answer rewrites the {consequence} — say so")
         self.assertRegex(self.gate[1], r"(?i)pre-decides Gate 2'?s DTA rule")
+
+        # It used to be filed under the consent — Gate 1's SECOND task — while the answer
+        # rewrites the protocol, which is the FIRST. Asked there it always came too late.
+        protocol = self.flatten(
+            self.doc.split("### The protocol", 1)[1].split("\n### ", 1)[0])
+        self.assertRegex(protocol, r"(?i)which institutions appear as collaborators",
+                         "the collaborator question belongs to the protocol task, which is "
+                         "the first thing drafted — not to the consent that follows it")
+        self.assertRegex(protocol, r"(?i)before a word is drafted|before drafting",
+                         "and it must say plainly that it comes before any drafting")
 
     def test_the_foreign_collaborator_policy_stays_an_open_question(self):
         """Whether ARGO studies name foreign collaborators is with Matteo and Rivka.
@@ -523,23 +542,50 @@ class TestNewStudyPipelineDocMatchesTheProcedure(unittest.TestCase):
         self.assertRegex(self.gate[1], r"(?i)what you changed in the questionnaire and why")
         self.assertRegex(self.gate[1], r"(?i)open questions for the PI")
 
-    def test_the_redcap_boilerplate_reference_carries_the_house_text(self):
-        """NITS 65: the largest proposal→final addition, shipped instead of a bare [TODO]."""
-        path = self.SKILL_DIR / "references/redcap-protocol-boilerplate.md"
-        self.assertTrue(path.is_file(), "the boilerplate reference must exist")
+    def test_the_protocol_fill_map_adds_only_what_the_template_lacks(self):
+        """One reference for the protocol, and it may not restate the template.
+
+        Two files used to cover this ground — a section map observed from one approved final,
+        and a REDCap boilerplate carrying data-management prose. The official template now
+        supersedes both: it has its own structure and its own 14.2-14.4 text. What it cannot
+        supply is where each answer COMES FROM, so that is all this file is for.
+        """
+        path = self.SKILL_DIR / "references/protocol-fill-map.md"
+        self.assertTrue(path.is_file(), "the protocol fill map must exist")
         text = self.flatten(path.read_text())
-        for phrase in ("REDCap", "protected health information", "SSL",
-                       "database administrator", "audited", "backed up nightly",
-                       "de-identified", "biostatistician", "two participant identifiers",
-                       "scanned and uploaded into REDCap", "biannual", "monthly",
-                       "corrective action", "under lock and key"):
-            self.assertIn(phrase, text,
-                          f"the boilerplate is missing ARGO's standard {phrase!r} text")
-        self.assertIn("[TODO", text, "every study-specific fact stays a visible TODO")
-        self.assertRegex(text, r"(?i)confirmed by the PI",
-                         "it is a starting draft the PI must confirm, not settled boilerplate")
-        self.assertRegex(text, r"(?i)ARGO'?s own final protocols|final.{0,20}protocols carry",
-                         "the header must say where the text came from")
+        for gone in ("references/redcap-protocol-boilerplate.md",
+                     "references/protocol-section-map.md"):
+            self.assertFalse((self.SKILL_DIR / gone).exists(),
+                             f"{gone} is superseded by the official template — delete it")
+
+        self.assertRegex(text, r"(?i)template is the authority",
+                         "the map defers to the template rather than competing with it")
+        # ARGO's standing answers are the boilerplate's surviving value: the programme's usual
+        # answer to a blank the template leaves open. Losing these sends a session back to
+        # emitting a bare [TODO] for facts ARGO has answered the same way every time.
+        for standing in ("OAUTHC", "biannually", "Nightly", "hospital number", "Monthly",
+                         "24 hours", "biostatistician", "ICMJE"):
+            self.assertIn(standing, text,
+                          f"the map is missing ARGO's standing answer involving {standing!r}")
+        self.assertRegex(text, r"(?i)Propose them; the PI confirms",
+                         "standing answers are defaults to propose, never asserted facts")
+        self.assertIn("[TODO", text, "an unconfirmed institutional fact stays visible")
+        # The template demands these cross-checks in its own words; the map is where a session
+        # finds them collected, because no single section of the template lists them all.
+        self.assertRegex(text, r"(?i)Cross-document consistency")
+        self.assertRegex(text, r"(?i)data dictionary",
+                         "8.2's items must match the questionnaire and the data dictionary")
+
+    def test_the_protocol_fill_map_covers_every_section_of_the_template(self):
+        """A map missing a section is a section drafted from nothing, or not drafted at all."""
+        text = (self.SKILL_DIR / "references/protocol-fill-map.md").read_text()
+        for section in ("1.0", "2.1", "3.0", "4.1", "4.3", "5.1", "5.4", "5.5", "5.6",
+                        "6.2", "6.3", "7.1", "7.5", "7.6", "8.1", "8.2", "8.3", "8.5",
+                        "9.0", "10.0", "11.1", "12.1", "12.5", "13.1", "13.2", "13.4",
+                        "14.1", "14.2", "14.3", "14.4", "14.5", "14.6", "14.7", "15.0",
+                        "16.0", "17.0"):
+            self.assertIn(section, text,
+                          f"the template's section {section} has no entry in the fill map")
 
     def test_the_irb_skeleton_is_not_filed_as_a_protocol(self):
         """NITS 62: templates/protocol.md was the HREC application form, mis-filed at Gate 1."""
@@ -585,10 +631,42 @@ class TestNewStudyPipelineDocMatchesTheProcedure(unittest.TestCase):
                          "funding is what picks the SOP and the checklist variant")
 
     def test_gate_3_says_the_unfillable_templates_out_loud(self):
-        self.assertIn("flattened image", self.gate[3])
+        """The memo is editable in Word — it is the TOOLING that can't reach it.
+
+        Both documents used to call the activation memo "a flattened image", which is wrong:
+        its body is a floating text box over the letterhead. The practical advice is the same
+        either way, but a session that repeats the wrong reason tells a PM their template is
+        unusable when it is not, and a fill attempt reports success while changing nothing.
+        """
+        self.assertRegex(self.gate[3], r"(?i)text box",
+                         "the memo's body is a floating text box, not a flattened image")
+        for label, text in (("SKILL.md", self.flat), ("the reference", self.flatten(self.ref))):
+            self.assertNotIn("flattened image", text,
+                             f"{label} repeats a claim about the memo that isn't true")
         self.assertRegex(self.gate[3], r"(?i)pptx skill",
                          "the SIV deck is PowerPoint: use a pptx skill or hand the content over")
         self.assertRegex(self.gate[3], r"(?i)slide content as text")
+
+    def test_the_branching_facts_are_named_once_with_what_each_decides(self):
+        """Seven answers are what make one study's document set differ from another's.
+
+        Each decides several documents across more than one gate, so a session that re-asks
+        one at the gate where it next bites has asked a PM the same question twice — and a
+        session that never asks fact 2 until Gate 2 has already drafted the wrong protocol.
+        """
+        block = self.flatten(
+            self.doc.split("## The seven facts that branch everything", 1)[1].split("\n## ", 1)[0])
+        for fact in ("Which gate", "Collaborators", "Funding", "Specimens", "Design",
+                     "Consent scenario", "Sites"):
+            self.assertIn(fact, block, f"the branching table is missing {fact!r}")
+        self.assertRegex(block, r"(?i)Mine before you ask",
+                         "most of these are in the proposal already")
+        self.assertRegex(block, r"(?i)never re-ask across gates",
+                         "the whole point of writing them down")
+        self.assertRegex(block, r"(?i)at Gate 1 before drafting anything",
+                         "the collaborator answer rewrites the protocol, so it can't wait")
+        self.assertRegex(block, r"(?i)stated, not guessed",
+                         "an unanswered branching fact is surfaced, never assumed")
 
     def test_gate_3_ends_at_the_redcap_build_request(self):
         self.assertIn("SIR survey", self.gate[3])

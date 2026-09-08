@@ -6,8 +6,9 @@ description: The ARGO new-study procedure — study idea to study launch, three 
 # The ARGO study-launch pipeline (the PM's real job)
 
 Three gates. Each gate is a natural prompt from the PM; each task produces ONE named document.
-Most fill a named template — but not all: the protocol has **no** template, and the questionnaire
-template is a **design guide** rather than a form (both flagged at Gate 1).
+Every task has a named template — but three of them are not fill-in forms (the questionnaire
+template is a **design guide**, the ICF is a legacy `.doc`, the activation memo's body is a text
+box), and each is flagged at its own task.
 All templates live in the Study Tracker File Repository under **ARGO Templates/** (fetched by
 `fetch_templates.py` into `project-manager/templates-official/` — never committed). The two
 Study Start-Up SOPs (NIH / non-NIH, under `ARGO Standard Operating Procedures (SOPs)/Study
@@ -17,27 +18,23 @@ Start-Up/`) are the procedure's own reference text — read the one matching the
 
 | Task | Template (real filename) | Input |
 |---|---|---|
-| Draft protocol | **NONE YET** — `ARGO Protocol Template/` is empty (being created). Say so plainly; then take one of the three paths below — never invent a house style | study proposal |
+| Draft protocol | `ARGO Protocol Template/ARGO Protocol Template.docx` — 17 sections, each carrying its own italicised instruction. Fill it; the section-by-section source map is [[protocol-fill-map]] | study proposal |
 | Draft consent (ICF) | `ARGO ICF Template/ARGO IPH Consent Form Template.doc` — a **legacy `.doc`**; see the fill ladder below | study proposal |
 | Draft questionnaire | `ARGO Questionnaire Template/ARGO Questionnaire Template.docx` — a **design GUIDE, not a fillable form** (Sections 1–5 are drafting principles). Build the questionnaire **to** its rules; never emit its advice as the instrument | questionnaire draft |
 
-### The protocol's three paths (in order of preference)
+### The protocol — one path: fill the official template
 
-1. **An approved ARGO protocol the PM supplies** → draft on that document's structure.
-2. **A closely comparable approved protocol from the same programme** → same, and say which one.
-3. **Neither — no ARGO protocol template exists and the PM has no approved protocol to model**
-   → **draft on the PM's OWN proposal's structure**, keeping its section order and adding the
-   sections a protocol needs that a proposal lacks, and **label it at the top of the document**:
-   *"Drafted on the study proposal's own structure — no ARGO protocol template exists yet; to be
-   reconciled against an approved ARGO protocol before submission."* This is what ARGO's own
-   editors did on the teaching case. It replaces the old dead-end ("stop at the other two
-   tasks"), which the finals disprove.
+The template arrived on **2026-09-08** and closes what had been this pipeline's one real gap. It
+supersedes the three-paths workaround the toolkit carried before it (draft on an approved
+protocol, a comparable one, or the PM's own proposal structure) and the separate REDCap
+boilerplate reference — the template now carries that data-management text itself, in 14.2–14.4.
+**Never draft a protocol on any other structure.**
 
-The largest proposal→final addition is the standard database/data-management text — REDCap PHI
-approval, SSL, OAUTHC as database administrator, permission auditing, nightly backups,
-de-identified exports to the biostatistician, source documentation, QA cadence, paper records
-under lock and key. Carry it from [[redcap-protocol-boilerplate]] with its `[TODO]`s visible and
-say it needs the PI's confirmation; never emit `[TODO: name the platform]` instead.
+[[protocol-fill-map]] is the map: which sections the proposal answers, which need the PI, which
+need the **named biostatistician** (required on the cover sheet before the protocol is circulated
+for review), which are removed when they don't apply, and ARGO's standing answers to the
+recurring institutional blanks. Propose those standing answers; the PI confirms. An unconfirmed
+one stays a visible `[TODO]` rather than becoming an asserted regulatory fact.
 
 ### Filling the ICF — the fallback ladder, and say which rung you used
 
@@ -147,10 +144,11 @@ First: confirm ICF + ethical clearance from **every** participating site (list t
 - Facts come from the proposal/protocol and the PM's answers; unknowns are visible [TODO]s.
 - Ask which gate the study is at ("where are we — approval just in, IRB submitted, or ethical
   approval received?") and do that gate's tasks; never dump all three gates at once.
-- Known gaps to say out loud when relevant: no protocol template yet (three paths above); the
-  questionnaire template is a design guide, not a form; the ICF template is a legacy `.doc` that
-  may not be fillable in place; no OAUTHC IRB form (IPH HREC only); the activation memo template
-  is a flattened image (fill limitations — draft content + hand over).
+- Known gaps to say out loud when relevant: the questionnaire template is a design guide, not a
+  form; the ICF template is a legacy `.doc` that may not be fillable in place, and its companion
+  *Consent Form Instructional Template* is not in the File Repository at all; no OAUTHC IRB form
+  (IPH HREC only); the activation memo's body is a floating text box, so docx tooling can't fill
+  it (draft the content + hand over).
 - Next procedure after launch (not built yet): amendment submission + collecting site
   amendment approvals.
 
@@ -161,7 +159,7 @@ proforma, show the intended progression. They live in the PM's own materials (no
 
 Gate 1 was drafted blind against that study and the drafts compared with the programme's real
 finals (2026-09-03). Everything above marked *"the finals"*, *"the editors"* or *"the teaching
-case"* comes from that comparison: the protocol's third path, the REDCap boilerplate, the ICF
+case"* comes from that comparison: ARGO's standing data-management answers, the ICF
 conventions, the questionnaire edit policy and the structural pre-flight. One question the
 comparison raised is **not** settled and is deliberately not answered here — whether foreign
 collaborators appear in ARGO study documents at all (see the first keep-note).

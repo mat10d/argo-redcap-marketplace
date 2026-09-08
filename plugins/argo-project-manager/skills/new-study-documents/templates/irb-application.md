@@ -39,8 +39,11 @@ skill; flag every [TODO] for PM/PI review. -->
 - **Data management & analysis plan:** [ANALYSIS_PLAN]
 - **Ethical considerations:** informed consent process, confidentiality, data protection,
   risks/benefits, vulnerable groups: [ETHICS]
-- **Confidentiality & data storage:** [DATA_STORAGE] — summarise the protocol's data-management
-  section rather than writing new text; the house wording is in [[redcap-protocol-boilerplate]]
+- **Confidentiality & data storage:** [DATA_STORAGE] — summarise the protocol's sections 14.1–14.3
+  rather than writing new text. Every answer on this form is **derived from the Gate-1 protocol**;
+  the committee's own instruction is that the form be completed in full rather than referring the
+  reader to the protocol, so it is restated here — but never re-interviewed and never
+  re-invented. Where the two disagree, the protocol is right and this form is wrong.
 - **Funding source:** [FUNDING]
 - **Timeline:** [TIMELINE]
 - **References:** [REFERENCES]

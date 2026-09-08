@@ -140,10 +140,11 @@ the REDCap build request, and it is **gate-first**. So the landing *is* its one 
 *"Which study — and where is it: (1) the directors just approved it, (2) ready for stakeholder
 review / IRB, or (3) ethical approval received?"* Ask it once (the greeting above already does
 when their role was known — then don't repeat it), and hand straight over. The skill works that
-gate's tasks one at a time, each filling its official ARGO template (consent, questionnaire, IRB
-form, CPL/ECL, study SOP, QA plan, SIV, activation memo), and ends at the study request the PM
-submits in REDCap themselves. **No key is required**; where the Study Tracker key is configured it
-fetches the official Word templates, and without it the documents come from the built-in skeletons.
+gate's tasks one at a time, each filling its official ARGO template (protocol, consent,
+questionnaire, IRB form, CPL/ECL, study SOP, QA plan, SIV, activation memo), and ends at the study
+request the PM submits in REDCap themselves. **No key is required**; where the Study Tracker key is
+configured it fetches the official Word templates, and without it the documents come from the
+built-in skeletons.
 
 If they ask where things stand across the programme instead, say plainly that the weekly check
 lives with the database manager now, and run [[weekly-check]] for them — it reads the same five
