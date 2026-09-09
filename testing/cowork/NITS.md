@@ -409,7 +409,9 @@ Mined from the live build chat. This was the first build of a **survey** study a
 
 87. **On a Mac, `~/.argo/.env` outranks the working directory's settings file.** Running a
     toolkit script from inside a test folder loads the REAL keys and talks to the REAL REDCap —
-    the loop's first smoke test did exactly that (2026-09-09; five reads, nothing written). The
+    the loop's first smoke test did exactly that (2026-09-09; five reads, which the rule permits;
+    nothing written). The defect is the silent bypass, not the reads: a write round run the same
+    way would have written to the live tracker. The
     search order is right for real users (home file = personal keys) and `ARGO_ENV_FILE` is the
     explicit override; the fix is procedural — `round.py smoke` pins it — plus two grader
     canaries so the boundary is checked every round rather than assumed.

@@ -1,4 +1,4 @@
-# LOOP.md — the dogfood loop, and why it cannot touch REDCap
+# LOOP.md — the dogfood loop, and why it cannot write to REDCap
 
 One round: a driver plays a team member in a fresh Cowork chat against a test folder; the
 toolkit runs for real — real skills, real scripts, real settings file — but every REDCap call
@@ -6,9 +6,23 @@ is answered by a mock inside the folder; the transcript is then graded against t
 expectations and the mock's logs. A failure becomes a fix, a release, a refresh, and the same
 round again.
 
+## The rule, and what the mock adds on top
+
+**The rule is: a test never writes to REDCap.** Reading the real instance during a test is
+permitted — the live rounds before this loop did exactly that, with real keys in the connected
+folder, and it is how the label-collision crash and the live CRC data-quality findings were
+caught.
+
+The mock goes further than the rule requires: it answers reads too, from synthetic fixtures. That
+is a choice, made for repeatability — the same round gives the same portfolio every week, no
+egress is needed, and the org-allowlist failure can be simulated on demand — not a claim that
+reads are dangerous. A `real-readonly` mode (real reads passed through, writes blocked at the
+same hook the mock uses) is the natural next addition when a round needs live data; it is not
+built yet.
+
 ## The boundary (read before anything else)
 
-Three layers, each sufficient on its own:
+Three layers, each sufficient on its own, all aimed at the rule above:
 
 1. **The test folder's REDCap address cannot resolve.** `~/Desktop/ARGO-cowork-test/.env` says
    `REDCAP_URL=https://mock.argo.invalid/api/`. `.invalid` is reserved by RFC 2606; no DNS on
@@ -23,6 +37,8 @@ Three layers, each sufficient on its own:
    *before* the working directory, so a script run from inside the test folder loads the real
    keys and talks to the real REDCap. That happened on the loop's first smoke test (2026-09-09):
    five scripts, every one a read, all against the live instance, and the mock never installed.
+   The reads themselves broke no rule. What matters is that the test folder's settings were
+   silently bypassed — a write round run the same way would have written to the real tracker.
    Never run a toolkit script against the test folder by hand. Use `round.py smoke`, which pins
    `ARGO_ENV_FILE` to the test settings file, strips inherited keys from the environment, and
    aborts the moment the real address appears in any output.
@@ -40,7 +56,9 @@ checked for shape.
 - for any round that talks to REDCap, the mock's `CALLS.jsonl` must be non-empty — a task that
   ran with the mock silent ran against something else.
 
-Either failing is a red alert, not a failed round: stop, wipe the workspace, find out why.
+Either failing is a red alert, not a failed round: stop, wipe the workspace, find out why. (In
+a future `real-readonly` mode the first canary inverts — the real host is *expected* — and the
+check becomes "no write left the machine", read from the write-guard's own log.)
 
 What the mock cannot protect against: someone copying a real key into the test folder by hand.
 Don't.

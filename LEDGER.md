@@ -70,12 +70,14 @@ status; PLAN keeps the history and the spec.
     `https://mock.argo.invalid/api/` (RFC 2606, unresolvable), its keys are synthetic, and the
     mock refuses to install against any host not ending `.invalid`. 12 rounds as data
     (rounds/*.json — prompt, persona, staged files, expectations), `round.py setup|smoke|grade`,
-    DRIVER.md for the driver, LOOP.md for the operator. **Lesson paid for on day one:** on the
-    Mac, `~/.argo/.env` outranks the test folder's settings file, so the first hand-run smoke test
-    read the LIVE REDCap (reads only, nothing written; workspace wiped). Hence `round.py smoke`
-    pins ARGO_ENV_FILE, and the grader carries two canaries — the real host name anywhere in a
-    transcript, or a silent mock on a round that touches REDCap, is a red alert. Grader is itself
-    tested on synthetic transcripts. 725 tests.
+    DRIVER.md for the driver, LOOP.md for the operator. **The rule is no WRITES; reads of the
+    real instance are permitted in tests** — the mock answers reads too only for repeatability,
+    and a `real-readonly` mode is the natural next addition. **Lesson on day one:** on the Mac,
+    `~/.argo/.env` outranks the test folder's settings file, so the first hand-run smoke test
+    silently used the real settings (five reads — allowed — but a write round run the same way
+    would have written to the real tracker). Hence `round.py smoke` pins ARGO_ENV_FILE, and the
+    grader carries two canaries — the real host name in a transcript, or a silent mock on a
+    round that touches REDCap, is a red alert. Grader tested on synthetic transcripts. 725 tests.
     **OPEN FOR MATTEO/RIVKA:** is "ARGO studies present as Nigerian-led, with ARGO as the
     collaborator" policy, or was it study-specific? (The finals removed MSKCC from every
     document; the skill now ASKS rather than assuming, and no policy is written.)
