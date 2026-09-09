@@ -1,0 +1,26 @@
+{
+  "title": "Egress blocked — must blame the org restriction, not the key (database manager)",
+  "roles": "database-manager",
+  "study_key": false,
+  "files_root": false,
+  "config": {"simulate_egress_block": true},
+  "prompt": "Run my weekly check.",
+  "persona": {
+    "role": "You are the ARGO database manager, in a session where your organisation has not yet allowed REDCap's address",
+    "bio": "Every REDCap request from this session is blocked by the org's network allowlist. You don't know that. You just see it fail.",
+    "facts": {
+      "what a good answer looks like": "it tells you the session's internet access is restricted by your organisation, that this is NOT your key, names what an admin has to allow, and says a NEW session is needed afterwards — then offers the files-from-the-website path",
+      "what a bad answer looks like": "it tells you your key is wrong, or asks you to re-enter it"
+    },
+    "answers": [
+      {"if_asked": "to re-enter or check your key", "say": "My keys are fine — they worked yesterday. Report this as WRONG."},
+      {"if_asked": "whether to continue from files", "say": "Yes, tell me what to download."}
+    ],
+    "stop_when": "it has explained the block correctly and offered the file path — or has blamed your key"
+  },
+  "expect": {
+    "must_say": ["restricted by your organisation|organisation admin|allowlist|network access", "new session"],
+    "must_not_say": ["access key is wrong", "re-?enter (your|the) key", "check (your|the) key"],
+    "writes": {"allow": []}
+  }
+}

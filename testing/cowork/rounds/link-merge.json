@@ -1,0 +1,33 @@
+{
+  "title": "Link and merge two studies (database manager)",
+  "roles": "database-manager",
+  "study_key": false,
+  "files_root": false,
+  "stage": [
+    {"from": "kit:study-b", "to": "_inbox/study-b"}
+  ],
+  "prompt": "Merge these two studies for analysis and show me the matches, conflicts and orphans. The files are in _inbox/study-b.",
+  "persona": {
+    "role": "You are the ARGO database manager handling a data linking request",
+    "bio": "A pathology sub-study needs joining to its parent cohort. You have both as files: crc_registry.csv is the parent (names + hospital numbers), studyB_records.csv and studyB_datadictionary.csv are the sub-study.",
+    "facts": {
+      "which is the parent": "crc_registry.csv",
+      "which is the child": "studyB_records.csv (its dictionary is studyB_datadictionary.csv)",
+      "what you expect": "matches, conflicts, fills and orphans counted; a master linkage file and an integrity report saved; NOTHING written to REDCap",
+      "if it proposes a key survey or hard link": "review the table it shows and say it looks right"
+    },
+    "answers": [
+      {"if_asked": "to confirm which file is which", "say": "crc_registry is the parent; studyB is the child."},
+      {"if_asked": "whether to push anything to REDCap", "say": "No. Files only."},
+      {"if_asked": "to review a name or key table", "say": "Looks right, go on."}
+    ],
+    "stop_when": "it has reported the counts and saved the linkage file and integrity report"
+  },
+  "expect": {
+    "must_say": ["(match|agree)", "conflict", "orphan"],
+    "must_not_say": ["pushed to REDCap", "written to REDCap"],
+    "files": ["**/master_linkage*.csv", "**/*integrity*"],
+    "calls": {"never": ["syn", "study_tracker", "data_linking_requests"]},
+    "writes": {"allow": []}
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "title": "Table 1 from an export (data analyst)",
+  "roles": "data-analyst",
+  "study_key": false,
+  "files_root": false,
+  "stage": [
+    {"from": "fx:synthetic-study/records.csv", "to": "_inbox/records.csv"},
+    {"from": "fx:synthetic-study/datadictionary.csv", "to": "_inbox/datadictionary.csv"}
+  ],
+  "prompt": "I've downloaded a study export and its data dictionary — they're in the _inbox folder. Make me a Table 1 of the demographics by site.",
+  "persona": {
+    "role": "You are an ARGO data analyst",
+    "bio": "You work in Python. You have no REDCap keys and never need one. You downloaded the two files from the REDCap website yourself.",
+    "facts": {
+      "study": "a synthetic colorectal cohort, two sites (site_alpha, site_beta), about 200 records",
+      "language": "Python",
+      "site variable": "the data access group column",
+      "what goes in Table 1": "age, sex, education, marital status, district — whatever the demographics section holds; grouped by site",
+      "denominators": "consented participants only, if it asks"
+    },
+    "answers": [
+      {"if_asked": "which language", "say": "Python."},
+      {"if_asked": "which variables or which section", "say": "The demographics section, by site."},
+      {"if_asked": "about an access key or token", "say": "I don't have one and don't need one — I have the files."}
+    ],
+    "stop_when": "a saved script and a Table 1 file exist in your data-analyst folder and it has told you where"
+  },
+  "expect": {
+    "must_say": ["records\\.csv", "datadictionary\\.csv"],
+    "must_not_say": ["access key", "API token", "paste (your|the) key"],
+    "files": ["data-analyst/**/*.py", "data-analyst/**/*table*"],
+    "calls": {"never": ["study_tracker", "syn"]},
+    "writes": {"allow": []}
+  }
+}

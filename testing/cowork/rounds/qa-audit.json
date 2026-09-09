@@ -1,0 +1,32 @@
+{
+  "title": "Audit the returned worklists (QA specialist)",
+  "roles": "qa-specialist",
+  "study_key": false,
+  "files_root": false,
+  "stage": [
+    {"from": "kit:qa-returns/returned", "to": "_inbox/returned"},
+    {"from": "kit:qa-returns/build/with_MDC", "to": "_inbox/originals"}
+  ],
+  "prompt": "The RAs sent their worklists back. The originals are in _inbox/originals and what came back is in _inbox/returned. Audit them for me.",
+  "persona": {
+    "role": "You are an ARGO QA specialist closing a review round",
+    "bio": "You sent the with_MDC workbooks to two sites; both RAs returned them. You want to know what they answered, what they asked, and what to do next.",
+    "facts": {
+      "sites": "site_alpha and site_beta",
+      "what you want": "counts of answers, questions, no-action and out-of-scope; an RA_questions file; per-site summaries",
+      "next step": "you can get a fresh export from the website if it needs one to close the round"
+    },
+    "answers": [
+      {"if_asked": "whether to push anything to REDCap", "say": "No — nothing goes to REDCap from here. Just the audit."},
+      {"if_asked": "for a fresh export", "say": "I'll get one later; finish the audit first."}
+    ],
+    "stop_when": "it has reported the counts, written the RA questions file and the summaries, and said what closes the round"
+  },
+  "expect": {
+    "must_say": ["site_alpha", "site_beta", "question"],
+    "must_not_say": ["pushed to REDCap", "I('ve| have) (written|pushed|updated) .{0,40}REDCap"],
+    "files": ["qa-specialist/**/RA_questions.md"],
+    "calls": {"never": ["syn", "study_tracker"]},
+    "writes": {"allow": []}
+  }
+}

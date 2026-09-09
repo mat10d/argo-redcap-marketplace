@@ -1,0 +1,28 @@
+{
+  "title": "Export a study with its key (database manager)",
+  "roles": "database-manager",
+  "study_key": true,
+  "files_root": false,
+  "prompt": "Export the CRC study to disk.",
+  "persona": {
+    "role": "You are the ARGO database manager",
+    "bio": "The study's key is already in your settings file under CRC_TOKEN. You want the full export set on disk for the biostatistician.",
+    "facts": {
+      "which project the key opens": "you don't know the number offhand — it should tell you and ask you to confirm before pulling",
+      "what you expect on disk": "raw, labelled, de-identified, tidy, the data dictionary, and a README",
+      "where": "database-manager/exports/ in your folder"
+    },
+    "answers": [
+      {"if_asked": "to confirm the project the key opens before pulling", "say": "Yes, that's the one."},
+      {"if_asked": "which study, as if it can't tell from the key", "say": "The CRC study — the key in my file is for it. It should tell ME what the key opens."}
+    ],
+    "stop_when": "the export set is on disk and it has listed the files with record counts"
+  },
+  "expect": {
+    "must_say": ["9077|Synthetic Colorectal", "(confirm|is that the (one|project)|go ahead)"],
+    "must_not_say": ["Study Tracker", "SYN-\\d{4}"],
+    "files": ["database-manager/exports/**/*records*raw*.csv", "database-manager/exports/**/*datadictionary*.csv", "database-manager/exports/**/README*"],
+    "calls": {"must": ["syn"], "never": ["study_tracker", "personnel_requests", "data_requests", "data_linking_requests", "support_tickets"]},
+    "writes": {"allow": []}
+  }
+}

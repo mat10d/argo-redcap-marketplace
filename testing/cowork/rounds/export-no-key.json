@@ -1,0 +1,32 @@
+{
+  "title": "Export a study with NO key — solicitation path (database manager)",
+  "roles": "database-manager",
+  "study_key": false,
+  "reveal_study_token": true,
+  "files_root": false,
+  "prompt": "Export the CRC study to disk.",
+  "persona": {
+    "role": "You are the ARGO database manager",
+    "bio": "You have the five tracker keys but have NOT added the CRC study's key yet. You do have it, on a sticky note.",
+    "facts": {
+      "what should happen": "it should notice there's no study key, put the settings file in front of you, and ask you to add it — BEFORE talking about downloading from the website, and WITHOUT looking the study up in the Study Tracker",
+      "then": "you add the key (see the instructions on this card), say 'done', it verifies and exports"
+    },
+    "answers": [
+      {"if_asked": "to add the key to the settings file", "say": "Do exactly what the card says under 'If it asks you to add your study key', then type: done."},
+      {"if_asked": "to paste the key into the chat", "say": "No — I'm not pasting a key into a chat. Show me the file. (And report this as WRONG.)"},
+      {"if_asked": "to confirm the project the key opens", "say": "Yes."}
+    ],
+    "stop_when": "the export set is on disk after you added the key, OR it went to the website path without ever offering the file"
+  },
+  "driver_notes": [
+    "The point of this round is the ORDER: the file must be offered before any 'download from the website' talk, and the Study Tracker must never be consulted to find the study."
+  ],
+  "expect": {
+    "must_say": ["(Add keys here|settings file)", "done|verified|connects"],
+    "must_not_say": ["Study Tracker", "paste (your|the|it) .{0,20}(here|in the chat)"],
+    "files": ["database-manager/exports/**/*records*raw*.csv"],
+    "calls": {"must": ["syn"], "never": ["study_tracker"]},
+    "writes": {"allow": []}
+  }
+}

@@ -207,10 +207,25 @@ def load_env_file(explicit: str | None = None) -> "Path | None":
                 value = value.strip().strip('"').strip("'")
                 if key and key not in os.environ:
                     os.environ[key] = value
+            _maybe_install_mock(path)
             return path
         except (OSError, UnicodeDecodeError):
             continue
     return None
+
+
+def _maybe_install_mock(settings_path) -> None:
+    """Test workspaces only. If the settings file just loaded names a mock REDCap folder
+    (ARGO_REDCAP_MOCK=...), every request from this process — the client's and the four scripts
+    that still build their own — is answered from that folder instead of the network. Inert
+    without the flag; refuses loudly if the flag is set against a real REDCap address. Lives
+    here, on the one path every script takes to find its settings, so no script can miss it.
+    """
+    if not os.environ.get("ARGO_REDCAP_MOCK", "").strip():
+        return
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import argo_redcap_mock
+    argo_redcap_mock.install(settings_path)
 
 
 _SCAFFOLD_ATTEMPTED = False

@@ -1,4 +1,4 @@
-# ARGO toolkit ledger — updated 2026-09-08 (0.23.0 released)
+# ARGO toolkit ledger — updated 2026-09-09 (0.24.0 released)
 
 The single answer to "what's done and what's outstanding". Supersedes PLAN.md's todo block for
 status; PLAN keeps the history and the spec.
@@ -62,6 +62,20 @@ status; PLAN keeps the history and the spec.
     asking. Plus: File Repository docs staged as a folder rather than a rename table, the
     structure table as a standard post-DD deliverable, a document→project table for split
     studies, and one line explaining `@MDC-EXEMPT`. NITS 78-86. 691 tests.
+18. **0.24.0** — the automated dogfood loop (testing/cowork/): a driver plays the persona in a
+    fresh Cowork chat on a dedicated test folder; the toolkit runs for real against a
+    **file-backed mock REDCap** vendored into every skill (`argo_redcap_mock.py`, hooked on the
+    one path every script takes to find its settings); the transcript is graded. Three
+    structural layers keep it off the real instance: the test folder's REDCAP_URL is
+    `https://mock.argo.invalid/api/` (RFC 2606, unresolvable), its keys are synthetic, and the
+    mock refuses to install against any host not ending `.invalid`. 12 rounds as data
+    (rounds/*.json — prompt, persona, staged files, expectations), `round.py setup|smoke|grade`,
+    DRIVER.md for the driver, LOOP.md for the operator. **Lesson paid for on day one:** on the
+    Mac, `~/.argo/.env` outranks the test folder's settings file, so the first hand-run smoke test
+    read the LIVE REDCap (reads only, nothing written; workspace wiped). Hence `round.py smoke`
+    pins ARGO_ENV_FILE, and the grader carries two canaries — the real host name anywhere in a
+    transcript, or a silent mock on a round that touches REDCap, is a red alert. Grader is itself
+    tested on synthetic transcripts. 725 tests.
     **OPEN FOR MATTEO/RIVKA:** is "ARGO studies present as Nigerian-led, with ARGO as the
     collaborator" policy, or was it study-specific? (The finals removed MSKCC from every
     document; the skill now ASKS rather than assuming, and no policy is written.)

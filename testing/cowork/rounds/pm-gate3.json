@@ -1,0 +1,46 @@
+{
+  "title": "New study, Gate 3 — ethical approval received, prepare for launch (project manager)",
+  "roles": "project-manager",
+  "study_key": false,
+  "files_root": true,
+  "stage": [
+    {"from": "kit:project-manager/Cervical Cancer Database Protocol.doc", "to": "_inbox/Cervical Cancer Database Protocol.doc"},
+    {"from": "kit:project-manager/IPH_Cervical Ca Database_Consent Form (Adult).doc", "to": "_inbox/IPH_Cervical Ca Database_Consent Form (Adult).doc"},
+    {"from": "kit:project-manager/Cervical Cancer Data Base Proforma .doc", "to": "_inbox/Cervical Cancer Data Base Proforma.doc"}
+  ],
+  "prompt": "We got ethical approval for the cervical cancer database study. The approved protocol, consent form and proforma are in _inbox. Let's get it ready to launch.",
+  "persona": {
+    "role": "You are the ARGO project manager",
+    "bio": "Ethics came through last week. You want the launch package: CPL, ECL, study SOP, QA plan, meeting agenda, SIV, checklist, activation memo — and to end at the REDCap build request you'll submit yourself.",
+    "facts": {
+      "gate": "ethical approval received (option 3)",
+      "sites": "OAUTHC only; you have its consent form and its ethics letter",
+      "funding": "not NIH-funded",
+      "specimens": "none",
+      "consenting professionals at OAUTHC": "Dr A. Example (gynaecologic oncologist) and Nurse B. Example (research nurse) — synthetic names, fine to use",
+      "SIV": "you'll schedule it yourself; you just want the slide content and the attendance log",
+      "who submits the SIR": "you do, in REDCap, once the package is ready"
+    },
+    "answers": [
+      {"if_asked": "where the study is / which gate", "say": "Ethical approval received."},
+      {"if_asked": "how the study is funded", "say": "Not NIH."},
+      {"if_asked": "about specimens", "say": "None."},
+      {"if_asked": "for the consenting professionals", "say": "Dr A. Example and Nurse B. Example, both at OAUTHC."},
+      {"if_asked": "the same question a second time (funding, specimens, sites)", "say": "Answer it, and report it as FRICTION: asked twice."},
+      {"if_asked": "to submit the SIR for you or for a key to do it", "say": "No — I submit it myself. Tell me what goes in which upload field."}
+    ],
+    "stop_when": "the package is drafted, every file is named with the study moniker, and it has given you the list of which document goes in which SIR field"
+  },
+  "driver_notes": [
+    "Count how many times it asks about funding and about specimens. Once each is right; twice is FRICTION.",
+    "It must check, site by site, that you have the consent form AND the ethics clearance before drafting anything.",
+    "The activation memo: it should say it drafted the CONTENT for you to type into the official memo, not that it filled the template."
+  ],
+  "expect": {
+    "must_say": ["ethic(al|s) (clearance|approval)", "(CPL|Consenting Professional)", "(ECL|Eligibility Checklist)", "SIR|Study Initiation Request", "(Start-Up SOP|Start Up SOP)"],
+    "must_not_say": ["flattened image", "I('ve| have) submitted the SIR"],
+    "files": ["project-manager/new-studies/**/*CPL*.docx", "project-manager/new-studies/**/*ECL*.docx"],
+    "calls": {"must": ["study_tracker"]},
+    "writes": {"allow": []}
+  }
+}

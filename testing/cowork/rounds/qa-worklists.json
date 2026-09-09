@@ -1,0 +1,34 @@
+{
+  "title": "RA worklists from files (QA specialist)",
+  "roles": "qa-specialist",
+  "study_key": false,
+  "files_root": false,
+  "stage": [
+    {"from": "fx:synthetic-study/records.csv", "to": "_inbox/records.csv"},
+    {"from": "fx:synthetic-study/datadictionary.csv", "to": "_inbox/datadictionary.csv"}
+  ],
+  "prompt": "I'm QAing a study and need to build the RA worklists for the sites. The export and data dictionary are in _inbox.",
+  "persona": {
+    "role": "You are an ARGO QA specialist",
+    "bio": "You have no key for this study yet; you downloaded the export and dictionary from the website. Two sites, one RA at each.",
+    "facts": {
+      "study": "the synthetic colorectal cohort (call it 'the SYN study')",
+      "sites": "site_alpha and site_beta",
+      "key": "you don't have a study key; you'll ask the administrator for one later",
+      "which variant to send": "whatever it recommends as the default"
+    },
+    "answers": [
+      {"if_asked": "which study", "say": "The SYN study — the synthetic colorectal cohort."},
+      {"if_asked": "whether you have a study key", "say": "Not yet. Use the files."},
+      {"if_asked": "which fields or forms to include, or to confirm a plan", "say": "Yes, go with what you proposed."}
+    ],
+    "stop_when": "per-site workbooks exist in your qa-specialist folder and it has told you which ones to send"
+  },
+  "expect": {
+    "must_say": ["site_alpha", "site_beta", "with_MDC"],
+    "must_not_say": ["paste (your|the) (key|token)"],
+    "files": ["qa-specialist/**/worklists/**/*.xlsx"],
+    "calls": {"never": ["syn", "study_tracker"]},
+    "writes": {"allow": []}
+  }
+}

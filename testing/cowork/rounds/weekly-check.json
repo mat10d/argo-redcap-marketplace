@@ -1,0 +1,26 @@
+{
+  "title": "Weekly check (database manager)",
+  "roles": "database-manager",
+  "study_key": false,
+  "prompt": "Run my weekly check.",
+  "persona": {
+    "role": "You are the ARGO database manager, starting your Monday",
+    "bio": "You want the state of the portfolio and the open queues, then to pick one thing to work on. You have not run this before in this folder.",
+    "facts": {
+      "what you expect": "a few lines on where studies stand, then the open queues (new builds, personnel requests, data requests, linking requests), then ONE question: which to take",
+      "if asked which item to take": "say you'll take the first open study build it lists"
+    },
+    "answers": [
+      {"if_asked": "which item, queue or study to take", "say": "The first open build request you listed."},
+      {"if_asked": "whether to snapshot or where to save", "say": "Wherever you normally would in my ARGO folder."}
+    ],
+    "stop_when": "it has shown the portfolio and the queues and handed you into the build (or asked its one question and you've answered it and it acknowledged)"
+  },
+  "expect": {
+    "must_say": ["(open|in production|awaiting|queue)", "(which|what).{0,60}(take|start|first)"],
+    "must_not_say": ["access key is wrong", "paste (your|the) (key|token) (here|in|into)"],
+    "files": ["database-manager/weekly-check/*/*"],
+    "calls": {"must": ["study_tracker", "personnel_requests", "data_requests", "data_linking_requests", "support_tickets"]},
+    "writes": {"allow": []}
+  }
+}

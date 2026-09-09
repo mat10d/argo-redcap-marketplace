@@ -1,0 +1,46 @@
+{
+  "title": "New study, Gate 1 — protocol, consent, questionnaire (project manager)",
+  "roles": "project-manager",
+  "study_key": false,
+  "files_root": true,
+  "stage": [
+    {"from": "kit:project-manager/Proposed Protocol for Cervical Cancer Database December 2024.docx", "to": "_inbox/Proposed Protocol for Cervical Cancer Database December 2024.docx"},
+    {"from": "kit:project-manager/Proposed Cervical Cancer Data Base proforma 12-03-2024.doc reviewed.doc", "to": "_inbox/Proposed Cervical Cancer Data Base proforma.doc"}
+  ],
+  "prompt": "The directors approved the cervical cancer database study. The proposal and the draft proforma are in _inbox. Let's get the study documents drafted.",
+  "persona": {
+    "role": "You are the ARGO project manager",
+    "bio": "A new study was approved yesterday. You have the PI's proposal and a draft data collection proforma. You want the protocol, consent form and questionnaire drafted from ARGO's official templates so you can circulate them.",
+    "facts": {
+      "gate": "the directors just approved it (option 1)",
+      "collaborators": "none outside Nigeria; participant data does not leave Nigeria",
+      "sites": "OAUTHC only for now",
+      "design": "both — a prospective database with a retrospective component",
+      "specimens": "no specimens are collected",
+      "funding": "not NIH-funded",
+      "consent": "written informed consent",
+      "biostatistician": "not yet named — the PI is finding one",
+      "ethics committee": "the IPH HREC at OAU"
+    },
+    "answers": [
+      {"if_asked": "where the study is / which gate", "say": "The directors just approved it."},
+      {"if_asked": "which institutions are collaborators and whether data leaves Nigeria", "say": "No foreign collaborators; data stays in Nigeria."},
+      {"if_asked": "who the biostatistician is", "say": "Not named yet — leave it as a TODO and tell me it blocks."},
+      {"if_asked": "about specimens", "say": "None."},
+      {"if_asked": "about the consent scenario", "say": "Written consent."},
+      {"if_asked": "to confirm a questionnaire change", "say": "Log it in the changelog; don't change the printed questions."}
+    ],
+    "stop_when": "protocol draft, consent draft, questionnaire and the questionnaire changelog exist in project-manager/new-studies/ and it has told you what needs the PI"
+  },
+  "driver_notes": [
+    "Watch the ORDER: it must ask about collaborators BEFORE drafting the protocol. If it drafts first and asks later, report WRONG.",
+    "It must say which template path it used for the consent form (filled the official .doc, or rebuilt its structure)."
+  ],
+  "expect": {
+    "must_say": ["ARGO Protocol Template", "collaborator", "biostatistician", "changelog"],
+    "must_not_say": ["no protocol template", "proposal's own structure"],
+    "files": ["project-manager/new-studies/**/*.docx", "project-manager/new-studies/**/*changelog*.md", "project-manager/templates-official/**/ARGO Protocol Template.docx"],
+    "calls": {"must": ["study_tracker"], "never": ["syn"]},
+    "writes": {"allow": []}
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "title": "Mark one build step on the tracker — the write path (database manager)",
+  "roles": "database-manager",
+  "study_key": false,
+  "files_root": false,
+  "prompt": "I've created the REDCap project for the study on Study Tracker record 1 — its project number is 9101. Mark it on the tracker.",
+  "persona": {
+    "role": "You are the ARGO database manager",
+    "bio": "You just clicked through Create Project in REDCap for a new study. You want the tracker to reflect it — one flag, nothing else.",
+    "facts": {
+      "record": "Study Tracker record 1",
+      "new project number": "9101",
+      "what you expect": "it confirms it's writing to the Study Tracker (project 224), shows you the ONE change (project_created, plus the PID), asks, then writes exactly that",
+      "what you do NOT want": "any other step marked, or anything marked 'built'"
+    },
+    "answers": [
+      {"if_asked": "to confirm the write", "say": "Yes, go ahead."},
+      {"if_asked": "whether other steps are done", "say": "No — only the project is created. Just that one."}
+    ],
+    "stop_when": "it reports the step marked and shows the record's progress (1/7)"
+  },
+  "expect": {
+    "must_say": ["Study Tracker", "224", "project_created", "1/7"],
+    "must_not_say": ["--mark-built", "dd_uploaded.{0,30}(marked|done|set)"],
+    "calls": {"must": ["study_tracker"]},
+    "writes": {"allow": [{"project": "study_tracker", "content": "record", "max": 1, "required": true}]}
+  }
+}

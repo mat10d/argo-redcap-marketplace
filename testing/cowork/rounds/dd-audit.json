@@ -1,0 +1,33 @@
+{
+  "title": "Audit a draft data dictionary for a SIR (database manager, build Path B)",
+  "roles": "database-manager",
+  "study_key": false,
+  "files_root": false,
+  "stage": [
+    {"from": "fx:synthetic-build/dirty_datadictionary.csv", "to": "_inbox/draft_datadictionary.csv"}
+  ],
+  "prompt": "The PM drafted a data dictionary for the study on Study Tracker record 5 — it's in _inbox/draft_datadictionary.csv. Check it and get it ready to upload.",
+  "persona": {
+    "role": "You are the ARGO database manager",
+    "bio": "A PM sent you a hand-made data dictionary. You want it validated and fixed so you can upload it yourself, and the build step marked on the tracker when it's done.",
+    "facts": {
+      "the record": "Study Tracker record 5",
+      "what you expect": "it pulls the SIR record, validates the CSV, lists what's wrong by severity, fixes what it can with a reason each, re-validates to clean, and gives you the clean file",
+      "uploading": "YOU upload it through the REDCap website; it should not try to upload for you",
+      "marking": "after you say you've uploaded it, it may mark dd_uploaded on the tracker — it should show you the change first"
+    },
+    "answers": [
+      {"if_asked": "to confirm a fix or a batch of fixes", "say": "Yes, apply them."},
+      {"if_asked": "whether you've uploaded the dictionary", "say": "Yes, uploaded just now."},
+      {"if_asked": "to confirm writing to the Study Tracker", "say": "Yes — mark it."}
+    ],
+    "stop_when": "the clean dictionary is saved, you've said it's uploaded, and it has marked (or offered to mark) the step"
+  },
+  "expect": {
+    "must_say": ["(CRITICAL|ERROR|WARNING)", "validat", "dd_uploaded"],
+    "must_not_say": ["I('ve| have) uploaded (it|the (data )?dictionary) (to|into) REDCap"],
+    "files": ["database-manager/**/*DataDictionary*.csv"],
+    "calls": {"must": ["study_tracker"], "never": ["syn"]},
+    "writes": {"allow": [{"project": "study_tracker", "content": "record", "max": 2, "required": false}]}
+  }
+}
