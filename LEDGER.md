@@ -1,4 +1,4 @@
-# ARGO toolkit ledger — updated 2026-09-09 (0.24.0 released)
+# ARGO toolkit ledger — updated 2026-09-14 (0.25.1 released)
 
 The single answer to "what's done and what's outstanding". Supersedes PLAN.md's todo block for
 status; PLAN keeps the history and the spec.
@@ -78,6 +78,20 @@ status; PLAN keeps the history and the spec.
     would have written to the real tracker). Hence `round.py smoke` pins ARGO_ENV_FILE, and the
     grader carries two canaries — the real host name in a transcript, or a silent mock on a
     round that touches REDCap, is a red alert. Grader tested on synthetic transcripts. 725 tests.
+19. **0.25.1** — the driver loop is DELETED and replaced by session mining. Removed: DRIVER.md,
+    LOOP.md, round.py, the 12 persona rounds and their two test files. **Why:** it could only
+    find what the test suite already covers (crashes, missing files); every real finding to date
+    — NITS 60-69 and 78-86 — came from reading a transcript of real work, and those were judgment
+    failures a scripted persona would not have flinched at. Kept: the mock REDCap
+    (`argo_redcap_mock.py`), which independently lets the toolkit run with no keys at all.
+    New: `.claude/skills/mine-sessions/` — a project skill that finds ARGO Cowork sessions, flags
+    friction turns (CORRECTION / REPEAT / MISSING / CONFUSED / RULE / TOOK-OVER / STOPPED /
+    TOOL-ERROR), reads them in context, and carries the judgment rules — candidates are not
+    findings, check the version stamp, log what went right, ask whether a stated rule
+    generalises, reconcile new doctrine against old. Validated against the Synoptic transcript:
+    it independently surfaced the same turns that became NITS 78-86, with no false positives
+    after filtering injected SKILL.md text. Watermark + finding record in
+    `testing/cowork/mined-sessions.json`. 739 tests.
     **OPEN FOR MATTEO/RIVKA:** is "ARGO studies present as Nigerian-led, with ARGO as the
     collaborator" policy, or was it study-specific? (The finals removed MSKCC from every
     document; the skill now ASKS rather than assuming, and no policy is written.)
