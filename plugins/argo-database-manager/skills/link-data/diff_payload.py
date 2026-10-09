@@ -9,11 +9,13 @@ for human review, never auto-pushed:
 
     <prefix>_update.csv     safe-fills only (current blank -> computed value),
                             and only for records that already exist in REDCap.
-                            Push with overwriteBehavior=normal.
+                            Applied, if at all, by the user in the Data Import
+                            Tool with blanks NOT overwriting (= overwriteBehavior
+                            normal). ARGO has no script that pushes it.
     <prefix>_conflicts.csv  long format: id, field, existing, computed.
                             For human triage. NOT pushed.
     <prefix>_overwrite.csv  the conflict rows, wide, with computed values.
-                            Push ONLY after explicit sign-off (overwrite mode).
+                            Applied ONLY after explicit sign-off on each conflict.
 
 The other two are the gap report — the two ways the id spaces fail to line up:
 
@@ -86,15 +88,42 @@ def is_structural(column: str) -> bool:
 
 
 def load(path, id_field):
-    """Load a CSV into {id: {field: value}} and return (rows, fieldnames)."""
+    """Load a CSV into ({normalised id: row}, fieldnames, {normalised id: id as written}).
+
+    Ids are matched normalised (so '1' and '1.0' line up) but written back exactly as the file
+    spelled them: the payload is imported into REDCap, and `007` normalised to `7` would CREATE
+    record 7 instead of filling record 007.
+
+    A repeated id stops the run, like link_studies.py. Keeping the last row silently made a field
+    filled on an earlier row (a repeat-instrument export, a duplicate) read as blank — a "safe
+    fill" that, imported, overwrites the real value.
+    """
     with open(path, newline="") as f:
         reader = csv.DictReader(f)
         if id_field not in (reader.fieldnames or []):
             raise SystemExit(f"ERROR: id field '{id_field}' not in {path}")
-        rows = {}
+        rows, spelled, repeated = {}, {}, []
         for r in reader:
-            rows[norm(r[id_field])] = r
-        return rows, reader.fieldnames
+            key = norm(r[id_field])
+            if key in rows:
+                repeated.append(r[id_field])
+                continue
+            rows[key] = r
+            spelled[key] = str(r[id_field]).strip()
+        if repeated:
+            shown = ", ".join(sorted(set(repeated))[:8])
+            raise SystemExit(
+                f"{Path(path).name} has more than one row for the same id ({shown}).\n"
+                "Each record must appear once to compare it field by field. Export one row per\n"
+                "record (no repeating instruments or events), or merge the duplicates first.")
+        return rows, reader.fieldnames, spelled
+
+
+def respell(rows, id_field, spelled):
+    """Put each row's id back the way its source file wrote it."""
+    for row in rows:
+        row[id_field] = spelled.get(row[id_field], row[id_field])
+    return rows
 
 
 def main():
@@ -114,8 +143,8 @@ def main():
                          "pushing")
     args = ap.parse_args()
 
-    computed, comp_cols = load(args.computed, args.id_field)
-    current, curr_cols = load(args.current, args.id_field)
+    computed, comp_cols, comp_ids = load(args.computed, args.id_field)
+    current, curr_cols, curr_ids = load(args.current, args.id_field)
 
     # Fields to compare: explicit list, else the intersection (minus the ID and the columns
     # REDCap keeps for itself — see REDCAP_STRUCTURAL_COLUMNS).
@@ -141,6 +170,10 @@ def main():
     result = diff_records(computed, current, fields, args.id_field)
     updates, conflicts, overwrites = result["updates"], result["conflicts"], result["overwrites"]
     orphans, missing_link = result["orphans"], result["missing_link"]
+    # Rows that would be imported into the current project carry ITS spelling of the id.
+    for rows in (updates, conflicts, overwrites, missing_link):
+        respell(rows, args.id_field, curr_ids)
+    respell(orphans, args.id_field, comp_ids)
     n_fill = result["counts"][FILL]
     n_conflict = result["counts"][CONFLICT]
     n_noop = result["counts"][NOOP]
@@ -194,8 +227,10 @@ def main():
                   f"they are what the merge could NOT do.")
         return
 
-    print(f"\nDry-run complete. Review before pushing. Push {p_update.name} with overwriteBehavior=normal.")
-    print(f"Only push {p_over.name} (overwrite) after explicit sign-off on {p_conf.name}.")
+    print(f"\nDry run — nothing was written to REDCap. Writing patient data back is a one-off,\n"
+          f"confirmed step: the user applies {p_update.name} in the Data Import Tool (review the\n"
+          f"changes; blanks must not overwrite). {p_over.name} only after sign-off on each row of\n"
+          f"{p_conf.name}.")
     if orphans:
         print(f"{p_orph.name} is a report, not a payload: those ids have no record in REDCap, so "
               f"importing them would create new records. That's a decision for the user.")

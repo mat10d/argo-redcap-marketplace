@@ -81,7 +81,21 @@ Two cautions survive the revision, because they're about accounts, not storage:
 
 ## Tier 3 — one dedicated person, extra caution: QA write-back
 
-- `qa-worklists/push_updates.py` — the one script in the suite that can overwrite live clinical/research
+**Decided 2026-10-09 — the QA specialist does not re-upload what the RAs return.** The RA enters
+every answer in REDCap. QA *checks* that REDCap now holds it (`qa-worklists/reconcile_return.py`,
+read-only: IN REDCAP / NOT ENTERED / DIFFERS per cell). The one exception is missing-data codes:
+`qa-worklists/upload_mdc.py` may upload a -666/-777/-888/-999 code (date form for dates) the RA
+returned, only into a cell that was on the worklist and is blank in REDCap now, only where the
+field lists that code, and only when the RA's note and the field comment fit it — a doubtful code
+goes back to the RA as a question. It refuses every other value and every non-blank cell, and is
+gated like `push_updates.py`: dry-run preview first, `--expect-project`, before-values saved,
+`overwriteBehavior=normal`, read back after. Reason: the RA's entry keeps REDCap's validation and
+audit trail on the value; a missing-data code into a blank cell is the one write that replaces
+nothing and needs no clinical judgement beyond what the RA already recorded.
+
+- `qa-worklists/upload_mdc.py` — missing-data codes only, into blank cells only (above).
+- `qa-worklists/push_updates.py` — legacy one-off migrations only (`--force-migration`); never
+  part of a QA round. The one script in the suite that can overwrite live clinical/research
   data at scale.
 
 Two requirements, both non-negotiable:
@@ -110,7 +124,7 @@ it is not an equal alternative, and skills must not present it as a choice to th
 |---|---|---|
 | **Marking build progress** | `sir_update.py --mark-step <field>`, one push per step | Ticking the box by hand in the Study Tracker UI is the fallback *only* when the SIR token is absent. Not offered as a choice. |
 | **HTTP client** | `argo_redcap_client.py` in `argo-core`, imported by every script | No script writes its own `urlopen` or `curl` call again. Raw `curl` survives in docs only as copy-paste for a human debugging by hand. |
-| **Confirming the right project** | `confirm_token()` inside the shared client, runs automatically before any write | The prose instruction "read [[token-confirmation]] before any write" is no longer the enforcement mechanism. The check is code, not convention. |
+| **Confirming the right project** | `confirm_project()` inside the shared client, runs automatically before any write | The prose instruction "read [[token-confirmation]] before any write" is no longer the enforcement mechanism. The check is code, not convention. |
 | **Creating a personnel record** | Resolves automatically on token presence: SPR token → API import; no token → SPR survey in the UI | Still a genuine two-path operation, but the skill decides and reports what it did. Never asks the user to pick. |
 | **Closing out a build** | `sir_update.py --mark-built` | `--set field=value` is a documented escape hatch for one-off corrections only, never a routine close-out path. |
 
@@ -212,19 +226,23 @@ Still true regardless of layout:
   is Tier 0, so most Cowork sessions need no key at all.
 - **Never put a token in a command.** `argo_setup.py` takes no token argument and never prompts
   for one; keys are pasted into the file in an editor. Commands end up in history and transcripts.
-- **Lookup order:** `ARGO_ENV_FILE` → working directory and its parents → `/mnt/*` →
-  `~/.argo/.env`. A token exported inline for a single command always wins over any file.
+- **Lookup order** (`settings_candidates()` is the single copy): `ARGO_ENV_FILE` →
+  `~/.argo/.env` → `~/argo-work/.env` → the working directory and two levels above → `/mnt/*`
+  and `~/mnt/*`. On a Mac, `~/.argo/.env` therefore beats the working folder (NITS 87). A token
+  exported inline for a single command always wins over any file.
 - The settings file is written `0600` and git-ignored on creation.
 
 ## Credential storage convention
 
-One file: **`~/.argo/.env`**, loaded with `set -a; source ~/.argo/.env; set +a`.
+One settings file, found by the lookup order above (on a Mac usually **`~/.argo/.env`**; in
+Cowork, the connected folder's `.env`). Scripts load it themselves — nothing needs sourcing.
 
 - `REDCAP_URL` — the API endpoint, shared by every project on that REDCap instance
 - One variable per project, named for the project (`STUDY_INITIATION_REQUEST`,
   `STUDY_PERSONELL_REQUEST`, `DATA_LINKING_REQUEST`, `DATA_REQUEST`,
   `SUPPORT_TICKET_REQUEST`)
-- Tier 2/3 study tokens are **not** stored here. They are supplied for the one task that needs them.
+- Study keys, where a person holds one, sit in the same file (see the 2026-08-20 Tier 2
+  revision above), under the variable name the skill asks for.
 - Never commit this file. Never log a full token — truncate to the last 4 characters.
 
 ## The trade-off that was considered and rejected

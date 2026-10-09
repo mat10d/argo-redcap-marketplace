@@ -173,6 +173,10 @@ class MockRedcapTests(unittest.TestCase):
         self.assertEqual(raw[0]["project_created"], "1", "label-stored yesno maps back to a code")
         one = client.export_records(records="2")
         self.assertEqual([r["record_id"] for r in one], ["2"])
+        # A Python list used to be sent as the literal string "['2']" and match nothing.
+        listed = client.export_records(records=["2"], fields=["record_id", "project_created"])
+        self.assertEqual([r["record_id"] for r in listed], ["2"])
+        self.assertEqual(set(listed[0]), {"record_id", "project_created"})
 
     def test_records_filters_the_way_the_scripts_ask(self):
         self._active()

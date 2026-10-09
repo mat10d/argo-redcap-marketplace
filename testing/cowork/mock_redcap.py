@@ -17,8 +17,7 @@ holding the real fetched templates (they carry staff contact details, so that fo
 outside any repo and is never committed) — otherwise it is empty, which is also a legitimate
 test: the skills must fall back to their skeletons and say so.
 
-Prints the fake tokens as KEY=VALUE lines; round.py writes them into the workspace settings
-file. They are deterministic 32-hex strings that open nothing anywhere real.
+Prints the fake tokens as KEY=VALUE lines, ready for a test settings file. They are deterministic 32-hex strings that open nothing anywhere real.
 """
 from __future__ import annotations
 

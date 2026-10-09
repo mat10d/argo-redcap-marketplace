@@ -10,7 +10,10 @@ can be waived explicitly by putting `@MDC-EXEMPT` in its Field Annotation column
 (on any field of a matrix group, that waives the whole group) — the mechanism for
 validated psychometric / Likert scales, which ARGO policy exempts.
 
-Usage: python3 validate_dd.py <path_to_csv>
+A self-completed survey carries no MDC at all (ARGO policy, 2026-10-09): `--survey` skips every
+MDC check.
+
+Usage: python3 validate_dd.py [--patient-level] [--survey] <path_to_csv>
 """
 import csv
 import sys
@@ -71,7 +74,7 @@ EXPECTED_HEADER = [
 COL = {name: i for i, name in enumerate(EXPECTED_HEADER)}
 
 
-def validate(filepath, patient_level=False):
+def validate(filepath, patient_level=False, survey=False):
     errors = []
     warnings = []
     var_names_seen = set()
@@ -228,6 +231,7 @@ def validate(filepath, patient_level=False):
         mdc_waived = (MDC_EXEMPT_ANNOTATION in annotation.upper()
                       or (matrix_group and matrix_group in mdc_exempt_groups))
         if (not is_first_field
+                and not survey
                 and not mdc_waived
                 and field_type not in MDC_EXEMPT_TYPES
                 and var_name not in MDC_EXEMPT_VARS
@@ -276,19 +280,22 @@ def main():
     if "--patient-level" in args:
         patient_level = True
         args = [a for a in args if a != "--patient-level"]
+    survey = "--survey" in args
+    args = [a for a in args if a != "--survey"]
     if not args:
         print("Usage: python3 validate_dd.py [--patient-level] <csv_file> [csv_file2 ...]")
         print("  --patient-level   require hospital_number field (ARGO standard for patient-level DDs)")
+        print("  --survey          a self-completed survey: no missing-data codes expected")
         sys.exit(1)
 
     total_errors = 0
     for filepath in args:
         print(f"\n{'='*60}")
-        print(f"Validating: {filepath}  (patient-level: {patient_level})")
+        print(f"Validating: {filepath}  (patient-level: {patient_level}, survey: {survey})")
         print(f"{'='*60}")
 
         try:
-            errors, warnings = validate(filepath, patient_level=patient_level)
+            errors, warnings = validate(filepath, patient_level=patient_level, survey=survey)
         except FileNotFoundError:
             print(f"  FILE NOT FOUND: {filepath}")
             total_errors += 1

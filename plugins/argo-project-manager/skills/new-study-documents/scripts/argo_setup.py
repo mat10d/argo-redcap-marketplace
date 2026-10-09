@@ -190,7 +190,8 @@ def run_check(work_dir: Path) -> int:
 
     print(
         "\nThe settings file looks reasonable. To check the keys actually work, run:\n"
-        f"\n    set -a; source {env_path}; set +a; python3 argo_redcap_client.py --check"
+        "\n    python3 argo_redcap_client.py --check\n"
+        "\n(It finds the settings file itself — nothing needs loading first.)"
     )
     return 0
 

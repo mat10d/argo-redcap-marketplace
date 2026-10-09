@@ -415,3 +415,49 @@ Mined from the live build chat. This was the first build of a **survey** study a
     search order is right for real users (home file = personal keys) and `ARGO_ENV_FILE` is the
     explicit override; the fix is procedural — `round.py smoke` pins it — plus two grader
     canaries so the boundary is checked every round rather than assumed.
+
+## 2026-10-09 — Microvascular build (SIR 117, PID 270) + Sep 22–Oct 6 weekly checks (0.26.0, all applied)
+
+Mined from 3ac17691 (the build, on 0.25.1) and 5a856f8f / d38aa15a / c910f797 / 4f1ee305 / 213704e1.
+The miner itself had gone blind: Cowork moved to bare 8-hex session folders on ~2026-09-25 and
+the `local_*` glob saw none of them; it also missed the version in the init event. Both fixed.
+
+88. **The build went ahead on an incomplete document set.** The intake offered "Build as far as
+    possible, TODO the gaps"; the ethics document arrived later and overturned the design.
+    Matteo: a missing questionnaire, protocol or ethics APPROVAL letter is a hard stop (an
+    application is not an approval). `HARD_STOP_DOCUMENTS` in setup_brief.py; "headway" scoped
+    to ambiguity inside a complete set.
+89. **dd_uploaded stayed 1 after the DD was revised.** *"The tracker says done and the project
+    isn't."* `sir_update.py --unmark-step`; `--reopen`/`--set f=` blanks now actually write.
+90. **Outstanding items were unclear; a user request vanished from the final status.** One
+    generated Outstanding list (tracker step · who · waits on · done), user requests carried
+    until closed; status files rewritten, not appended.
+91. **Too verbose.** OPEN_QUESTIONS.md reached 4,289 words for a 70-field survey. Only items
+    needing an answer, ≤3 lines, owner named; chat leads with the decision, ~120 words.
+92. **contains_phi offered four times.** Now pushed with the mechanical flags when the DD has an
+    identifier (`--dd`), shown in the diff.
+93. **"No missing data codes!"** Programme rule: self-completed surveys carry no MDCs; the SIR's
+    MDC boxes are cleared (`--survey` in dd_builder/validate_dd).
+94. **Email vs anonymity.** Matteo: multi-round surveys need email to send the next instrument,
+    whatever the paperwork says; names come out of anonymous studies; the questionnaire beats
+    the ethics paperwork, and a disagreement goes on the PM's list.
+95. **"Close out the build"** = all remaining steps + form Complete in one `--close-out` push.
+    Two closings had left the form Incomplete; one re-asked which flags to tick.
+96. **Blank IRB at production passed silently.** Now a warning naming the field and who fills it.
+97. **Weekly check:** false "keys lack import rights" claim removed; `close_request.py` (no guessed
+    usernames); repeated notes collapse to "(still open)"; an all-failed run no longer becomes
+    the baseline. Missing tracker fields keep a study on the queue — deletion guidance removed.
+98. **`export_records(records=[...])` silently returned []** — lists were urlencoded as one string.
+    Client now sends `records[0]=`.
+99. **PI and biostatistician asked in one field**; one name answered both and the biostatistician
+    was recorded missing. One role per question; one name fills both.
+100. **QA re-uploaded RA answers / checked only indirectly.** Matteo: QA checks REDCap reflects
+    the returned form, uses the Field Comment Log, and uploads only judged MDCs into blank
+    cells. `reconcile_return.py`, `upload_mdc.py`. OPEN: confirm the Field Comment Log CSV
+    headings and the logging `details` format on OAU 13.11.4 with a real comment.
+
+### What went right — don't "fix" these
+Refused unapproved questionnaire wording (IRB); tracked deletions rather than silent edits; read
+the ethics document before acting; never flipped review/production/phi_confirm unasked; diff
+before every tracker write; refused to hand-roll a delete; a verifier subagent fact-checked the
+weekly report; "No data this week — not a quiet week" on a failed run.

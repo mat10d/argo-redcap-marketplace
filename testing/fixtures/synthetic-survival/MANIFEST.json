@@ -1,0 +1,91 @@
+{
+  "contract_version": 1,
+  "expected": {
+    "analysed": 182,
+    "by_group": {
+      "0": {
+        "events": 29,
+        "n": 61
+      },
+      "1": {
+        "events": 32,
+        "n": 58
+      },
+      "2": {
+        "events": 43,
+        "n": 63
+      }
+    },
+    "censored_at_end_of_follow_up": 14,
+    "cox_complete_cases": 180,
+    "events": 104,
+    "excluded": {
+      "censor_date_missing": 3,
+      "end_before_start": 1,
+      "event_date_contradicts_status": 1,
+      "event_date_missing": 3,
+      "start_blank": 2,
+      "start_mdc": 2,
+      "start_not_applicable": 4,
+      "status_unknown": 2
+    },
+    "excluded_total": 18
+  },
+  "n_records": 200,
+  "note": "SYNTHETIC TEST DATA \u2014 no real people. Derived from ../synthetic-study.",
+  "plan": {
+    "censor_date": "fu_date",
+    "covariates": [
+      "age",
+      "sex",
+      "tnm_n",
+      "tnm_m"
+    ],
+    "end_of_follow_up": "2026-06-30",
+    "event_codes": [
+      "3"
+    ],
+    "event_date": "death_date",
+    "event_field": "follow_status",
+    "group_by": "tnm_n",
+    "origin": "dx_date"
+  },
+  "planted": {
+    "age_mdc": [
+      "SYN-0013",
+      "SYN-0144"
+    ],
+    "death_before_dx": [
+      "SYN-0073"
+    ],
+    "death_date_blank": [
+      "SYN-0096",
+      "SYN-0155"
+    ],
+    "death_date_mdc": [
+      "SYN-0194"
+    ],
+    "death_date_not_dead": [
+      "SYN-0200"
+    ],
+    "dx_date_blank": [
+      "SYN-0040",
+      "SYN-0174"
+    ],
+    "dx_date_mdc": [
+      "SYN-0015",
+      "SYN-0105"
+    ],
+    "fu_date_blank": [
+      "SYN-0018",
+      "SYN-0031",
+      "SYN-0154"
+    ],
+    "status_blank": [
+      "SYN-0026",
+      "SYN-0182"
+    ]
+  },
+  "seed": 20261008,
+  "synthetic": true
+}

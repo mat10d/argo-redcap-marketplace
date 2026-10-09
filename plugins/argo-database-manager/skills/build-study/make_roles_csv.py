@@ -39,6 +39,9 @@ COLUMNS = [
 ]
 
 # Canonical ARGO roles. forms / forms_export use _template strings filled in at runtime.
+# forms_export levels: 0 No Access · 1 Full Data Set · 2 De-Identified · 3 Remove All Identifier
+# Fields. Study Builder and Project Manager export with identifier fields removed by default
+# (Matteo, 2026-10-09): flagging a field as an identifier should keep it out of their exports.
 ROLES = [
     # (label, perm-dict, forms-template, forms-export-template)
     ("Study Builder", {
@@ -51,7 +54,7 @@ ROLES = [
         "mobile_app": 0, "mobile_app_download_data": 0,
         "record_create": 1, "record_rename": 1, "record_delete": 1,
         "lock_records_customization": 1, "lock_records": 1, "lock_records_all_forms": 1,
-    }, "all_full", "all_full"),
+    }, "all_full", "all_noidentifiers"),
     ("Principal Investigator", {
         "design": 0, "alerts": 1, "user_rights": 1, "data_access_groups": 1,
         "reports": 1, "stats_and_charts": 1, "manage_survey_participants": 1,
@@ -73,7 +76,7 @@ ROLES = [
         "mobile_app": 0, "mobile_app_download_data": 0,
         "record_create": 1, "record_rename": 1, "record_delete": 1,
         "lock_records_customization": 0, "lock_records": 0, "lock_records_all_forms": 0,
-    }, "all_full", "all_full"),
+    }, "all_full", "all_noidentifiers"),
     ("Data Entry", {
         "design": 0, "alerts": 0, "user_rights": 0, "data_access_groups": 0,
         "reports": 1, "stats_and_charts": 1, "manage_survey_participants": 1,
@@ -127,6 +130,8 @@ def forms_block(template: str, all_forms: list, clinical_forms: list) -> str:
             levels[f] = 1
         elif template == "all_deidentified":
             levels[f] = 2
+        elif template == "all_noidentifiers":
+            levels[f] = 3       # Remove All Identifier Fields
         elif template == "all_noexport":
             levels[f] = 0
         elif template == "clinical_full_qa_readonly":

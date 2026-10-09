@@ -82,8 +82,9 @@ python3 release.py --set 1.0.0
 - **Tier 1 — deterministic, local:** `python3 tests/run_all.py`. Business logic runs against
   the committed synthetic study (`testing/fixtures/synthetic-study/`, seeded generator +
   MANIFEST of engineered counts). No network, keys, or patient data.
-- **Tier 2 — Cowork rounds:** `testing/cowork/round.py` stages a fresh workspace and mines the
-  session transcript afterwards. Checks agent behavior and UI, not logic.
+- **Tier 2 — real sessions:** the `mine-sessions` project skill reads real Cowork transcripts
+  for friction and feeds `testing/cowork/NITS.md`. (The automated round loop, `round.py`, was
+  removed on 2026-09-14.)
 
 ## History note
 

@@ -218,6 +218,9 @@ def render(snapshot: dict, diff: "dict | None" = None) -> str:
                 marker = ""
                 if diff and item["record_id"] in diff.get(env_var, {}).get("new_open", set()):
                     marker = " 🆕"
+                elif diff and item["record_id"] in diff.get(env_var, {}).get("still_open", set()):
+                    # Already reported last time: say so, so it gets one line, not a re-explanation.
+                    marker = " (still open)"
                 lines.append(f"  - [{item['record_id']:>3}] {item['summary']}{marker}")
         else:
             lines.append("  (no open items)")
@@ -265,7 +268,17 @@ def load_previous(state: Path) -> "dict | None":
                 file=sys.stderr,
             )
         return None
-    return json.loads(snapshots[-1].read_text())
+    # A run where every tracker failed recorded nothing. Using it as the baseline makes the next
+    # diff compare against nothing and report no changes, so skip back to the last real one.
+    for path in reversed(snapshots):
+        try:
+            snap = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        projects = snap.get("projects", {})
+        if projects and not all("error" in v for v in projects.values()):
+            return snap
+    return None
 
 
 def save(snapshot: dict, snap_dir: Path) -> Path:

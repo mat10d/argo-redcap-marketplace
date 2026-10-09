@@ -9,7 +9,7 @@ Compiled from real ARGO bulk imports. Each item below was discovered the hard wa
 
 ## 0. POLICY: no programmatic writes to cohort patient data
 
-**Default: the QA/analysis loop is read-only.** Cohort patient records are entered and corrected by RAs *directly in REDCap*, against the worklists — not by pushing CSVs. Programmatic record import bypasses the three things REDCap does for you:
+**Default: the QA/analysis loop does not write patient data** — with one narrow exception, below. Cohort patient records are entered and corrected by RAs *directly in REDCap*, against the worklists — not by pushing CSVs. Programmatic record import bypasses the three things REDCap does for you:
 
 - **branching logic** — writes land in fields that are hidden/not-applicable (orphan data),
 - **field validation** — out-of-range / wrong-coded values land silently,
@@ -19,16 +19,15 @@ Every silent-failure mode in this document was hit during the 2026-06 CRC push: 
 
 **Scope.** This restricts *cohort patient-data record imports* (`content=record` writes to a study/cohort project). It does NOT restrict admin-REDCap writes (e.g. `build-study` lifecycle tracking) or project-structure writes (data dictionary / user rights) — those are a separate, lower-risk class.
 
-**Cohort record import is migration-only.** If legacy data genuinely must be bulk-loaded, treat it as a separate, deliberate one-off migration — REDCap-native import with validation ON, a decode-and-categorize preview (FILL / RECODE / OVERWRITE / HIDDEN-orphan / ALREADY) reviewed by a human, and a fresh `snapshot_project.py` first — never a step in the routine cycle. The `qa-worklists` write-back scripts (`push_updates.py`, `verify_push.py`) are **deprecated** under this policy; `snapshot_project.py` (read-only export) is retained.
+**The one QA exception (decided 2026-10-09, [[access-tiers]] Tier 3):** `qa-worklists/upload_mdc.py` may upload a missing-data code the RA returned (-666/-777/-888/-999; date form `8888-08-08` for dates; the code's own option column for a checkbox), only into a worklist cell that is blank in REDCap now, only where the field lists the code and the RA's note / field comment fit it. Every other returned value is entered by the RA in REDCap; QA checks it landed with `reconcile_return.py` (read-only).
+
+**Cohort record import is otherwise migration-only.** If legacy data genuinely must be bulk-loaded, treat it as a separate, deliberate one-off migration — REDCap-native import with validation ON, a decode-and-categorize preview (FILL / RECODE / OVERWRITE / HIDDEN-orphan / ALREADY) reviewed by a human, and a fresh `snapshot_project.py` first — never a step in the routine cycle. The `qa-worklists` write-back scripts (`push_updates.py`, `verify_push.py`) are **deprecated** under this policy; `snapshot_project.py` (read-only export) is retained.
 
 ## 1. Dates must be YYYY-MM-DD on import
 
-Regardless of how the field is configured to display (e.g. `date_dmy` shows as DD-MM-YYYY in the UI), the API only accepts ISO 8601 (`YYYY-MM-DD`) on import.
-
-- Sending `"08/10/2025"` returns HTTP 400 with `"Invalid date format. (NOTE: Dates must be imported here only in Y-M-D format, regardless of the specific date format designated for this field.)"`
-- Normalize all date strings to `yyyy-mm-dd` before posting.
-
-This is especially important when parsing free-text date sources (Excel cells, multi-site IRB strings) — write a normalizer that pads single-digit days/months and expands 2-digit years before serializing.
+Whatever a field's display format (`date_dmy` shows DD-MM-YYYY), import every date as
+`YYYY-MM-DD` — a DD-MM-YYYY value is rejected, and a DD/MM value can be misread as M/D. The full
+rule, the normalizer, and the MDC date codes in import form are in [[redcap-date-import]].
 
 ## 2. `overwriteBehavior=normal` silently drops cross-form fields on NEW records
 
@@ -36,7 +35,7 @@ When creating a new record with fields spanning multiple forms (e.g. `study_init
 
 **Rule of thumb:**
 - **Creating a new record** (record_id doesn't yet exist) → use `overwriteBehavior=overwrite`
-- **Updating an existing record** (preserve fields not in the payload) → use `overwriteBehavior=normal`
+- **Updating an existing record** where a blank in the payload must not erase a stored value → use `overwriteBehavior=normal` (blank cells are ignored; non-blank cells still replace)
 
 After any bulk import, spot-check 2-3 records by exporting them and confirming cross-form fields landed. Don't trust the `{count: N}` response alone.
 

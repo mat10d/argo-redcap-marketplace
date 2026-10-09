@@ -204,8 +204,12 @@ def show_queue(key: str, expand: bool = True) -> "int | None":
                 nxt = _next_step(rec)
                 extra = f"  [{_sir_progress(rec)} build steps done" + (f"; next: {nxt}]" if nxt else "]")
             print(f"  {rid}: {lead}{_detail_line(key, rec, fields, id_field)}{extra}")
-        print(f"  -> fulfilled in {ROUTE[key]}; when done, mark the record's"
-              f" '{done_marker}' box in the {title} project on the REDCap website.")
+        if key == "builds":
+            print(f"  -> fulfilled in {ROUTE[key]}; each step is marked with sir_update.py as it"
+                  " lands (--close-out when the build is done).")
+        else:
+            print(f"  -> fulfilled in {ROUTE[key]}; when done, close it with close_request.py"
+                  f" (or tick '{done_marker}' in the {title} project on the REDCap website).")
     return len(open_recs)
 
 

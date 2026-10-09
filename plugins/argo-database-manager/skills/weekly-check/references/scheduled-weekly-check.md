@@ -85,7 +85,11 @@ Structure it as:
   items, each with where it goes: studies to build → the build-study skill; data requests →
   the export-data skill; linking requests → the link-data skill; people requests → by hand on
   the study project's User Rights page in REDCap (there is no add-users skill).
+- **Notes disagree with flags** — open builds whose `build_notes` claim more than their flags
+  (from the snapshot's `STUDY_INITIATION_REQUEST.csv`), if any.
 - **Anything unavailable** — trackers that couldn't be read, in plain words.
+
+An item marked `(still open)` was in last week's report: one line, not a re-explanation.
 
 Numbers come from the two commands. Don't estimate, and don't fill a gap with a guess: if
 something couldn't be read, the report says so.

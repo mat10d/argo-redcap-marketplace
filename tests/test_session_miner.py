@@ -129,11 +129,32 @@ class MinerTests(unittest.TestCase):
         self.assertTrue(s["argo"])
         self.assertEqual(s["version"], "0.24.0")
 
+    def test_version_comes_from_the_init_event_when_setup_never_ran(self):
+        init = {"type": "system", "subtype": "init", "plugins": [
+            {"name": "argo-data-analyst", "path": "/var/x", "source": "argo-data-analyst@inline",
+             "version": "0.25.1"}]}
+        s, _ = self.mine([init, user("go"), tool_error("sir_update.py failed")])
+        self.assertEqual(s["version"], "0.25.1")
+
     def test_cowork_echoed_user_turns_are_collapsed(self):
         """Cowork writes each user message twice; without deduping every finding appears twice."""
         text = "Wait did you modify the proformas?"
         s, (pushback, _) = self.mine([user(text), user(text), assistant("checking")])
         self.assertEqual(len(pushback), 1)
+
+    def test_both_cowork_folder_layouts_are_found(self):
+        """The bare 8-hex layout appeared 2026-09-25; the old glob missed every session after it."""
+        original = miner.STORE
+        try:
+            miner.STORE = self.root
+            for name in ("local_aaaa0000", "3ac17691"):
+                d = self.root / "org" / "ws" / name
+                d.mkdir(parents=True)
+                (d / "audit.jsonl").write_text(json.dumps(user("hi")))
+            self.assertEqual({p.parent.name for p in miner.sessions()},
+                             {"local_aaaa0000", "3ac17691"})
+        finally:
+            miner.STORE = original
 
     def test_the_watermark_round_trips(self):
         original = miner.WATERMARK

@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """setup_brief.py — generate MANUAL_SETUP_BRIEF.md for a study build from its SIR record.
 
-Turns the per-study manual UI work into a copy-paste-and-click checklist: derives the File
-Repository rename table, the Data Access Groups, the user→role table, and the build_tracking
-commands directly from the SIR. Replaces hand-writing the brief each build.
+Opens with the build's ONE outstanding list: the 7 Study Tracker steps in tracker order (what,
+who, what it waits on, done / not done — read from the record), then every open request in the
+build folder's `outstanding_requests.csv`. Below it, the details derived from the SIR: the File
+Repository rename table, the Data Access Groups, the user→role table, the survey-setup clicks.
+
+The file is regenerated whole on every run — never appended to — so it never carries a stale
+status line above a newer one.
 
 Works with or without an access key ([[token-optional]]): pulls the SIR via the API if the Study
 Tracker key is set, or reads a pre-pulled record JSON (`sir_update.py <RID> --pull > rec.json`)
@@ -26,6 +30,7 @@ for _cand in (_here / "scripts",
         sys.path.insert(0, str(_cand))
         break
 from argo_redcap_client import load_env_file  # noqa: E402
+from argo_trackers import SIR_BUILD_STEPS, PROGRESS_NOT_DONE  # noqa: E402
 
 def pull(rid):
     load_env_file()          # the settings file loads itself; nothing to source by hand
@@ -94,6 +99,80 @@ def repo_label(field, sites):
     tag = site_token(name)
     return (f"{stem}_{tag}" if tag else f"{stem}_[TODO site {n}]"), name
 
+# The build's hard stop — the ONE list (Matteo, 2026-10-09). If any of these is missing, no data
+# dictionary is drafted: no partial build, no "proceed with assumptions". build-study's SKILL.md
+# names the same three, and a guard test holds the two together.
+# (document, the SIR fields that carry it — empty when the SIR has no field for it)
+HARD_STOP_DOCUMENTS = (
+    ("questionnaire", ("quest_univ_file", "quest_site_")),
+    ("protocol", ()),
+    ("ethics approval letter", ("irb_file_",)),
+)
+
+
+def missing_hard_stop_documents(rec):
+    """Hard-stop documents the SIR record shows no file for. The protocol has no SIR field, so it
+    can't be checked here — the build checks the folder for it."""
+    missing = []
+    for name, prefixes in HARD_STOP_DOCUMENTS:
+        if not prefixes:
+            continue
+        if not any(str(v).strip() and str(v).strip() not in ("0", "1", "2")
+                   and (f == p or f.startswith(p)) for f, v in rec.items() for p in prefixes):
+            missing.append(name)
+    return missing
+
+
+# The build's outstanding work, keyed to the Study Tracker's 7 build steps in tracker order —
+# the same steps, names and order the weekly check counts (N/7). Setup work the tracker has no
+# flag for (DAGs, File Repository, weekly report, survey settings) is folded into the step it
+# has to be finished before, so there is ONE list and every item on it has a done/not-done state.
+# (what to do, who does it). {rid} and {setup} are filled in per study.
+STEP_ROWS = {
+    # step: (what to do, who does it, what it waits on)
+    "project_created": ("Create the project from `CREATE_NEW_PROJECT_{rid}.txt` "
+                        "(REDCap → New Project). Note the PID.", "Database manager", "—"),
+    "dd_uploaded": ("Upload the checked data dictionary "
+                    "(Designer → Data Dictionary → Upload).", "Database manager",
+                    "The three documents; DD passes `validate_dd.py`"),
+    "user_rights_complete": ("Upload the roles CSV (User Rights → User Roles → Upload). "
+                             "{dags}Add the users in the table below.", "Database manager",
+                             "Project created"),
+    "data_imported": ("{import_text}", "Database manager", "DD uploaded"),
+    "review_internal": ("Finish setup: {setup}. Then check the whole build.", "ARGO internal QA",
+                        "Steps above done"),
+    "review_pi": ("PI checks the project and answers `OPEN_QUESTIONS.md`.", "PI",
+                  "Internal QA done"),
+    "study_production": ("Move to Production (Project Setup).", "Database manager",
+                         "PI sign-off; IRB approval in date{irb_gap}"),
+}
+# Requests the user made during the build that are not tracker steps ("mark the identifiers so
+# exports drop them"). They live in ONE file in the build folder, and the brief renders every
+# open one into the same Outstanding table — so the closing "are we done?" can't drop one.
+REQUESTS_FILE = "outstanding_requests.csv"
+REQUEST_COLUMNS = ("item", "who", "waiting_on", "status")
+
+
+def read_requests(folder):
+    """Rows of the build folder's request list, open ones only. Missing file → none."""
+    path = Path(folder) / REQUESTS_FILE
+    if not path.exists():
+        return [], 0
+    import csv as _csv
+    with open(path, newline="") as fh:
+        rows = [{k: (v or "").strip() for k, v in r.items() if k} for r in _csv.DictReader(fh)]
+    open_rows = [r for r in rows if r.get("item") and r.get("status", "").lower() != "done"]
+    return open_rows, len(rows) - len(open_rows)
+
+
+HUMAN_GATES = ("review_internal", "review_pi", "study_production")
+
+
+def step_done(rec, step):
+    """The tracker's own done rule (argo_trackers): any settled answer that isn't "no"."""
+    return str(rec.get(step) or "").strip().lower() not in PROGRESS_NOT_DONE
+
+
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("rid"); ap.add_argument("--out",required=True,help="Folder to write the brief into — normally database-manager/<study>")
@@ -112,6 +191,7 @@ def main():
         if any(s in f for s in ["quest_univ_file","quest_site_","sop","eligibility_checklist","irb_file_","consent_file_","consent_prof_"]) \
            and str(v).strip() and str(v).strip() not in ("0","1","2"):
             docs.append((f,v))
+    missing_docs=missing_hard_stop_documents(r)
     # DAGs / sites — the SIR's institution list is the only source of site names
     sites=site_names(r)
     dags=[sites[k] for k in sorted(sites,key=int)]
@@ -120,7 +200,7 @@ def main():
     if exp:
         try:
             if datetime.date.fromisoformat(exp) < datetime.date.today():
-                exp_flag=f"  ⚠️ **IRB expiry {exp} is PAST — confirm a renewal before production.**"
+                exp_flag=f"⚠️ IRB approval expired on {exp}. Get the renewal before production."
         except ValueError: pass
     # personnel
     people=[]
@@ -128,84 +208,128 @@ def main():
     if g("pm_name"): people.append((g("pm_name"),g("pm_email"),"Project Manager"))
     if g("ra_name"): people.append((g("ra_name"),g("ra_email"),"Data Entry (RA)"))
     addl=g("addl_users")
+    prospective = g("data_collection")=="2"
+    setup=["File Repository" if docs else None, "weekly report", "survey settings (only if a survey)"]
+
+    fill={"rid":a.rid,
+          "dags":(f"Create the DAGs ({len(dags)} sites). " if dags else ""),
+          "import_text":("Prospective — nothing to import. Mark it with `--set data_imported=2`." if prospective else
+                         "Old data to load? Map it, check it with `validate_import.py`, import it "
+                         "(Data Import Tool), then mark it. No old data? `--set data_imported=2`."),
+          "setup":", ".join(x for x in setup if x),
+          "irb_gap":"".join(f"; {w} missing on the SIR" for k,w in
+                            (("irb_number","IRB number"),("irb_approval_expires","IRB expiry"))
+                            if not g(k))}
+    rows=[]
+    for step in SIR_BUILD_STEPS:
+        what,who,waits=STEP_ROWS[step]
+        rows.append((step,what.format(**fill),who,waits.format(**fill),
+                     "Done" if step_done(r,step) else "Not done"))
+    n_done=sum(1 for *_,st in rows if st=="Done")
+    requests,n_closed=read_requests(a.out)
 
     L=[]
-    L.append(f"# MANUAL_SETUP_BRIEF — SIR {a.rid}: {g('project_title')[:80]}")
-    L.append(f"\nPI: {g('pi_first_name')} {g('pi_surname')} · IRB {g('irb_number') or '—'} · "
-             f"PID {g('new_project_pid') or '(not yet created)'} · moniker `{mon}`.{exp_flag}")
-    L.append("\nMark `build_tracking` via `sir_update.py` if your Study Tracker access key is set up, "
-             "else tick the same fields in the Study Tracker UI.\n")
-    L.append("## 1. Create project → `project_created`\nUse the paste sheet (`CREATE_NEW_PROJECT_%s.txt` / `fill_new_project.py %s`). Mark with `--pid <PID>`." % (a.rid,a.rid))
-    L.append("\n## 2. Upload the data dictionary → `dd_uploaded`\nDesigner → Data Dictionary → Upload the validated DD CSV.")
-    L.append("Two deliverables sit alongside the DD, split by kind — the DD itself mirrors the printed "
-             "IRB-approved questionnaire exactly, so neither one is ever pre-applied to it:")
-    L.append("\n- `OPEN_QUESTIONS.md` — every assumption the build made where the form was ambiguous "
-             "(\"we assumed X — accurate?\"). The build always makes headway: the best guess goes into "
-             "the DD and the question comes here. Written even if there was nothing to assume.")
-    L.append("- `<name>_redcap_changes.docx` — changes the QUESTIONNAIRE itself needs (contradictory "
-             "skips, questions the SIR commits to that the form lacks), delivered as the original "
-             "document with tracked changes; a `<name>_redcap_changes.md` list instead when the "
-             "original is a PDF. Absent if the form needs no changes.")
-    L.append("\nTypos, numbering quirks and no-option columns appear in neither: they are built as "
-             "printed and never raised.")
-    L.append("\nIf you see **`@MDC-EXEMPT`** in the Field Annotation column, leave it: it is an ARGO "
-             "marker, not a REDCap one. REDCap treats that column as free text, so it is invisible "
-             "to respondents and changes nothing on upload — it exists only so `validate_dd.py` "
-             "knows the missing-data codes were left off on purpose (validated Likert scales). "
-             "Strip it and those fields fail ARGO validation on every future run.")
-    L.append("\n## 3. Form vs survey\nDefault to data-entry forms unless the proposal says respondents self-complete.")
-    L.append("\n**If this study IS a survey**, enabling it is four clicks, not one — none of which "
-             "the data dictionary upload does for you:")
+    L.append(f"# Setup brief — SIR {a.rid}: {g('project_title')[:80]}")
+    L.append(f"\nPI: {g('pi_first_name')} {g('pi_surname')} · IRB: {g('irb_number') or '—'} · "
+             f"PID: {g('new_project_pid') or 'not created yet'} · Moniker: `{mon}`")
+    if exp_flag: L.append(f"\n{exp_flag}")
+    irb_blank=[f"`{k}` ({w})" for k,w in (("irb_number","IRB number"),
+                                           ("irb_approval_expires","IRB expiry date")) if not g(k)]
+    if irb_blank:
+        L.append(f"\n⚠️ Blank on the SIR: {' and '.join(irb_blank)}. The PM / requester updates "
+                 "it on the Study Tracker before production. It doesn't block the build.")
+    needed=", ".join(n for n,_ in HARD_STOP_DOCUMENTS)
+    them='it' if len(missing_docs)==1 else 'them'
+    if not step_done(r,"dd_uploaded"):
+        if missing_docs:
+            L.append(f"\n⛔ The build can't start. Missing from the SIR: {', '.join(missing_docs)}. "
+                     f"Ask the PM to send {them}.")
+        L.append(f"\nNo data dictionary until all three are in the build folder: {needed}.")
+    elif missing_docs:
+        L.append(f"\n⚠️ Missing from the SIR: {', '.join(missing_docs)}. Get {them} before production.")
+
+    L.append(f"\n## Outstanding — {n_done}/{len(rows)} tracker steps done, "
+             f"{len(requests)} open request{'s' if len(requests)!=1 else ''}")
+    L.append("\nThe 7 Study Tracker steps in tracker order (status from the Study Tracker), then "
+             f"every open request from `{REQUESTS_FILE}`. This is the one list.")
+    L.append("\n| Item | Who | Waiting on | Status |\n|---|---|---|---|")
+    for step,what,who,waits,st in rows:
+        L.append(f"| `{step}` — {what} | {who} | {waits} | {st} |")
+    for q in requests:
+        L.append(f"| {q['item']} | {q.get('who') or '[TODO]'} | {q.get('waiting_on') or '—'} | "
+                 f"Not done |")
+    if n_closed:
+        L.append(f"\n{n_closed} closed request{'s' if n_closed!=1 else ''} not shown.")
+    L.append(f"\nMark a step when it's done: `sir_update.py {a.rid} --mark-step <step>` "
+             f"(first one: add `--pid <PID>`). The last three need a yes from the person named. "
+             f"No Study Tracker key? Tick the same box in the Study Tracker.")
+
+    L.append("\n## Details")
+    L.append("\n### Data dictionary (`dd_uploaded`)")
+    L.append("The DD matches the printed questionnaire exactly. Two files go with it:")
+    L.append("\n- `OPEN_QUESTIONS.md` — each guess the build made where the form was unclear "
+             "(\"we assumed X — right?\"). Always written, even if empty.")
+    L.append("- `<name>_redcap_changes.docx` — changes the questionnaire itself needs, as tracked "
+             "changes on the original. A `<name>_redcap_changes.md` list if the original is a PDF. "
+             "Only if there are changes.")
+    L.append("\nTypos and numbering go in neither: they are built as printed.")
+    L.append("\n**`@MDC-EXEMPT`** in the Field Annotation column: leave it. REDCap ignores it — it is "
+             "invisible to respondents and changes nothing on upload. It tells `validate_dd.py` the "
+             "missing-data codes were left off on purpose (validated scales). Strip it and those "
+             "fields fail ARGO validation.")
+
+    L.append("\n### Survey settings (only if people fill it in themselves)")
+    L.append("Default is data-entry forms. If it is a survey, the DD upload does not set it up. Do:")
     L.append("\n1. Project Setup → **Enable \"Use surveys in this project\"**.")
-    L.append("2. Designer → **enable each instrument as a survey** (one at a time; a disabled "
-             "instrument has no link).")
-    L.append("3. Survey Settings, per instrument → title, instructions, and the **approved consent "
-             "text as the preamble** on the baseline round.")
-    L.append("4. Survey Settings → **Question Numbering = \"Custom numbering\"**. On the default "
-             "(auto) REDCap renumbers the questions and the survey stops matching the paper form.")
-    L.append("\nThen check the build carries the four things a link-distributed survey needs and a "
-             "printed questionnaire never shows: an **email field** (no invitations without one — "
-             "and it makes the project PHI-bearing), **one instrument per collection round**, "
-             "**baseline-vs-follow-up branching**, and a **consent question first that gates "
-             "everything**. None of these is on the 7-step tracker, so none of them marks itself.")
+    L.append("2. Designer → **enable each instrument as a survey**.")
+    L.append("3. Survey Settings → title, instructions, and the **approved consent text** on the "
+             "baseline survey.")
+    L.append("4. Survey Settings → **Question Numbering = \"Custom numbering\"**. Otherwise REDCap "
+             "renumbers the questions and the survey stops matching the paper form.")
+    L.append("\nCheck the DD has: an **email field** (if more than one round), **one instrument "
+             "per round**, **baseline-vs-follow-up branching**, a **consent question first**, and "
+             "**no missing-data codes** (surveys never get them; clear the SIR's "
+             "`missing_data_codes` boxes). None of these is on the 7-step tracker — they are part "
+             "of `review_internal`.")
+
     if dags:
-        L.append("\n## 4. Data Access Groups\nUser Rights → DAGs — create and assign users for: "+", ".join(dags)+".")
-    L.append("\n## 5. User rights / roles → `user_rights_complete`\nUpload the roles CSV (User Rights → User Roles → Upload), then assign:")
+        L.append("\n### DAGs (`user_rights_complete`)")
+        L.append("User Rights → DAGs — create one per site, then put each user in theirs: "
+                 + ", ".join(dags) + ".")
+    L.append("\n### Users (`user_rights_complete`)")
     if people or addl:
         L.append("\n| User | Email | Role |\n|---|---|---|")
         for n,e,role in people: L.append(f"| {n} | {e or '—'} | {role} |")
-        if addl: L.append(f"| *(additional, confirm roles)* | | {addl[:80]} |")
+        if addl: L.append(f"| *(more — confirm roles)* | | {addl[:80]} |")
     else:
-        L.append("\n*(no personnel named in the SIR — confirm with the PM)*")
-    L.append("\nUsers without REDCap accounts → log them in the Study Personnel Request "
-             "tracker (PID 221); an administrator creates the account.")
-    L.append("\n## 6. File Repository (rename with moniker `%s`)" % mon)
+        L.append("\nNo one is named in the SIR. Ask the PM.")
+    L.append("\nThe roles CSV gives Study Builder and Project Manager exports with identifier "
+             "fields removed. Only fields flagged `Identifier?` are removed — check the flags.")
+    L.append("\nNo REDCap account yet? Log them in the Study Personnel Request tracker (PID 221). "
+             "A REDCap admin makes the account.")
+
+    L.append("\n### File Repository (`review_internal`) — moniker `%s`" % mon)
     if docs:
         L.append("\n| SIR field / file | Rename to | Folder | Site |\n|---|---|---|---|")
         for f,v in docs:
             label,site=repo_label(f,sites)
             L.append(f"| `{f}` = {v[:40]} | `{mon}_{label}` (keep ext) | {repo_folder(f)} | {site} |")
-        L.append("\n**Stage the files, don't just list them.** Put the actual documents, already "
-                 "renamed, in `file-repository/` inside this study's build folder — one folder to "
-                 "drag, in the order of the table above. Where a document went through tracked "
-                 "changes, stage the version with the changes **accepted**, and keep the "
-                 "tracked-changes copy beside it under its `_redcap_changes` name so the review "
-                 "trail survives. A rename table is a plan; the folder is the deliverable.")
+        L.append("\n**Stage the files, don't just list them.** Put the renamed files in "
+                 "`file-repository/` in the build folder, in table order. If a file had tracked "
+                 "changes, stage it with the changes **accepted**, and keep the `_redcap_changes` "
+                 "copy beside it.")
     else:
-        L.append("\n*(no documents attached to the SIR)*")
-    dc=g("data_collection")
-    L.append("\n## 7. Data import → `data_imported`\n"+("Prospective → `data_imported=2` (no historical data)." if dc=="2" else "If retrospective data exists, map + import, then `data_imported=1`; else `=2`."))
-    L.append("\n## 8. Review → Production (human gates — confirm each)\n`review_internal` (internal QA), `review_pi` (PI sign-off), then `study_production`."+(" "+exp_flag.strip() if exp_flag else ""))
-    L.append("\n## Mark the tracker (works with or without an access key)\nWith an access key: run the Study Tracker step-marking script (`sir_update.py`, in the "
-             "build-study skill) once per step, e.g.\n```\nsir_update.py %s --pid <PID> --mark-step project_created\n```\n"
-             "No access key → tick these `build_tracking` boxes in the Study Tracker." % a.rid)
+        L.append("\nNo documents are attached to the SIR.")
+
+    L.append("\n### Weekly report (`review_internal`)")
     if g("weekly_stat") or g("category"):
-        L.append(f"\n## Weekly report\nFrom SIR: weekly_stat={g('weekly_stat')!r}, category={g('category')!r}.")
+        L.append(f"From the SIR: weekly_stat={g('weekly_stat')!r}, category={g('category')!r}.")
     else:
-        L.append("\n## Weekly report\nSIR `weekly_stat`/`category` blank — confirm the report spec with the PM or skip.")
+        L.append("Not set in the SIR. Ask the PM, or skip.")
 
     out=os.path.join(a.out,"MANUAL_SETUP_BRIEF.md")
     open(out,"w").write("\n".join(L)+"\n")
-    print(f"wrote {out} ({len(docs)} docs, {len(dags)} DAGs, {len(people)} named users)")
+    print(f"wrote {out} ({n_done}/{len(rows)} steps done, {len(docs)} docs, {len(dags)} DAGs, "
+          f"{len(people)} named users)")
 
 if __name__=="__main__": main()

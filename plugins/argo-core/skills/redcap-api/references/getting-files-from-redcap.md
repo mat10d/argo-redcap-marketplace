@@ -66,7 +66,8 @@ crc_datadictionary_2026-08-03.csv
 
 ## Handing them to a tool
 
-Give both paths together. For example, to build QA worklists without an access key:
+Give both paths together. For example, to build QA worklists without an access key (the
+[[qa-worklists]] skill writes `fields.yaml` itself from the dictionary — nobody is asked for it):
 
 ```bash
 python3 build_worklists.py \

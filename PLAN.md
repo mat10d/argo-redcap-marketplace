@@ -42,7 +42,7 @@ Next, in order:
   **live portfolio against REDCap from inside Cowork**. This is the demo. It already happened.
 - Plugins load on every surface tested; `argo-core:start-here` answers every time
   (standalone skill retired on that evidence, 0.14.0).
-- The test loop works: `testing/cowork/round.py` prepare/collect, full transcript mining from
+- Real-session mining works (`mine-sessions`; the round.py loop was removed 2026-09-14), from
   `~/Library/Application Support/Claude/local-agent-mode-sessions/`.
 - Toolkit internals: 104 tests, vendored self-contained skills, runtime version stamp
   (`ARGO toolkit X.Y.Z` in --ensure/--check output), release gate on tests.
@@ -224,7 +224,7 @@ PM/portfolio: already witnessed live in round 5's continuation; re-run only if t
 
 ## Where things live
 
-- Test loop: `testing/cowork/round.py` (prepare --role X / collect)
+- Session mining: `.claude/skills/mine-sessions/` (writes `testing/cowork/mined-sessions.json`)
 - Round reports: `~/Desktop/ARGO-cowork-rounds/round-NN-role/`
 - Workspace under test: `~/Desktop/ARGO-cowork`
 - Session transcripts: `~/Library/Application Support/Claude/local-agent-mode-sessions/`

@@ -14,8 +14,15 @@ Usage (it finds your ARGO settings file by itself — there is nothing to load f
     # Backfill IRB number + expiry (YYYY-MM-DD)
     python3 sir_update.py <RID> --irb-number IPH/OAU/12/3275 --irb-expires 2027-04-16
 
-    # Mark a build step done (one push per step, no batching)
-    python3 sir_update.py <RID> --mark-step dd_uploaded
+    # Mark a build step done (one push per step, no batching). With --dd, a DD that flags an
+    # identifier also sets contains_phi=1 in the same push.
+    python3 sir_update.py <RID> --mark-step dd_uploaded --dd Study_DataDictionary.csv
+
+    # The DD changed after upload: the step is not done until the new one is uploaded
+    python3 sir_update.py <RID> --unmark-step dd_uploaded
+
+    # "Close out the build": every remaining step + the build_tracking form, one push
+    python3 sir_update.py <RID> --close-out
 
     # Push the project to production (sets study_production=1 + study_status=2 Open to accrual)
     python3 sir_update.py <RID> --close
@@ -55,10 +62,22 @@ def api_post(token, **params):
         return json.loads(resp.read())
 
 
+def overwrite_mode(payload):
+    """REDCap's import mode for this payload.
+
+    With overwriteBehavior=normal REDCap IGNORES blank values, so `--reopen` (which blanks
+    study_production) and `--set field=` reported success and changed nothing. The payload only
+    ever holds the fields this run is changing, so 'overwrite' is safe whenever one of them is
+    meant to become blank — it cannot touch a field the diff didn't show.
+    """
+    blanking = any(str(v) == "" for rec in payload for k, v in rec.items() if k != "record_id")
+    return "overwrite" if blanking else "normal"
+
+
 def api_post_record(token, payload):
     data = urllib.parse.urlencode({
         "token": token, "format": "json",
-        "content": "record", "overwriteBehavior": "normal",
+        "content": "record", "overwriteBehavior": overwrite_mode(payload),
         "data": json.dumps(payload),
     }).encode()
     req = urllib.request.Request(REDCAP_URL, data=data, method="POST")
@@ -105,6 +124,121 @@ BUILD_STEPS = (
 )
 
 
+def dd_identifier_fields(path):
+    """Fields a data dictionary CSV flags `Identifier? = y` (website or API header style)."""
+    import csv
+    try:
+        with open(path, newline="") as fh:
+            rows = list(csv.DictReader(fh))
+    except FileNotFoundError:
+        sys.exit(f"I couldn't find the data dictionary {path}. Check the name and folder.")
+    out = []
+    for row in rows:
+        name = row.get("Variable / Field Name") or row.get("field_name") or ""
+        flag = row.get("Identifier?") or row.get("identifier") or ""
+        if name and flag.strip().lower() in ("y", "yes", "1"):
+            out.append(name.strip())
+    return out
+
+
+def _done(value):
+    """The tracker's own rule (argo_trackers): any settled answer that isn't "no" is done."""
+    return str(value or "").strip().lower() not in ("", "no", "0")
+
+
+def plan(rec, args, dd_identifiers=None):
+    """The write this run would make: (payload, diff lines, notes). Pure — no network.
+
+    `rec` is the record as it stands; `args` the parsed flags; `dd_identifiers` the identifier
+    fields of the DD given with --dd (None when no --dd).
+    """
+    payload = {"record_id": str(args.rid)}
+    diff_lines, notes = [], []
+
+    def queue(field, new_value, label=None):
+        """Add an update to the payload if it would change the current value."""
+        cur_val = rec.get(field, "")
+        if cur_val == new_value:
+            notes.append(f"{field} already '{new_value}' — skipping")
+            return
+        payload[field] = new_value
+        diff_lines.append(f"    {field}:  '{cur_val}'  ->  '{new_value}'" + (f"  ({label})" if label else ""))
+
+    if args.irb_number is not None:
+        queue("irb_number", args.irb_number)
+    if args.irb_expires is not None:
+        queue("irb_approval_expires", args.irb_expires)
+    if args.close:
+        queue("study_production", "1", "Pushed to production")
+        if not args.status:
+            queue("study_status", "2", "Open to accrual")
+    if args.close_out:
+        # "Close out the build": every step not yet done is ticked, in one push, one diff. A step
+        # already settled keeps its answer (data_imported=2 stays "prospective"). The form-complete
+        # rule below then closes build_tracking. Saying the phrase IS the confirmation of the
+        # three human gates — the diff still shows them before anything is written.
+        for step in BUILD_STEPS:
+            if not _done(rec.get(step)):
+                queue(step, "1", "done — close-out")
+    if args.mark_built:
+        for step in BUILD_STEPS:  # all 7 yes/no
+            queue(step, "1", "done")
+        if not args.status:
+            queue("study_status", "2", "Open to accrual")
+        queue("completed", "1", "tracking.completed = Yes")
+        for form in ("study_initiation_request_complete", "build_tracking_complete",
+                     "study_metadata_complete", "tracking_complete"):
+            queue(form, "2", "form Complete")
+    if args.reopen:
+        queue("study_production", "", "blank (reopened)")
+        if not args.status:
+            queue("study_status", "1", "Building/Pending")
+    if args.pid:
+        queue("new_project_pid", args.pid)
+    if args.status:
+        queue("study_status", STATUS_MAP[args.status], args.status)
+    for step in args.mark_step:
+        if step not in BUILD_STEPS:
+            notes.append(f"⚠️  '{step}' is not one of the canonical build_tracking fields "
+                         f"({', '.join(BUILD_STEPS)}). Proceeding anyway — confirm this is intentional.")
+        queue(step, "1", "done")
+    for step in args.unmark_step:
+        # "0", not blank: the step is answered "not done", and a blank would be ignored by an
+        # overwriteBehavior=normal import.
+        if str(rec.get(step, "")).strip() in ("", "0"):
+            notes.append(f"{step} already not done — skipping")
+            continue
+        queue(step, "0", "not done — re-mark when it's done again")
+    for pair in args.set_pairs:
+        if "=" not in pair:
+            sys.exit(f"--set requires FIELD=VALUE format, got: {pair}")
+        field, value = pair.split("=", 1)
+        queue(field.strip(), value.strip())
+
+    # A DD with an identifier field makes the project PHI-bearing. That follows from the DD, so
+    # it rides in this push (shown in the diff) instead of being asked as a separate question.
+    # Only ever set to 1 — a DD without identifiers says nothing about other PHI.
+    if dd_identifiers:
+        queue("contains_phi", "1", f"the DD flags identifiers: {', '.join(dd_identifiers[:5])}")
+
+    after = {**rec, **payload}
+    # When the 7th step lands, close the build_tracking form too — two closings left it
+    # "Incomplete" because nothing set it.
+    if all(_done(after.get(step)) for step in BUILD_STEPS) and \
+            str(after.get("build_tracking_complete", "")) != "2":
+        queue("build_tracking_complete", "2", "all 7 steps done — form Complete")
+
+    # Production with no IRB number or expiry on the record: say so out loud. A warning for now
+    # (Matteo may make it a stop); a PAST expiry is already flagged by the build before this.
+    if _done(payload.get("study_production")):
+        for field, what in (("irb_number", "IRB number"), ("irb_approval_expires", "IRB expiry date")):
+            if not str(after.get(field, "")).strip():
+                notes.append(f"⚠️  `{field}` ({what}) is blank. The PM / requester updates it on the "
+                             f"Study Tracker (or add it with --{field.replace('_approval', '').replace('_', '-')}). "
+                             f"Going ahead; it stays on the Outstanding list.")
+    return payload, diff_lines, notes
+
+
 def main():
     ap = argparse.ArgumentParser(description="Apply targeted updates to a SIR record.")
     ap.add_argument("rid", help="SIR record_id")
@@ -118,10 +252,19 @@ def main():
     ap.add_argument("--irb-expires", help="Set irb_approval_expires as YYYY-MM-DD")
     ap.add_argument("--close", action="store_true", help="Push to production: study_production=1 + study_status=2 (Open to accrual)")
     ap.add_argument("--mark-built", action="store_true", help="Mark study fully built/in-production: all 7 build_tracking steps=1, study_production=1, study_status=2, tracking.completed=1, all 4 instrument_complete=2.")
+    ap.add_argument("--close-out", action="store_true",
+                    help="Close out the build: tick every build step not yet done and set the "
+                         "build_tracking form to Complete, in one push with one diff.")
     ap.add_argument("--reopen", action="store_true", help="Clear study_production and reset study_status to 1 (Building/Pending)")
     ap.add_argument("--pid", help="Set new_project_pid (the PID of the newly-created REDCap project)")
     ap.add_argument("--status", choices=list(STATUS_MAP.keys()), help=f"Set study_status. Choices: {'/'.join(STATUS_MAP.keys())}")
     ap.add_argument("--mark-step", action="append", default=[], help=f"Mark a build_tracking yesno as done. Repeatable. Canonical 7: {', '.join(BUILD_STEPS)}. Warns (but proceeds) for fields outside this list.")
+    ap.add_argument("--dd", metavar="CSV",
+                    help="The study's data dictionary. If it flags any identifier field, "
+                         "contains_phi=1 is added to this push (shown in the diff).")
+    ap.add_argument("--unmark-step", action="append", default=[], choices=BUILD_STEPS,
+                    help="Set a build step back to not done (0) — e.g. dd_uploaded after the DD is "
+                         "revised, until the new one is uploaded. Repeatable.")
     # Escape hatch for any field
     ap.add_argument("--set", action="append", default=[], dest="set_pairs", metavar="FIELD=VALUE", help="Set any field (intake, build_tracking, or study_metadata). Repeatable.")
     args = ap.parse_args()
@@ -162,8 +305,12 @@ def main():
         return
 
     if not (args.irb_number or args.irb_expires or args.close or args.reopen
-            or args.pid or args.status or args.mark_step or args.set_pairs or args.mark_built):
-        sys.exit("Nothing to do — pass at least one of: --pull, --irb-number, --irb-expires, --close, --reopen, --pid, --status, --mark-step, --mark-built, --set FIELD=VALUE")
+            or args.pid or args.status or args.mark_step or args.unmark_step or args.set_pairs
+            or args.mark_built or args.dd or args.close_out):
+        sys.exit("Nothing to do — pass at least one of: --pull, --irb-number, --irb-expires, --close, --reopen, --pid, --status, --mark-step, --unmark-step, --close-out, --mark-built, --dd, --set FIELD=VALUE")
+    clash = set(args.mark_step) & set(args.unmark_step)
+    if clash:
+        sys.exit(f"Can't mark and unmark the same step in one run: {', '.join(sorted(clash))}")
 
     if args.irb_expires and not re.match(r"^\d{4}-\d{2}-\d{2}$", args.irb_expires):
         sys.exit(
@@ -211,52 +358,10 @@ def main():
             print(f"    {step:24s}= '{v}'")
 
     # Step 3: build the diff
-    payload = {"record_id": str(args.rid)}
-    diff_lines = []
-
-    def queue(field, new_value, label=None):
-        """Add an update to the payload if it would change the current value."""
-        cur_val = rec.get(field, "")
-        if cur_val == new_value:
-            print(f"  {field} already '{new_value}' — skipping")
-            return
-        payload[field] = new_value
-        diff_lines.append(f"    {field}:  '{cur_val}'  ->  '{new_value}'" + (f"  ({label})" if label else ""))
-
-    if args.irb_number is not None:
-        queue("irb_number", args.irb_number)
-    if args.irb_expires is not None:
-        queue("irb_approval_expires", args.irb_expires)
-    if args.close:
-        queue("study_production", "1", "Pushed to production")
-        if not args.status:
-            queue("study_status", "2", "Open to accrual")
-    if args.mark_built:
-        for step in BUILD_STEPS:  # all 7 yes/no
-            queue(step, "1", "done")
-        if not args.status:
-            queue("study_status", "2", "Open to accrual")
-        queue("completed", "1", "tracking.completed = Yes")
-        for form in ("study_initiation_request_complete", "build_tracking_complete",
-                     "study_metadata_complete", "tracking_complete"):
-            queue(form, "2", "form Complete")
-    if args.reopen:
-        queue("study_production", "", "blank (reopened)")
-        if not args.status:
-            queue("study_status", "1", "Building/Pending")
-    if args.pid:
-        queue("new_project_pid", args.pid)
-    if args.status:
-        queue("study_status", STATUS_MAP[args.status], args.status)
-    for step in args.mark_step:
-        if step not in BUILD_STEPS:
-            print(f"  ⚠️  '{step}' is not one of the canonical build_tracking fields ({', '.join(BUILD_STEPS)}). Proceeding anyway — confirm this is intentional.")
-        queue(step, "1", "done")
-    for pair in args.set_pairs:
-        if "=" not in pair:
-            sys.exit(f"--set requires FIELD=VALUE format, got: {pair}")
-        field, value = pair.split("=", 1)
-        queue(field.strip(), value.strip())
+    dd_identifiers = dd_identifier_fields(args.dd) if args.dd else None
+    payload, diff_lines, notes = plan(rec, args, dd_identifiers)
+    for note in notes:
+        print(f"  {note}")
 
     if len(payload) == 1:
         print("\n  No changes to apply.")
@@ -265,7 +370,6 @@ def main():
     print(f"\n  Proposed write:")
     for line in diff_lines:
         print(line)
-    print(f"\n  Payload: {json.dumps([payload])}")
     if not confirm("\nPost this update?"):
         sys.exit("Aborted by user — no changes made.")
 

@@ -58,7 +58,7 @@ status,form,,radio,"Status","1, Active | 2, Inactive | 3, Pending",,,,,,,,,,,,
 Cannot hold MDC codes. Use `radio` with `1, Yes | 0, No` + MDC instead. See [[mdc-rules]].
 
 ### checkbox
-Multiple selection. Values stored as comma-separated.
+Multiple selection. Exported as one 0/1 column per option (`skills___1`, `skills___2`, …).
 ```
 skills,form,,checkbox,"Skills","1, Python | 2, R | 3, SQL | 4, Excel",,,,,,,,,,,,
 ```
@@ -119,7 +119,7 @@ institution_other,form,,text,"Other Institution (specify)",,,,,,,"[institution] 
 
 ### Conditional Yes/No with follow-up
 ```
-has_insurance,form,,radio,"Do you have insurance?","1, Yes | 0, No | -666, Patient does not know | -777, Patient refused to answer | -888, Missing in case notes | -999, Other missing",,,,,,,,,,,,,
+has_insurance,form,,radio,"Do you have insurance?","1, Yes | 0, No | -666, Patient does not know | -777, Patient refused to answer | -888, Missing in case notes | -999, Other missing",,,,,,,,,,,,
 insurance_provider,form,,text,"Insurance Provider",,,,,,,"[has_insurance] = '1'",,,,,,
 no_insurance_reason,form,,notes,"Reason for no insurance",,,,,,,"[has_insurance] = '0'",,,,,,
 ```

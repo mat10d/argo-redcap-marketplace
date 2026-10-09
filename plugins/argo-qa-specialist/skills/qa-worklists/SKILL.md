@@ -1,6 +1,6 @@
 ---
 name: qa-worklists
-description: Two QA jobs for the study you're assigned to. (1) Build the worklists: I ask what you want QA'd first, then one Excel workbook per site listing every cell in that scope that should have been filled but is blank, ready to hand to the RAs. (2) Audit what comes back: read the RAs' returned workbooks, sort their answers into resolved / needs-a-question / no-action, and confirm the gaps closed. Works from a downloaded export if you don't have the study's access key.
+description: Two QA jobs for the study you're assigned to. (1) Build the worklists: I ask what you want QA'd first, then one Excel workbook per site listing every cell in that scope that should have been filled but is blank, ready to hand to the RAs. (2) Audit what comes back: read the RAs' returned workbooks, check cell by cell that REDCap now holds each answer (field comments included), turn what didn't land into questions for the RA, and upload only missing-data codes into blank cells. Works from a downloaded export if you don't have the study's access key.
 allowed-tools: Read, Bash, Write, Edit, Glob, Grep
 ---
 
@@ -31,7 +31,7 @@ you get the plain reason and what to do about it, and the round stops there unti
 
 **Shared references**
 - [[mdc-rules]] — how MDC sentinels (-666/-777/-888/-999, 666=N/A) are interpreted
-- [[redcap-api-gotchas]] — read-side OK; a QA round never writes back
+- [[redcap-api-gotchas]] — a QA round uploads only missing-data codes into blank cells (§0)
 
 Legacy bulk loads only: [[migration-push]] (requires `--force-migration`; not part of a QA round).
 
@@ -221,8 +221,8 @@ python3 "$W/review_responses.py" \
   in an amber cell is still an answer. Amber ones are tagged `[AMBER …]` in the output, because
   amber meant "we couldn't read this field's condition" — confirm the field applies at all
   before you act on the value.
-- **Records with RA notes but no cell changes** (often "RESOLVED" without filling — verify
-  directly in REDCap, or "patient died/care elsewhere" — no action)
+- **Records with RA notes but no cell changes** (often "RESOLVED" without filling, or "patient
+  died/care elsewhere") — the REDCap check below looks at each of their flagged cells
 - **Cells changed that were NOT on the worklist** — a gate-context column, an ID column, any
   field nobody flagged. Listed separately, at the end, because they are not answers to anything
   we asked.
@@ -231,19 +231,83 @@ A worklist built before ARGO 0.18 highlighted its gaps in a pale **rose** rather
 Those returns still audit correctly — the rose fill is read exactly like yellow — and the run
 prints one line saying it recognised the old colour. Nothing needs rebuilding to read them.
 
-Sort each answer into one of four buckets:
+### Check that REDCap holds it — the RA enters, you check
 
-| Bucket | What it is | What you do |
+You don't re-upload what the RAs send back. The RA enters every answer in REDCap; your job is to
+check it landed. This needs REDCap's state **after** the RA's work: the study's access key, or a
+fresh Data Export (raw) + Data Dictionary downloaded after the return
+([[getting-files-from-redcap]]). Add the Field Comment Log if there is one: Applications →
+Field Comment Log → download, saved in `RA_response/`.
+
+```bash
+python3 "$W/reconcile_return.py" \
+    qa-specialist/<study>/worklists/<round>/with_MDC/<workbook>_<site>.xlsx \
+    "qa-specialist/<study>/RA_response/<RA-filename>.xlsx" \
+    --records-csv export_after_return.csv --metadata-csv data_dictionary.csv \
+    --comments qa-specialist/<study>/RA_response/<field-comment-log>.csv \
+    --out qa-specialist/<study>/reconcile/<round>/<site>_<workbook>.md
+```
+
+*Have the study's key?* Replace the two `--…-csv` options with `--token-env CRC_TOKEN`. With a
+key and no `--comments` file, field comments are read from the project's logging if the key is
+allowed to; if not, the report says so and you download the log instead. (Reading comments from
+logging is untested on a live project — none existed when it was built. The downloaded log's
+column headings aren't confirmed against a real download either: if they don't match, the script
+stops and names them.)
+
+It reads only. Each answered cell gets one status — compared the way REDCap stores values
+(labels and codes, any date layout, checkbox options):
+
+| Status | Meaning | What you do |
 |---|---|---|
-| **READY** | Clean answer — a value or MDC code that maps directly to a field | Confirm it's in REDCap; if the RA only wrote it in the spreadsheet, ask them to enter it |
-| **QUESTION_FOR_RA** | Ambiguous (e.g. RA wrote "NO SURGERY" into a select field, or a value that doesn't exist in the DD's choice list) | Append to `RA_questions.md` |
-| **NO_ACTION** | RA explained why blank (patient died with no chart, care happened off-site) and no recode is warranted | Nothing |
-| **VERIFY** | RA marked RESOLVED but didn't fill the cell — likely fixed directly in REDCap | Re-pull and confirm; if filled, drop. If still blank, ask. |
+| **IN REDCAP** | REDCap holds the RA's answer | Nothing |
+| **NOT ENTERED** | REDCap still shows what the worklist showed — the RA wrote it only in the spreadsheet | Ask the RA to enter it. A missing-data code into a blank cell, you may upload (next section) |
+| **DIFFERS** | REDCap holds something else | Ask the RA which is right. Never settle it yourself |
+| **UNCLEAR** | Not one of the field's choices, a date we can't read, or a column we can't match | Ask the RA what they meant |
 
-Out-of-scope edits are **not** one of the four buckets — nobody asked for them, so none of the
-four applies. Each one becomes its own question to the RA: what did you change here, and why?
-And if a *gate* field changed, rebuild that site's worklist afterwards — different fields may
-apply now.
+Rows the RA marked **RESOLVED** without filling a cell are checked the same way: each flagged
+cell on that row is either in REDCap now, or "marked resolved, still blank" — a question. A row
+whose note *explains* a blank ("patient died, chart not available") is listed for you to decide:
+no action, or a question.
+
+Field comments sit beside their cells. Comments are evidence, never values: a flagged cell still
+blank with a comment explaining it stays blank until you decide — it is never turned into a
+missing-data code for you. Comments on cells that weren't on the worklist are listed separately.
+
+The report is short: counts first, then only what needs action, then a block ready to paste into
+`RA_questions.md`. Cells changed that were never on the worklist (from `review_responses.py`)
+are not checked against REDCap — each is its own question: what did you change, and why? If a
+*gate* field changed, rebuild that site's worklist afterwards — different fields may apply now.
+
+### Missing-data codes — the one upload you may do
+
+A missing-data code the RA returned (-666/-777/-888/-999, [[mdc-rules]]) for a cell that is
+still blank in REDCap, you may upload yourself. Nothing else — every other value the RA enters.
+The codes are checked first, not rubber-stamped. Held back, as a question to the RA:
+
+- the field doesn't take that code (not in its choices or Field Note; @MDC-EXEMPT; a validated
+  scale; a self-completed survey — name survey forms with `--survey-forms`; a date-and-time field);
+- the code doesn't fit the RA's note or the field comment (-666 "does not know" for a patient who
+  died; a note that reads like a different code; -999 with no reason given);
+- the note or comment says the value exists ("in the paper chart") — enter it, don't code it;
+- an amber cell (confirm the field applies first).
+
+A site whose answers are unusually often codes gets one line in the report. Then:
+
+```bash
+python3 "$W/upload_mdc.py" <worklist>.xlsx "<returned>.xlsx" --token-env CRC_TOKEN \
+    --comments <field-comment-log>.csv --dry-run
+python3 "$W/upload_mdc.py" <worklist>.xlsx "<returned>.xlsx" --token-env CRC_TOKEN \
+    --comments <field-comment-log>.csv --upload --expect-project "<project name>" \
+    --snapshot-dir qa-specialist/<study>/snapshots
+```
+
+The preview shows exactly what would be sent and what was refused, and why. The real upload needs
+that same preview, the project named, and saves the before-values first; it refuses any non-code
+value and any cell REDCap already holds, then reads the codes back. *No key?* Use
+`--records-csv … --metadata-csv … --import-file mdc_import.csv` and upload that file in REDCap's
+Data Import Tool (blank values must not overwrite). Checkbox codes are left out of that file — the
+RA ticks them.
 
 ### Ask the open questions
 
@@ -270,26 +334,28 @@ The **whole** `## ` header is the site name — matched ignoring case and spacin
 questions to every RA in the study.) Two headers that collapse to the same name are merged, and
 the run says so.
 
-Loop with the RA until all questions resolve; new answers either become READY or NO_ACTION.
+`reconcile_return.py` ends with a block in exactly this shape — paste it in under the site.
+Loop with the RA until all questions resolve; re-run the check after each answer.
 
 ### Confirm the gaps closed — and where to stop when you can't yet
 
-Re-run Task 1's build **on a fresh export**. Cells the RAs resolved drop out of the new worklist —
-anything still yellow is either a fix that didn't land in REDCap or a new gap. Diff against the
-prior round for a clean "did this round do what we expected" check.
+`reconcile_return.py` is the direct check: every answer is IN REDCAP, or it is a question. To find
+**new** gaps, re-run Task 1's build on a fresh export — anything still yellow that the check didn't
+already explain is new. Diff against the prior round for a clean "did this round do what we
+expected" check.
 
 **If there is no post-RA export, the round stops here — and that is a finished state, not a
 failure.** The RAs enter their answers in REDCap, so the only way to see whether a gap closed is
-to pull the data again; re-checking the old export would just re-report the same gaps, and
-nothing in a returned workbook is evidence that REDCap changed. So:
+to pull the data again; checking against the old export would report every answer as NOT
+ENTERED, and nothing in a returned workbook is evidence that REDCap changed. So:
 
-1. Send the summaries and the open questions (below) — that work is complete and doesn't wait.
+1. Send the open questions you already have — that work doesn't wait.
 2. Ask for a fresh export: either the study's access key in the settings file, or a new Data
    Export + Data Dictionary download ([[getting-files-from-redcap]]).
-3. Say plainly what is outstanding — "N cells answered, verification pending the next pull" —
-   and stop. Don't mark anything verified, and don't run VERIFY against the pre-RA export.
+3. Say plainly what is outstanding — "N cells answered, check pending the next pull" — and stop.
+   Don't mark anything as in REDCap, and don't run `reconcile_return.py` against the pre-RA export.
 
-The round closes on the next pull, when the rebuild shows the cells gone.
+The round closes on the next pull, when every answer checks IN REDCAP or is an open question.
 
 ### Send each RA their summary
 
@@ -323,10 +389,11 @@ A condition it cannot read does **not** cause the field to be dropped. The cell 
   outliers, and impossible-value detection are planned follow-ups.
 - **Single form / single arm only for now** — multi-event REDCap projects need a per-event
   split; not yet wired.
-- **No write-back (by design, enforced by policy)** — the RA enters changes in REDCap directly
-  so REDCap's branching, validation, and audit trail apply. We do not round-trip dirty Excel
-  into REDCap. See [[redcap-api-gotchas]] §0. The only exception is a one-off legacy migration:
-  [[migration-push]].
+- **No re-upload of RA answers (decided 2026-10-09)** — the RA enters changes in REDCap
+  directly so REDCap's branching, validation, and audit trail apply; you check they landed.
+  The one QA upload is missing-data codes into blank cells (`upload_mdc.py`). See
+  [[redcap-api-gotchas]] §0 and [[access-tiers]] Tier 3. Bulk loads are a separate one-off
+  legacy migration: [[migration-push]].
 
 Roadmap (not yet built): source-document audit verification, and a PM-side blocker view that QA
 flags should eventually feed into.

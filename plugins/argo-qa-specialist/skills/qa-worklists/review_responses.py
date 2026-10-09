@@ -145,6 +145,10 @@ class Audit(NamedTuple):
     out_of_scope: list         # [OutOfScopeEdit, ...]
     flags_total: int = 0       # cells the ORIGINAL worklist highlighted, any colour
     legacy_flags: int = 0      # of those, ones painted in a retired colour
+    # Every cell the worklist flagged: {(record_id, header): (original_value, kind)}.
+    # reconcile_return.py reads it to check, against REDCap itself, the flagged cells the RA
+    # left blank on a row they marked RESOLVED — one reading of the workbooks, not two.
+    flagged: "dict | None" = None
 
 
 def _flag_hex(cell) -> str:
@@ -320,7 +324,7 @@ def diff(orig_path: str, resp_path: str) -> Audit:
                                            is_id_column=1 <= col <= id_cols))
 
     return Audit(by_record, response_notes, id_field, response_col_idx is not None, out_of_scope,
-                 flags_total=len(flagged), legacy_flags=legacy_flags)
+                 flags_total=len(flagged), legacy_flags=legacy_flags, flagged=flagged)
 
 
 def main():

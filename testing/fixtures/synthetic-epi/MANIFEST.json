@@ -1,0 +1,20 @@
+{
+  "contract_version": 1,
+  "synthetic": true,
+  "note": "SYNTHETIC TEST DATA — no real people. The epi measures are checked on ../synthetic-survival/records.csv (the coherent-dates edition of the synthetic CRC cohort); nothing here is a data file.",
+  "data": "../synthetic-survival/records.csv",
+  "dictionary": "../synthetic-survival/datadictionary.csv",
+  "plan": {
+    "exposure": "tnm_m",
+    "exposed": ["1"],
+    "unexposed": ["0"],
+    "outcome": "follow_status",
+    "cases": ["3"],
+    "non_cases": ["1", "2"],
+    "covariates": ["age", "sex", "tnm_n"],
+    "origin": "dx_date",
+    "event_date": "death_date",
+    "censor_date": "fu_date",
+    "end_of_follow_up": "2026-06-30"
+  }
+}

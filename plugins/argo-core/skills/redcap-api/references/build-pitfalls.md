@@ -13,7 +13,8 @@ This is the running list of mistakes we've made on real ARGO builds and the rule
 `yesno` cannot hold MDC codes. Always use `radio` with `1, Yes | 0, No | -666, ... | -777, ... | -888, ... | -999, ...`. Validator enforces this.
 
 ### 2. `hospital_number` is required for patient-level DDs
-Even if the Word proforma omits it. ARGO standard: text field, Identifier=`y`, position 2 (right after the record-id field). The validator can be run with `--patient-level` to enforce. Non-patient studies (training, capacity-building surveys, biobank specimen tracking with no patient link) may skip — document the deviation in the Active Databases sheet.
+Even if the Word proforma omits it. ARGO standard: text field, Identifier=`y`, position 2 (right after the record-id field). The validator can be run with `--patient-level` to enforce. Non-patient studies (training, capacity-building surveys, biobank specimen tracking with no patient link) may skip — record the deviation on the study's Study Tracker (SIR, PID 224) record, where all
+study metadata now lives.
 
 ### 3. DD column 11 is `Identifier?`, column 13 is `Required?`
 A `y` in column 11 means the field holds PII (and gets de-identified on export based on role permissions). A `y` in column 13 means data entry blocks until populated. Agents reading the DD via index have confused the two — count commas carefully or use a DictReader.
@@ -35,17 +36,13 @@ Cleaner than nearest-match nudging or losing the data.
 ## Dates
 
 ### 6. Display format ≠ import format
-REDCap's `content=record action=import` API and Data Import Tool both require dates in **YYYY-MM-DD** or M/D/Y format, regardless of the field's `date_dmy` display validation. Always normalize import CSV dates to YYYY-MM-DD. See [[redcap-date-import]] for full rules.
+Import every date as **YYYY-MM-DD**, whatever the field's `date_dmy` display — including the MDC
+date codes, which reverse (`06-06-6666` in the Field Note, `6666-06-06` in the data CSV). Full
+rules: [[redcap-date-import]].
 
 ### 6b. Checkbox MDC bits don't survive import naming
-When a checkbox field's DD has MDC codes as choices (`-666, ... | -999, ...`), naïvely expanding them to checkbox bit columns produces `field___-666` etc. **REDCap rejects this** ("not found in the project as real data fields"). Two fixes:
-- **Preferred:** omit MDC bit columns from the import CSV when no record actually has MDC for that checkbox (common for retrospective data — all bits are 0 anyway).
-- **Alternative:** rename to `field___666` (no hyphen) — REDCap's internal column naming strips negative signs from checkbox codes.
-
-Radio/dropdown fields are not affected; they take the raw `-666` as a cell value.
-
-### 7. MDC date codes reverse for import
-Display form (`06-06-6666`) goes in the Field Note. Import form (`6666-06-06`) goes in the data CSV. REDCap converts on display.
+`field___-666` is rejected on import — omit the MDC bit columns when no record uses them, or
+strip the hyphen. Details in [[mdc-rules]] ("Import-CSV caveat").
 
 ## Ingest
 
@@ -88,10 +85,12 @@ PIs often submit before IRB approval lands ("Pending" `irb_number`, blank `irb_a
 ## Decision protocol
 
 ### 15. Walk every non-mechanical decision through the user
-Auto mode applies to file ops and validation. Decisions about data semantics, DD structure, identifier conflicts, or live-project writes always go through a user check, one at a time, sorted by stakes. See [[decision-protocol]].
+Data semantics, DD structure, identifier conflicts and live-project writes go through the user,
+one at a time, sorted by stakes, each with your proposed answer. See [[decision-protocol]].
 
 ### 16. Don't over-escalate
-The flip side of #15: when the data tells you the answer (column headers, clinical literature, distribution of values), make the call and document it. Don't bury the user in confirmations.
+The flip side of #15: when the data tells you the answer (column headers, clinical literature,
+distribution of values), make the call and record it in the mapping report.
 
 ## Cross-cutting
 

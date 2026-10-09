@@ -41,7 +41,7 @@ meaningful against stale code.
 
 ---
 
-## 0. First-time setup
+## 0b. First-time setup
 
 Cowork has no `~/.argo/.env` and no persistent home, so the working folder has to be created.
 This check confirms setup works *and* that it's safe to run.
@@ -50,9 +50,10 @@ This check confirms setup works *and* that it's safe to run.
 U=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name argo_setup.py 2>/dev/null | head -1); echo "--- with no arguments, must create nothing ---"; python3 "$U" 2>&1 | tail -4; echo "--- the default first step: --ensure (scaffolds loudly on a fresh machine, skips if set up) ---"; python3 "$U" --ensure 2>&1 | tail -6; echo "--- explicit folder form ---"; python3 "$U" --dir /tmp/argo-work-test 2>&1 | tail -8; ls -la /tmp/argo-work-test/.env
 ```
 
-**Pass:** the first run explains itself and ends with "Nothing has been created yet"; the second
-creates `project-manager/ qa-specialist/ database-manager/ data-analyst/`, a `.gitignore`, and a `.env` with permissions
-`-rw-------`. **Fail:** the no-argument run creates anything, or the `.env` is group/world
+**Pass:** the no-argument run explains itself and says "Nothing has been created yet"; `--ensure`
+either scaffolds or says `Settings found … setup skipped`; the `--dir` run creates
+`project-manager/ qa-specialist/ database-manager/ data-analyst/`, a `.gitignore`, and a `.env`
+with permissions `-rw-------`. **Fail:** the no-argument run creates anything, or the `.env` is group/world
 readable.
 
 For a real setup, use a folder you've connected rather than `/tmp`, and paste the REDCap address
@@ -92,13 +93,13 @@ incomplete" for the second. **Fail:** any `Traceback`.
 ## 3. `--check` with no access keys
 
 The setup check must work — and be *useful* — on a machine with nothing configured. This is the
-normal Cowork state, so this is the most representative check of the three.
+normal Cowork state, so this is the most representative of the crash checks.
 
 ```bash
 P=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name portfolio.py 2>/dev/null | head -1); python3 "$P" --check 2>&1 | tail -15
 ```
 
-**Pass:** it finds argo-core across the plugin boundary, then either lists the trackers as
+**Pass:** it imports the shared client from its own `scripts/` folder, then either lists the trackers as
 "no access key set up (skipping)" or scaffolds a settings file and names it (the REDCap web
 address is pre-filled by setup, so it is never blank after that path runs). Exit code 1 with no
 keys configured.
@@ -180,10 +181,10 @@ T=$(find /mnt -name run_all.py -path '*tests*' 2>/dev/null | head -1); [ -n "$T"
 
 ## Checks that need an access key — skip in Cowork unless a credentials folder is connected
 
-These are Tier 1/2/3 paths ([[access-tiers]]). In Cowork they only run if a folder containing an
-`.env` (the file setup creates) has been connected; the client searches cwd, its parents,
-`/mnt/*`, and `ARGO_ENV_FILE`.
-**Connect a folder holding only that file** — connected folders are readable in full.
+These are Tier 1/2/3 paths ([[access-tiers]]). In Cowork they only run if the ARGO working folder
+(which holds the `.env` setup created) is connected; the search order is in [[redcap-api]]'s
+"Setup and the settings file". On a Mac, `~/.argo/.env` is found first — pin a test run with
+`ARGO_ENV_FILE` so it never loads real keys by accident.
 
 | Check | Expected |
 |---|---|

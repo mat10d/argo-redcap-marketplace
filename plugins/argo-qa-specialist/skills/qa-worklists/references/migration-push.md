@@ -1,8 +1,9 @@
 # Migration-only push workflow
 
-**This is not part of a QA round.** In a QA round the RAs edit REDCap directly and you re-run
-the worklist build to confirm — so REDCap's own branching, validation and audit trail apply. We
-do not round-trip dirty Excel into REDCap.
+**This is not part of a QA round.** In a QA round the RAs edit REDCap directly and you check
+it landed with `reconcile_return.py` — so REDCap's own branching, validation and audit trail
+apply. We do not round-trip dirty Excel into REDCap; the only QA upload is missing-data codes
+into blank cells (`upload_mdc.py`, decided 2026-10-09 — [[access-tiers]] Tier 3).
 
 This page exists only for a genuine one-off legacy migration: a bulk load of historical data
 into a study. `push_updates.py` refuses to run without `--force-migration` plus a shown dry-run

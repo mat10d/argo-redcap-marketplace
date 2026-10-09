@@ -1,4 +1,4 @@
-# ARGO toolkit ledger — updated 2026-09-14 (0.25.1 released)
+# ARGO toolkit ledger — updated 2026-10-09 (0.26.0 released)
 
 The single answer to "what's done and what's outstanding". Supersedes PLAN.md's todo block for
 status; PLAN keeps the history and the spec.
@@ -95,6 +95,15 @@ status; PLAN keeps the history and the spec.
     **OPEN FOR MATTEO/RIVKA:** is "ARGO studies present as Nigerian-led, with ARGO as the
     collaborator" policy, or was it study-specific? (The finals removed MSKCC from every
     document; the skill now ASKS rather than assuming, and no policy is written.)
+20. **0.26.0** — fortified for Opus 5.5 from the Microvascular build and five weekly checks
+    (NITS 88–100). Build: hard stop on missing questionnaire / protocol / ethics approval; one
+    Outstanding list; terse outputs; `sir_update.py --close-out / --unmark-step / --dd`; surveys
+    carry no MDCs; identifiers excluded from Builder/PM exports. QA: `reconcile_return.py`
+    checks REDCap against the RA's returned form (+ Field Comment Log); `upload_mdc.py` is the
+    only QA write — judged MDCs into blank cells. Docs: contradictions fixed across all
+    role skills, export-data 3757→1360 words. Miner sees the new Cowork folder layout.
+    **Held back on purpose:** the uncommitted survival-analysis work in argo-data-analyst —
+    waits for a biostatistician's review.
 
 ## Graded complete 2026-08-26 (the five continued chats)
 - B Table 1 — pass (district grouping per in-chat answer; self-verified, fixed 2 own-script bugs)

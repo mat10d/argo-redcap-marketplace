@@ -1,7 +1,7 @@
 <!-- ARGO New Study / New Site Checklist — skeleton (official text). Use the NIH variant for
 NIH-funded studies; drop the clinicaltrials.gov + NIH-specific items for non-NIH. Render to .docx
 via the docx skill. This is the study START-UP / activation checklist (distinct from the technical
-build checklist in argo-core/build-pitfalls.md). -->
+build checklist in argo-core's [[build-pitfalls]]). -->
 
 # New Study / New Site Checklist — [NIH Funded | Non-NIH Funded]
 
@@ -17,7 +17,7 @@ build checklist in argo-core/build-pitfalls.md). -->
 ## Documents
 - ☐ Has the site provided the consent forms for review?
 - ☐ Do the consent forms list collaborating sites as needed (e.g. data shared with MSK for analysis; site contact in ICF)?
-- ☐ Has any IRB template text been removed? If so, ask the site to restore required template language.
+- ☐ Has any of the IRB template text been removed? If so, ask the site to edit the consent forms so all required template language is present.
 - ☐ Has the ECL been created or updated to include new sites?
 - ☐ Has the site provided the CPL list?
 - ☐ Has the site provided all HSP/GCP training certificates?

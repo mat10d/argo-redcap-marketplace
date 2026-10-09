@@ -73,7 +73,7 @@ Full system access. Design, API, locking, all admin functions. Full data export.
   "record_create": 1, "record_rename": 1, "record_delete": 1,
   "lock_records_customization": 1, "lock_records": 1, "lock_records_all_forms": 1,
   "forms": {"<all_forms>": 1},
-  "forms_export": {"<all_forms>": 1}
+  "forms_export": {"<all_forms>": 3}
 }
 ```
 
@@ -113,7 +113,7 @@ Record management with user rights, data quality, logging. No API, no locking, n
   "record_create": 1, "record_rename": 1, "record_delete": 1,
   "lock_records_customization": 0, "lock_records": 0, "lock_records_all_forms": 0,
   "forms": {"<all_forms>": 1},
-  "forms_export": {"<all_forms>": 1}
+  "forms_export": {"<all_forms>": 3}
 }
 ```
 

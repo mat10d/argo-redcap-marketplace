@@ -39,6 +39,9 @@ REDCap will display these as `06-06-6666` etc. on the form (because the field is
 ## Boilerplate for ingest scripts
 
 ```python
+import re
+from datetime import date, datetime
+
 def parse_date(v):
     """Return YYYY-MM-DD string if parseable, '' if blank, None if unparseable."""
     if v is None or str(v).strip() == "":

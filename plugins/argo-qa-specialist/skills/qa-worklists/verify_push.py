@@ -1,8 +1,9 @@
 """Re-pull REDCap state and emit only the push-draft cells that are still needed.
 
 ⚠️ DEPRECATED — supports the migration-only push path. See argo-core
-redcap-api-gotchas.md §0 (no programmatic writes to cohort patient data). The QA
-loop is read-only; only use this as part of a deliberate one-off legacy migration.
+redcap-api-gotchas.md §0 (no programmatic writes to cohort patient data). A QA
+round checks RA entries with reconcile_return.py and uploads only missing-data
+codes (upload_mdc.py); use this only in a deliberate one-off legacy migration.
 NOTE: its conflict heuristic skips planned="0", so it under-flags real overwrites
 (e.g. a yes/no field going Yes→No). Cross-check with a full decode/categorize
 preview before trusting it.

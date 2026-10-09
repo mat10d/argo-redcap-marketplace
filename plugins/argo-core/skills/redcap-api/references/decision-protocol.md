@@ -28,9 +28,13 @@ Any choice that affects:
 
 1. **Triage by stakes.** Highest first: clinical semantics > identifier conflicts > category coverage > formatting.
 2. **One at a time.** Don't batch — the user will skim and miss things.
-3. **State the finding, the stakes, the options, and your recommendation (only if asked).**
-4. **Wait for the call** before applying.
-5. **Document the decision** in the relevant `mapping_report.md` or audit log so it's reproducible.
+3. **State the finding, the stakes, and your proposed answer** — a design to confirm, not an open
+   question. On one real build, proposing instead of asking cut the PI sign-off list from nine
+   questions to one.
+4. **Resolve from the documents first, then ask the user in session; only a question that
+   genuinely needs the PI goes to the PI.**
+5. **Wait for the call** before applying.
+6. **Document the decision** in the relevant `mapping_report.md` or audit log so it's reproducible.
 
 ## Where this rule lives
 
@@ -38,7 +42,8 @@ This convention applies to:
 - Importing external/historical data — every column→field translation that isn't 1:1
 - `argo-database-manager/build-study` Path B — every audit finding with a non-obvious fix
 - `argo-database-manager` — every write to a live project
-- Any `argo-project-manager` skill that closes a ticket or modifies an admin REDCap
+- `argo-project-manager/new-study-documents` — clinical content in a questionnaire is proposed
+  to the PI, never invented
 
 ## See also
 - [[record-id-safety]] — never modify the record ID field without confirmation

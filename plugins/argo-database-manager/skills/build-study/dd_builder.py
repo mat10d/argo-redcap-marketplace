@@ -24,6 +24,11 @@ that annotation (on a single field, or on any field of a matrix group, which exe
 the whole group). Use it for validated psychometric / Likert scales, which ARGO
 policy exempts; not to dodge MDC on ordinary clinical fields. See [[mdc-rules]].
 
+A self-completed SURVEY carries no MDC at all (ARGO policy, 2026-10-09): MDC records why a
+staff member couldn't abstract a value, and a respondent filling in a form has no such reason.
+Build it with `DD(survey=True)` (CLI: `--survey`) — no codes, and no `@MDC-EXEMPT` annotations
+either, since nothing is being waived — and validate with `validate_dd.py --survey`.
+
 `yesno` is refused at build time — it cannot hold MDC codes. Use `radio` with
 "1, Yes | 0, No" and dd_builder adds the MDC choices for you.
 
@@ -41,7 +46,7 @@ Two ways to use it:
   dd.field("age", "text", "Age (years)", valid="integer")
   dd.write("Study_DataDictionary_2026-06-26.csv")
 
-  # (b) CLI from a JSON field spec:
+  # (b) CLI from a JSON field spec (add --survey for a self-completed survey):
   python3 dd_builder.py fields.json out.csv
   # where fields.json = [{"var": "...", "type": "...", "label": "...", "choices": "...",
   #                       "branching": "...", "section": "...", "valid": "...", ...}, ...]
@@ -76,8 +81,9 @@ CHOICE_TYPES = {"radio", "dropdown", "checkbox"}
 
 
 class DD:
-    def __init__(self, form="data"):
+    def __init__(self, form="data", survey=False):
         self.form = form
+        self.survey = survey
         self.rows = []
 
     def field(self, var, type, label, choices="", note="", valid="", min="", max="",
@@ -90,7 +96,7 @@ class DD:
                 "clinical field. Use type 'radio' with choices \"1, Yes | 0, No\" instead — "
                 "this builder adds the missing-data codes to it for you.")
         is_first = not self.rows  # first field is the record identifier — never gets MDC
-        if not is_first and type not in EXEMPT_TYPES and var not in EXEMPT_VARS:
+        if not is_first and not self.survey and type not in EXEMPT_TYPES and var not in EXEMPT_VARS:
             if mdc:
                 if type in CHOICE_TYPES:
                     choices = (choices + " | " + MDC_CHOICES) if choices else MDC_CHOICES
@@ -116,15 +122,19 @@ class DD:
 
 
 def main():
+    survey = "--survey" in sys.argv
+    sys.argv = [a for a in sys.argv if a != "--survey"]
     if len(sys.argv) != 3:
         sys.exit(
         "Give me two file names: the field definitions to read, and where to save the data\n"
         "dictionary I build from them. For example:\n"
         "\n"
-        "    python3 dd_builder.py fields.json my_study_datadictionary.csv"
+        "    python3 dd_builder.py fields.json my_study_datadictionary.csv\n"
+        "\n"
+        "Add --survey for a questionnaire respondents fill in themselves (no missing-data codes)."
     )
     spec = json.load(open(sys.argv[1]))
-    dd = DD(form=spec[0].get("form", "data") if spec else "data")
+    dd = DD(form=spec[0].get("form", "data") if spec else "data", survey=survey)
     for n, fld in enumerate(spec, 1):
         try:
             dd.field(**{k: v for k, v in fld.items()})

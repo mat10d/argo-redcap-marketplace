@@ -18,8 +18,8 @@ sitting and a protocol that comes back with forty `[TODO]`s in it.
 
 **The template's own standing rules, which govern everything below:**
 
-- Every `[bracketed placeholder]` is either replaced or answered **"Not applicable"**. A protocol
-  silent on a question reads as an oversight — the template says so itself.
+- Every `[bracketed placeholder]` is either replaced or answered **"Not applicable"** — never
+  deleted or left blank. A protocol silent on a question reads as an oversight.
 - Every italicised instruction, and the version line on the cover sheet, is **deleted before
   submission**.
 - Sections marked *(remove if not applicable)* may be deleted in full. **Nothing else may be.**
@@ -58,7 +58,7 @@ circulated for review**. `ARGO` = there is a standing programme answer — propo
 | 8.3 Data sources | PI | Who extracts from records, against what, and what happens when a record is missing |
 | 8.4 Biospecimen handling | PI | *(removed with 5.6)* |
 | 8.5 Follow-up | PI | Interval, window, **how many contact attempts before lost to follow-up** |
-| 9.0–9.1 Schedule of assessments | Other doc | Must match the ICF's study calendar and the questionnaire's structure |
+| 9.0–9.1 Schedule of assessments, losses to follow-up | Other doc | Must match the ICF's study calendar and the questionnaire's structure |
 | 10.0 Removal from the study | PI | Whether data already collected are **retained or destroyed on withdrawal — this must match the ICF exactly** |
 | 11.1–11.2 Outcomes, evaluability | PI + Biostat | Name the staging system, classification and criteria **with version and year** |
 | 12.1–12.4 Biostatistics | Biostat | **Blocking.** Sample size and its basis, analysis populations, the analysis plan, missing data |
@@ -73,11 +73,11 @@ circulated for review**. `ARGO` = there is a standing programme answer — propo
 | 14.3 Source documentation | ARGO | Standing text; PI names the second identifier |
 | 14.4 Quality assurance | ARGO | Standing text; must stay consistent with the study QA plan (Gate 3) |
 | 14.5 Data and safety monitoring | PI | Minimal-risk studies normally take the template's "not required" paragraph, **with the reason** |
-| 14.6 Data sharing and transfer | PI | Decided by the collaborator question; drives Gate 2's DTA rule |
+| 14.6 Data sharing, transfer and secondary use | PI | Written from the collaborator question; drives Gate 2's DTA rule. Not removable |
 | 14.7 Publication and authorship | ARGO | ICMJE criteria; every contributing site represented |
 | 15.0 References | Proposal | Numbered in order of appearance, one style throughout |
 | 16.0 Appendices | Other doc | I sites · II questionnaire · III ICF · IV ECL · V lab manual · VI version history |
-| 17.0 Multi-site addendum | PI | *(remove for a single-site study)* |
+| 17.0 Multi-site addendum | PI | *(remove for a single-site study)* — its standard text says a DTA is executed with **each** site; if Gate 2's rule says no DTA is needed, flag the conflict to the PM rather than editing either |
 
 ## ARGO's standing answers
 

@@ -20,8 +20,9 @@ In anything the user sees, call it an **access key**, never a token or API token
 
 For any operation a skill performs:
 
-1. **Check whether a token for the target project is present** (e.g. `os.environ.get(VAR)`).
-2. **Token present → use the API path** (after confirming the project, see [[token-confirmation]]).
+1. **Check whether a token for the target project is present** — `RedcapClient.from_env(VAR)`
+   returns `None` when it isn't.
+2. **Token present → use the API path** (writes confirm the project first — [[token-confirmation]]).
 3. **Token absent → take the no-token path. Do not error, do not demand a token.** Tell the user
    plainly that you're proceeding without the API, and use files instead.
 

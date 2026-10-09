@@ -1,8 +1,10 @@
 """Push QA writeback payloads to REDCap.
 
 ⚠️ DEPRECATED — MIGRATION-ONLY. See argo-core redcap-api-gotchas.md §0
-"no programmatic writes to cohort patient data". The QA loop is read-only:
-RAs fill REDCap directly against the worklists. This script bypasses REDCap's
+"no programmatic writes to cohort patient data". A QA round never re-uploads RA
+answers: RAs fill REDCap directly against the worklists, QA checks it landed
+(reconcile_return.py), and the only QA upload is missing-data codes into blank
+cells (upload_mdc.py, decided 2026-10-09). This script bypasses REDCap's
 branching logic, field validation, and audit trail, and is retained only for
 deliberate one-off legacy migrations.
 
@@ -108,8 +110,11 @@ def write_receipt(fingerprint: str, rows: int, paths: list[str]) -> Path:
     return receipt
 
 
-def check_receipt(fingerprint: str) -> "str | None":
-    """Return None if a valid preview exists, else a plain-language reason why not."""
+def check_receipt(fingerprint: str, real_flag: str = "--force-migration") -> "str | None":
+    """Return None if a valid preview exists, else a plain-language reason why not.
+
+    Shared with upload_mdc.py, whose real run is `--upload` rather than `--force-migration`.
+    """
     receipt = RECEIPT_DIR / f"{fingerprint}.json"
     if not receipt.exists():
         return (
@@ -117,7 +122,7 @@ def check_receipt(fingerprint: str) -> "str | None":
             "\n"
             "Before anything is written to REDCap, you need to look at exactly what would be\n"
             "sent, so nothing goes in unseen. Run the same command again with --dry-run instead\n"
-            "of --force-migration, read what it prints, and if it's right, run the real command.\n"
+            f"of {real_flag}, read what it prints, and if it's right, run the real command.\n"
             "\n"
             "If you did already preview it, then something in the files has changed since — even\n"
             "one edited cell counts as different data and needs previewing again."

@@ -14,7 +14,7 @@ Check your setup at any time (the client finds the settings file itself):
 
 Using it from another script:
 
-    from argo_redcap_client import RedcapClient, find_argo_core
+    from argo_redcap_client import RedcapClient
 
     client = RedcapClient.from_env("STUDY_INITIATION_REQUEST")
     if client is None:
@@ -22,10 +22,8 @@ Using it from another script:
     records = client.export_records()
     client.import_records(payload, expect_title="Study Tracker")
 
-To import this from a script in another ARGO plugin, put this at the top:
-
-    import sys, os
-    sys.path.insert(0, find_argo_core())   # or copy the _bootstrap block from any ARGO script
+Every skill carries its own synced copy in its `scripts/` folder, so import it same-folder;
+never reach into another plugin for it.
 
 See [[access-tiers]] for which skills should hold a token at all.
 """
@@ -305,6 +303,20 @@ def _egress_blocked_message(url: str) -> str:
     )
 
 
+def _expand_lists(params: dict) -> dict:
+    """REDCap reads arrays as `records[0]=…&records[1]=…`. urlencode turns a Python list into
+    the single string "['109']", which REDCap matches against nothing and returns [] — no error.
+    A session closing a study read its own record back as missing because of this."""
+    out = {}
+    for key, value in params.items():
+        if isinstance(value, (list, tuple)):
+            for i, item in enumerate(value):
+                out[f"{key}[{i}]"] = item
+        else:
+            out[key] = value
+    return out
+
+
 def mask(token: str | None) -> str:
     """Show only the last 4 characters of a token. Never print the whole thing."""
     if not token:
@@ -377,7 +389,8 @@ class RedcapClient:
     def _post(self, raw: bool = False, **params) -> "list | dict | str":
         """POST to the REDCap API, retrying briefly if REDCap is temporarily unreachable."""
         payload = urllib.parse.urlencode(
-            {"token": self.token, "format": "json", "returnFormat": "json", **params}
+            _expand_lists({"token": self.token, "format": "json", "returnFormat": "json",
+                           **params})
         ).encode()
 
         last_error: Exception | None = None
@@ -595,7 +608,8 @@ class RedcapClient:
 
         overwrite='overwrite' is the ARGO default: with 'normal', REDCap silently drops fields
         belonging to forms not present in the payload. Pass overwrite='normal' deliberately when
-        you specifically want to fill only blank cells and never replace an existing value.
+        you want blank cells in the payload to leave REDCap alone — a NON-blank cell still
+        replaces whatever REDCap holds, so 'normal' is not a fill-only mode on its own.
         """
         if not payload:
             return {"count": 0}

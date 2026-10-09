@@ -6,422 +6,464 @@ allowed-tools: Read, Bash, Write, Glob, Edit, Grep
 
 # build-study
 
-One skill for the whole build pipeline: **SIR record → live study.** It merges what used to be two
-skills (intake triage + DD build). The spine is a feedback loop — **most pipeline steps you finish
-let you flip one `build_tracking` flag on the Study Tracker, so the portfolio gets more accurate
-in real time.** Mark as you go; never batch at the end.
+One skill for the whole build: **SIR record → live study.** The spine is a feedback loop: each
+step that lands flips one `build_tracking` flag on the Study Tracker, right then, so the
+portfolio's progress column is true between runs. Never batch the marks at the end.
 
-## Which access this skill needs (read first)
+**How to talk to the user.** Short sentences, plain words.
+- **Lead with the decision you need**, then only what they need to make it. About 120 words a
+  reply; detail goes in the build folder, not the chat.
+- **Two or more decisions pending?** Ask each as a structured choice (the question widget), one
+  per decision — not a numbered list of questions in prose.
+- **Status = the brief's Outstanding table** (Step 6): every tracker step and every open request,
+  each with who and done / not done. Never a paragraph of status, never a second list. When the
+  user asks for something that isn't a tracker step, add it to that list the moment they ask; it
+  stays until it's done.
+- **Ask once.** A value that follows from something already settled is not a new question: it
+  rides in the next tracker push, shown in the diff. `contains_phi=1` follows from any identifier
+  field in the DD — `sir_update.py --dd <csv>` adds it for you. If the user declines a value, it
+  goes on the Outstanding list once and is never offered again. (A live session offered the same
+  `contains_phi=1` four times.)
+- **"Close out the build"** (also "it's closed", "it's in production") means: tick every
+  remaining step and close the tracker form, in one push — `sir_update.py <RID> --close-out`.
+  One diff, one confirmation, no per-step questions. The phrase is the sign-off for the human
+  gates; anything less explicit is not.
 
-Two different things get confused here, so be precise ([[access-tiers]]):
+## Access
 
-- **Writing build progress to the Study Tracker** uses your Study Tracker access key
-  (`STUDY_INITIATION_REQUEST`) — one of the five tracker keys everyone on the team has. It needs
-  no per-study permission from anyone. `sir_update.py --mark-step` is **the** way to mark
-  progress; do not offer the user a choice about it.
-- **Anything against the new study's own project** (creating it, uploading the DD) is done in the
-  REDCap website regardless, because OAU has no super access key — REDCap's Super API Token, the
-  one that could create projects for us ([[project-no-super-token]]).
+- **Build progress** goes to the Study Tracker with `sir_update.py --mark-step`, using the
+  Study Tracker key (`STUDY_INITIATION_REQUEST`) everyone on the team holds. It needs no
+  per-study permission. It is *the* way to mark progress — don't offer a choice.
+- **The new study's own project** (creating it, uploading the DD, roles) is done in the REDCap
+  website, because OAU has no Super API Token that could create projects for us
+  ([[project-no-super-token]]).
 
-If the Study Tracker key genuinely isn't configured on this machine, fall back to setting the same
-`build_tracking` yes/no fields by hand in the Study Tracker — but say that's what you're doing and
-why. That's a fallback for a broken setup, not an equal option to present each time.
+No Study Tracker key on this machine? Tick the same `build_tracking` fields by hand in the Study
+Tracker, and say that's what you did and why. It's a fallback for a broken setup, not an option.
 
-## The pipeline ↔ tracker loop
-
-| # | Step | Do this | Script | → flip `build_tracking` |
-|---|---|---|---|---|
-| 1 | **Triage** | Pull the SIR; is there enough to build? | `sir_update.py --pull` | *(gate — no flag)* |
-| 1b | **Port the documents** | Make the build folder, pull the attached documents in, then read them | *(files)* | *(no flag)* |
-| 2 | **Create project** | Paste sheet → create in UI | `fill_new_project.py` | `project_created` (+ `--pid`) |
-| 3 | **Build DD** | Construct (Path A) or audit (Path B) → upload | `dd_builder.py`, `validate_dd.py` | `dd_uploaded` |
-| 4 | **Roles & users** | Roles CSV + assign users | `make_roles_csv.py` | `user_rights_complete` |
-| 5 | **Data import** | Map + import, or mark prospective | `validate_import.py` | `data_imported` (1 / 2) |
-| 6 | **Setup** | File Repository, weekly reports, DAGs | `setup_brief.py` | *(part of setup)* |
-| 7 | **Review** | Internal QA, then PI sign-off | — | `review_internal`, `review_pi` |
-| 8 | **Production** | Move project to Production | — | `study_production` |
-
-After each step, immediately — find the script first, then run it:
+Every script is located the same way, because plugin paths differ per environment and shell
+state doesn't survive between commands — find and run in one command:
 
 ```bash
 S=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name sir_update.py 2>/dev/null | head -1)
 python3 "$S" <RID> --mark-step <flag>
 ```
 
-One push per step, never batched at the end — that's what keeps the portfolio's progress column
-honest between runs.
+The commands below write just the script name; locate it this way first.
 
-> ### Two kinds of flags — treat them differently
-> - **Mechanical** (`project_created`, `dd_uploaded`, `data_imported`): objective facts about what
->   happened. The agent marks these directly as each step lands.
-> - **Sign-off / go-live gates** (`review_internal`, `review_pi`, `study_production`): these assert
->   that a *human* reviewed/approved, or that the study is live. **Never auto-flip them.** Set them
->   only on explicit confirmation from the responsible person (internal QA done / PI signed off /
->   cleared for production). Flipping them early puts false state in a live tracker — and is wrong.
+## The pipeline ↔ tracker loop
+
+| # | Step | Do this | Script | → flip `build_tracking` |
+|---|---|---|---|---|
+| 1 | **Triage** | Pull the SIR | `sir_update.py --pull` | *(no flag)* |
+| 1b | **Port the documents** | Build folder, pull the documents in, check the hard stop, read them | *(files)* | *(no flag — the hard stop lives here)* |
+| 2 | **Create project** | Paste sheet → create in UI | `fill_new_project.py` | `project_created` (+ `--pid`) |
+| 3 | **Build DD** | Construct (Path A) or audit (Path B) → upload | `dd_builder.py`, `validate_dd.py` | `dd_uploaded` |
+| 4 | **Roles & users** | Roles CSV, DAGs, assign users | `make_roles_csv.py` | `user_rights_complete` |
+| 5 | **Data import** | Map + import, or mark prospective | `validate_import.py` | `data_imported` |
+| 6 | **Setup** | File Repository, weekly report, survey settings | `setup_brief.py` | *(part of `review_internal`)* |
+| 7 | **Review** | Internal QA, then PI sign-off | — | `review_internal`, `review_pi` |
+| 8 | **Production** | Move project to Production | — | `study_production` |
+
+**Two kinds of flags.** `project_created`, `dd_uploaded`, `user_rights_complete` and
+`data_imported` are facts about what happened — mark them as each lands. `review_internal`,
+`review_pi` and `study_production` assert that a *person* reviewed, signed off or cleared the
+study for production. Set those only when that person has said so — or the user says "close out
+the build". Flipping one early puts a false statement in a live tracker the whole programme reads.
 
 ---
 
-## Step 1 — Triage (is there enough to build?)
+## Step 1 — Triage
+
 ```bash
-S=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name sir_update.py 2>/dev/null | head -1)
-python3 "$S" <RID> --pull > intake.json
+sir_update.py <RID> --pull > intake.json
 ```
-`--pull` returns the full record (intake + `build_tracking` + `study_metadata`). The build-readiness
-gate: a **questionnaire attached** (the linchpin for Path A), plus PI and IRB number. If the
-questionnaire is missing, flag back to the PM — don't build. Don't re-ask for anything the SIR
-already captured. Key fields drive later steps:
+
+`--pull` returns the whole record (intake + `build_tracking` + `study_metadata`). Don't re-ask
+for anything the SIR already captured. A blank required field (PI name, `irb_number`,
+`irb_approval_expires`) is not a stop: name the field in one line and who fills it — the PM or
+requester, on the Study Tracker — and put it on the Outstanding list. (If the approval letter is in
+hand, its number and date can be backfilled with `--irb-number` / `--irb-expires`.) What stops a
+build is a missing document: the hard stop in Step 1b.
 
 | SIR field(s) | Drives |
 |---|---|
 | `quest_universal`, `quest_univ_file`, `quest_site_1..10` | Step 3 questionnaire source |
-| `data_collection` | Step 5 (`data_imported`: retrospective vs prospective) |
+| `data_collection` | Step 5 (retrospective vs prospective) |
 | `num_institutions`, `inst_name_*`, `irb_file_*`, `consent_file_*`, `sop`, `eligibility_checklist` | Step 6 File Repository + DAGs |
-| `weekly_stat`, `category` | Step 6 weekly reports |
+| `weekly_stat`, `category` | Step 6 weekly report |
 | `pm_*`, `ra_*`, `pi_user_*`, `addl_users` | Step 4 user roles |
 
-**One study, several REDCaps.** A study is sometimes split across several SIRs and several
-projects — different populations, or data that will be sampled and analysed separately. Build them
-**one SIR at a time**, as normal; nothing about the pipeline changes. But before you start, put
-the mapping on screen as a table: **which document belongs to which project, and which projects
-are still missing one.** Document names and project names drift apart fast, and a build that
-starts from the wrong file is a build done twice. If a document you were given doesn't map onto a
-project, say so and ask — don't guess which one it belongs to.
+**One study, several REDCaps.** A study is sometimes split across several SIRs and projects —
+different populations, or data analysed separately. Build them **one SIR at a time**, as normal.
+But first put the mapping on screen as a table: **which document belongs to which project, and
+which projects are still missing one.** Document and project names drift apart fast, and a build
+started from the wrong file is done twice. If a document doesn't map onto a project, say so and
+ask — don't guess.
+
+**Several SIRs with the same title** aren't necessarily duplicates (build-pitfalls #17): decide
+from the *questionnaires*. Different questionnaires → separate builds (ask for a site/substudy
+suffix). Identical questionnaire across all → flag a possible resubmission before building N
+copies.
 
 ## Step 1b — Port the documents into the build folder (before any analysis)
 
-The first thing you do after triage passes is **collect the request's attached documents**. Not
-after the DD is designed, not while you build — first, as a single act, so the rest of the build
-reads from a folder instead of hunting for files. In order:
+Collect the request's documents first, as one act, so the rest of the build reads from a folder
+instead of hunting for files.
 
 1. **Make the folder.**
    ```bash
    mkdir -p database-manager/<study>/questionnaires database-manager/<study>/protocol \
             database-manager/<study>/ethics
    ```
-   (`<study>` is the study moniker you'll use everywhere else. Skip a subfolder if the SIR
-   attaches nothing for it.)
-2. **Pull the documents in.** `sir_update.py --pull` (Step 1) already gave you the filenames — the
-   SIR's file fields sort straight into the folders:
+   `<study>` is the study moniker you'll use everywhere else.
+2. **Pull the documents in.** The `--pull` output names the files; they sort into the folders:
 
    | SIR field(s) | → folder |
    |---|---|
    | `quest_univ_file`, `quest_site_1..10` | `questionnaires/` |
-   | `sop`, `eligibility_checklist`, plus the proposal/protocol if the study has one | `protocol/` |
+   | `sop`, `eligibility_checklist`, the protocol / proposal | `protocol/` |
    | `irb_file_*`, `consent_file_*`, `consent_prof_*` | `ethics/` |
 
-   Look for each named file in the workspace first (`Glob`). Ask for whatever isn't there **in one
-   message, listing every missing file at once** — the user downloads them from the SIR record in
-   REDCap (open the record → the file field → Download) or from the study's File Repository and
-   drops them into the folder you just made. One ask, not one question per file.
-3. **Then read them.** Extract the text (`textutil -convert txt -stdout "file.docx"`) and read the
-   questionnaire and the protocol before designing anything. This is the folder Step 3 builds the
-   DD from and the folder Step 6 renames for File Repository upload — so the copies live here from
-   the start, and nothing gets built from a half-remembered attachment.
+   Look for each file in the workspace first (`Glob`). Ask for everything that isn't there in
+   **one** message — the user downloads them from the SIR record in REDCap (open the record → the
+   file field → Download) or from the study's File Repository, and drops them in the folder.
+3. **Then read them.** Extract the text (`textutil -convert txt -stdout "file.docx"`) and read
+   the questionnaire and the protocol before designing anything. Step 3 builds the DD from this
+   folder; Step 6 renames these copies for the File Repository.
 
-If the questionnaire turns out to be missing entirely, that's the Step 1 gate failing — go back to
-the PM rather than building around it.
+### Hard stop: no data dictionary until the documents are complete
+
+The build needs three documents before any DD work starts:
+
+1. **the questionnaire** — every one the SIR names (universal and each site's),
+2. **the protocol** (or the approved proposal),
+3. **the ethics approval letter** — the committee's approval, with its number and date. An
+   ethics *application* or submission form is not an approval: it doesn't count.
+
+If any is missing, **stop**. Don't draft a DD, don't build the parts you can, don't proceed on
+assumptions — and don't offer "build ahead and mark the gaps TODO" as a choice. In a real build
+that offer was taken, and the ethics document that arrived later overturned the DD. Tell the
+user in one or two plain sentences what is missing and what to send:
+
+> I can't start the build yet. Missing: the site 2 questionnaire and the ethics approval letter.
+> Please add them to `database-manager/<study>/`, or ask the PM to attach them to SIR <RID>.
+
+Why: a DD drafted from part of the documents is rebuilt when the rest arrive, and its guesses
+look like decisions to whoever reads it next. A file that is empty or won't open counts as
+missing. This list lives here and nowhere else (`setup_brief.py` checks the SIR against the same
+three, guard-tested). Other documents — consent forms, SOP, eligibility checklist — don't block
+the DD; they are needed for Step 6 and before production.
+
+**Auditing an existing DD (Path B) without the questionnaire:** run `validate_dd.py`, and say the
+label-by-label comparison waits for the questionnaire. That isn't a build, so it isn't blocked —
+but it isn't a finished audit either.
 
 ## Step 2 — Create project → `project_created`
-```bash
-S=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name fill_new_project.py 2>/dev/null | head -1)
-python3 "$S" <RID> [<RID> ...]
-```
-Outputs a paste-ready "Create New Project" box per record (Empty project; title, purpose,
-sub-category, PI cited, IRB, folder, notes all pre-derived). **Save it** to the study's folder
-(`database-manager/<study>/CREATE_NEW_PROJECT_<RID>.txt`) — don't just print it. The SIR title is
-often ALL-CAPS; normalize to sentence case (preserve acronyms/proper nouns) for the project title.
-The user pastes it into REDCap → New Project. Once it exists, mark it on the tracker:
 
 ```bash
-S=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name sir_update.py 2>/dev/null | head -1)
-python3 "$S" <RID> --pid <PID> --mark-step project_created
+fill_new_project.py <RID> [<RID> ...] > database-manager/<study>/CREATE_NEW_PROJECT_<RID>.txt
 ```
 
-**Multiple SIRs, same title:** decide from the *questionnaires*, not the title (build-pitfalls #17).
-Different questionnaires → separate builds (ask the user for a site/substudy suffix); identical
-questionnaire across all → flag possible resubmission before building N copies.
+A paste-ready "Create New Project" box per record (Empty project; title, purpose, sub-category,
+PI cited, IRB, folder, notes all derived). The SIR title is often ALL-CAPS; normalize it to
+sentence case in the saved sheet (keep acronyms and proper nouns). The user pastes it into
+REDCap → New Project. Once it exists:
+
+```bash
+sir_update.py <RID> --pid <PID> --mark-step project_created
+```
 
 ## Step 3 — Build the data dictionary → `dd_uploaded`
 
-**Path A (construct from Word)** vs **Path B (audit an existing CSV)**. If the user says "review",
-"audit", "check", or "fix", use Path B.
+**Path A** constructs from the questionnaire; **Path B** audits an existing CSV ("review",
+"audit", "check", "fix"). Read [[build-pitfalls]] first; column reference: [[dd-column-spec]].
 
-> ### MDC goes on EVERY non-exempt field — not just clinical Yes/No
+**Form or survey — decide now, from the protocol.** It changes the DD (next blocks), so it can't
+wait for setup. Default to **data-entry forms**: ARGO's standard model is paper questionnaire →
+RA enters. Survey mode only if the protocol says respondents **self-complete** (online link,
+app). Being a questionnaire doesn't make it a survey.
+
+**The questionnaire beats the paperwork.** Where the ethics application or another document
+says something the questionnaire doesn't (no identifiers, anonymous, a different item list),
+build what the questionnaire says and put the discrepancy on the Outstanding list for the PM. It
+doesn't change the build.
+
+> ### MDC on every non-exempt field
 > Per [[mdc-rules]]: every radio/dropdown/checkbox gets the four MDC **choices**; every
-> text/notes field gets the text-format MDC **field-note**; any date/datetime validation gets the
-> date-format note. Exempt without asking: the **record-ID field**, **descriptive/calc/file**
-> types, and the study-team admin fields (`hospital_number`, `hospital_site`).
-> `dd_builder.py` applies this automatically (and keeps a Field Note you wrote, appending the MDC
-> note to it) — hand-write a DD and the validator will flag dozens of fields. `yesno` is refused at
-> build time: use `radio` with `1, Yes | 0, No`.
+> text/notes field gets the text-format MDC **field note**; any date/datetime validation gets the
+> date-format note. Exempt without asking: the record-ID field, descriptive/calc/file types, and
+> the study-team admin fields (`hospital_number`, `hospital_site`). `dd_builder.py` applies all of
+> this (a Field Note you wrote is kept, with the MDC note appended); a hand-written DD fails the
+> validator on dozens of fields. `yesno` is refused at build time: use `radio` with
+> `1, Yes | 0, No`.
 >
-> **The one waiver:** a validated psychometric / Likert instrument is MDC-exempt by ARGO policy.
-> Build those fields with `mdc=False`, which writes `@MDC-EXEMPT` into the Field Annotation column;
-> `validate_dd.py` honours that annotation (put it on any field of a matrix group and the whole
-> group is waived). Never use it to dodge MDC on ordinary clinical fields.
+> **Self-completed surveys get no MDC at all** (decided 2026-10-09). MDC records why staff
+> couldn't abstract a value; a respondent has no such reason. Build with `DD(survey=True)` /
+> `dd_builder.py --survey` and validate with `validate_dd.py --survey`. With the `dd_uploaded`
+> push, clear the SIR's `missing_data_codes` boxes (`--set missing_data_codes___<n>=0` for each
+> box the `--pull` shows ticked).
+>
+> **The one per-field waiver:** a validated psychometric / Likert instrument is MDC-exempt by
+> ARGO policy — adding codes changes a published instrument. Build those fields with `mdc=False`,
+> which writes `@MDC-EXEMPT` into Field Annotation; `validate_dd.py` honours it (on any field of a
+> matrix group it waives the whole group). Never use it to quiet MDC on ordinary clinical fields.
 
 > ### Build the instruments the questionnaire defines — don't over-materialize
-> Build exactly what the questionnaire in front of you contains. A multi-section questionnaire
-> usually becomes **one instrument per section** (Section A/B/C…). Do NOT fabricate extra
-> instruments for follow-up rounds, time-points, or study arms that the questionnaire itself
-> doesn't contain — those live in the proposal's *design* narrative, and the follow-up interviews
-> are typically a **separate instrument from a separate source**, built separately. Read the
-> proposal to understand administration mode (form vs survey, Step 6) and design, but materialize
-> only the instrument(s) the questionnaire actually defines.
+> Build what the questionnaire contains. A multi-section questionnaire usually becomes one
+> instrument per section. Don't fabricate instruments for follow-up rounds, time-points or arms
+> the questionnaire doesn't contain — those live in the proposal's design narrative, and
+> follow-up interviews are usually a separate instrument from a separate source.
 >
-> **One exception, and only one: a link-distributed survey** — see the next block. There the
-> rounds *must* become instruments, because a REDCap survey link addresses an instrument. That is
-> a mechanical constraint, not a licence to materialize design narrative anywhere else.
+> **One exception, and only one: a link-distributed survey** — next block. There the rounds
+> *must* become instruments, because a REDCap survey link addresses an instrument. That is a
+> mechanical constraint, not a licence to materialize design narrative anywhere else.
 
 > ### A link-distributed survey needs four things the questionnaire never prints
-> When the proposal says respondents **self-complete via a link** (Step 6's form-vs-survey call),
-> ARGO's convention adds structure the printed instrument has no way to show. **Propose all four
-> as a design — don't raise them as open questions.** None of them changes a single approved
-> question, so none is an IRB amendment.
+> When respondents **self-complete via a link**, ARGO's convention adds structure the printed
+> instrument can't show. **Propose all four as a design — don't raise them as open questions.**
+> None changes an approved question, so none is an IRB amendment.
 >
-> 1. **An email field.** REDCap cannot send a survey invitation without one. It goes on the
->    baseline instrument, **flagged as an identifier in the DD**, and it makes the project
->    PHI-bearing — so `contains_phi` on the SIR is `1`, not `0`. (The two `phi_confirm`
->    attestations assert that the protocol permits storing PHI: those are the PI's to tick,
->    never yours.)
-> 2. **One instrument per collection round**, named for the round — baseline, 3-month, 6-month,
->    12-month. Not one instrument with a timepoint field: a survey link addresses an instrument,
->    so each round needs its own link and its own invitation schedule. **Read the round schedule
->    off the proposal**, and quote the sentence you took it from.
-> 3. **Branching on baseline-versus-follow-up.** A question that only makes sense at baseline
->    (prior experience, background, anything asked "before implementation") must not reappear at
->    follow-up, and a question that compares against baseline cannot be asked *at* baseline.
+> 1. **An email field, when there is more than one round.** It is how REDCap sends the next
+>    instrument, so it stays even where the documents say anonymous or "no PHI". On the baseline
+>    instrument, **flagged as an identifier**; that makes the project PHI-bearing, so
+>    `contains_phi` on the SIR is `1` (pushed with `--dd`, not asked). An anonymous study gets no
+>    name fields. (The two `phi_confirm` attestations say the protocol permits storing PHI: those
+>    are the PI's to tick, never yours.)
+> 2. **One instrument per collection round**, named for the round — baseline, 3-month, 6-month.
+>    Not one instrument with a timepoint field: each round needs its own link and invitation
+>    schedule. **Read the round schedule off the protocol** and quote the sentence you used.
+> 3. **Branching on baseline-versus-follow-up.** A baseline-only question (prior experience,
+>    anything asked "before implementation") must not reappear at follow-up; a question that
+>    compares against baseline can't be asked *at* baseline.
 > 4. **A consent question first, gating everything else.** A link goes out with no one in the
->    room, so consent is question one and every following field branches on it. Use the study's
->    approved consent form as the preamble — it is already in the File Repository.
+>    room. Use the approved consent form (in `ethics/`, from Step 1b) as the preamble.
 >
-> A **repeat-measures study that is NOT a survey** has the parallel problem: if the design has the
-> same record scored more than once — several rounds, or two independent reviewers per case — the
-> instrument needs a **round field, a reviewer field and a case identifier**, or the scores can't
-> be paired and disagreement can't be measured. Propose these the same way.
+> A **repeat-measures study that is not a survey** has the parallel gap: if the same record is
+> scored more than once — several rounds, or two independent reviewers per case — it needs a
+> **round field, a reviewer field and a case identifier**, or the scores can't be paired and
+> disagreement can't be measured. Propose these the same way.
 
 > ### The questionnaire is IRB-approved — mirror it, don't improve it
-> Only critically essential changes to a questionnaire are allowed (IRB amendments). So the
-> data dictionary matches the **printed form exactly**: spelling errors, numbering quirks, and
-> answer wordings are reproduced as-is, never fixed. A column printed with **no answer options**
-> becomes free text as printed — not a proposed coded list. None of these — typos, numbering,
-> wordings, a missing option list — is a change to propose or a question to ask: they are built as
-> printed and appear in **neither** of the two deliverables below.
+> Only critically essential changes are allowed (IRB amendments). So the DD matches the **printed
+> form exactly**: spelling errors, numbering quirks and answer wordings are reproduced as-is. A
+> column printed with **no answer options** becomes free text as printed. None of these — typos,
+> numbering, wordings, a missing option list — is a change to propose or a question to ask: they
+> appear in **neither** of the two deliverables below.
 >
-> This governs the **questions**, not the scaffolding around them. The survey block above adds an
-> email field, a consent gate, per-round instruments and branching — none of which alters an
-> approved question, and none of which is an amendment. Mirroring the form and giving it the
-> structure REDCap needs to collect it are different jobs.
+> This governs the **questions**, not the scaffolding around them. The survey structure above
+> alters no approved question and is no amendment. Mirroring the form and giving it the structure
+> REDCap needs are different jobs.
 >
 > ### The build always makes headway — best guess in, question out
-> Never stall on an ambiguity and never drop a field because the form is unclear. Where the form
-> can't be parsed cleanly — branching you can't resolve, an enumeration that isn't spelled out, an
-> implicit unit or range — put your **best guess in the DD** and keep building. Then log every
-> guess in **`OPEN_QUESTIONS.md`** in the build folder, one entry each, phrased as a question about
-> what you assumed and pointing at the field — *"Q7 / `pain_score`: the printed skip is ambiguous,
-> we assumed it only fires on Yes — accurate?"*
-> These are **questions about the build's assumptions, never proposed edits to the form**. Write
-> the file even when you guessed nothing — one line saying so.
+> This is about ambiguity *inside* documents you have — never a way around the hard stop. Once
+> the three documents are in, never stall and never drop a field because the form is unclear.
+> Branching you can't resolve, an enumeration not spelled out, an implicit unit: put your **best
+> guess in the DD** and keep building. Log every guess in **`OPEN_QUESTIONS.md`** in the build
+> folder, one entry each, as a question about what you assumed, pointing at the field — *"Q7 /
+> `pain_score`: the printed skip is ambiguous; we assumed it only fires on Yes — right?"* These
+> are questions about the build's assumptions, never proposed edits to the form. Write the file
+> even when you guessed nothing — one line saying so.
+>
+> **Keep it short enough to answer.** Only items that need an answer: at most three lines each,
+> each naming who must answer. **Never list something built as printed** — a typo, a numbering
+> quirk, a column with no options, a wording you kept: that is the rule working, not a question.
+> (A 70-field survey once got 20 items and 4,289 words, mostly as-printed reproductions; nobody
+> can sign that.)
+>
+> **Rewrite it, never append.** Each revision regenerates the open questions at the top; an
+> answered one leaves the list and becomes one line in a "Resolved" log at the bottom (question,
+> answer, who, date). The same goes for every status file in the build folder — a stale "open"
+> header above a later "resolutions" section reads as still open.
 >
 > **Escalate down the ladder, not straight to the PI.** Every question costs a round trip with a
-> clinician who has a clinic to run, so a question only reaches them when nobody else could have
-> answered it:
-> 1. **Resolve it from the documents.** The proposal, the SIR record, the study SOP and the
->    approved consent between them settle most of it — round schedules, sites, who self-completes,
->    what the endpoint counts. Read before asking.
-> 2. **Ask the database manager, in this session.** They know ARGO's conventions and can answer in
->    seconds what would take the PI a week. Design questions belong here — how a survey is
->    structured, whether a study needs DAGs, what a round is called.
-> 3. **Only then, the PI.** Reserve it for what genuinely needs their authority: clinical meaning,
->    what counts as one item to score, wording that would need an amendment, and any attestation.
+> clinician who has a clinic to run:
+> 1. **Resolve it from the documents.** The protocol, the SIR, the SOP and the consent settle
+>    most of it — round schedules, sites, who self-completes, what the endpoint counts.
+> 2. **Ask the database manager, in this session.** They know ARGO's conventions and answer in
+>    seconds what would take the PI a week. Design questions belong here.
+> 3. **Only then, the PI** — for what needs their authority: clinical meaning, what counts as one
+>    item, wording that would need an amendment, any attestation.
 >
-> The target is a sign-off packet the PI can mostly tick and return. A packet that asks them nine
+> The target is a sign-off packet the PI can mostly tick and return. A packet with nine
 > questions is a build that stopped early.
 
 > ### Changes the QUESTIONNAIRE itself needs → tracked changes on the original document
-> Substantive defects in the form are a different kind of thing: skip instructions pointing at
-> sections that don't exist, questions the SIR commits the study to that the form lacks,
-> structural contradictions. Those aren't assumptions you made — they're changes the
-> **questionnaire** needs, so they're delivered *on the questionnaire*:
-> - **Word original** → the original document with **tracked changes**, saved beside it as
+> Substantive defects in the form — a skip pointing at a section that doesn't exist, a question
+> the SIR commits to that the form lacks, a structural contradiction — aren't your assumptions;
+> they're changes the **questionnaire** needs, delivered *on the questionnaire*:
+> - **Word original** → the original with **tracked changes**, saved beside it as
 >   `<name>_redcap_changes.docx`. Use the **docx skill's tracked-changes support** (real
->   insertions/deletions, plus a comment on each one saying why and whether it needs an IRB
->   amendment). Never retype the questionnaire — edit a copy of the original, so the reviewer sees
->   their own document and accepts or rejects each change in place. **The document is the review
->   vehicle**; whoever holds the questionnaire reviews it there.
-> - **PDF original** (tracked changes aren't possible) → `<name>_redcap_changes.md` beside it,
->   listing each change: where it is, what it says now, what it should say, why, and whether it
->   needs an IRB amendment.
+>   insertions/deletions, a comment on each saying why and whether it needs an IRB amendment).
+>   Edit a copy of the original, never a retyped version: the reviewer accepts or rejects each
+>   change in their own document.
+> - **PDF original** → `<name>_redcap_changes.md` beside it: where, what it says now, what it
+>   should say, why, and whether it needs an IRB amendment.
 >
-> The DD you build still mirrors the form **as printed** — you propose the change on the document,
-> you don't pre-apply it to the dictionary. Surfaced, never applied.
+> The DD still mirrors the form **as printed** — surfaced on the document, never pre-applied.
 
 **Path A workflow:**
-1. Work from the questionnaires you ported in Step 1b
-   (`database-manager/<study>/questionnaires/`); extract with
-   `textutil -convert txt -stdout "file.docx"`.
+1. Work from `database-manager/<study>/questionnaires/` (Step 1b).
 2. Parse into a field list (instruments → forms; bullets → fields; sub-bullets → choices). Labels
-   must match the Word text **EXACTLY**; but normalize broken choice **codes** (duplicate/non-
-   sequential numbers, `99` for Other) — that's a DD mechanic, not a change to the form: say so in
-   the run per [[decision-protocol]], and put it in `OPEN_QUESTIONS.md` if you had to guess what
-   the code was meant to be. Grids of same-scale items → a REDCap **matrix group** (shared
-   `Matrix Group Name` + identical choices).
-3. Emit with `dd_builder.py` (do NOT hand-write the CSV) — import its `DD` class or feed a JSON spec:
-   ```bash
-   B=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name dd_builder.py 2>/dev/null | head -1)
-   python3 "$B" fields.json out.csv
-   ```
-4. Save `database-manager/<study>/<Project>_DataDictionary_<YYYY-MM-DD>.csv`; first field is the
-   record ID (meaningful name, not always `record_id` — [[record-id-safety]]). Patient-level DDs
-   also get `hospital_number` (identifier); surveys/non-patient-level skip it.
-5. Validate before upload:
-   ```bash
-   V=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name validate_dd.py 2>/dev/null | head -1)
-   python3 "$V" <csv>
-   ```
+   match the Word text **exactly**. Broken choice **codes** (duplicate or non-sequential numbers,
+   `99` for Other) do get normalized — that's a DD mechanic, not a change to the form. Say so in
+   the run per [[decision-protocol]], and log it in `OPEN_QUESTIONS.md` if you had to guess the
+   intended code. Grids of same-scale items → a **matrix group** (shared `Matrix Group Name` +
+   identical choices).
+3. Emit with `dd_builder.py`, never a hand-written CSV — import its `DD` class or feed a JSON
+   spec: `dd_builder.py fields.json out.csv` (add `--survey` for a self-completed survey).
+4. Save as `database-manager/<study>/<Project>_DataDictionary_<YYYY-MM-DD>.csv`. The first field
+   is the record ID (a meaningful name, not always `record_id` — [[record-id-safety]]).
+   Patient-level DDs also get `hospital_number` (identifier); surveys and non-patient-level DDs
+   skip it.
+5. Validate: `validate_dd.py <csv>` (`--patient-level` requires `hospital_number`; `--survey`
+   expects no MDC).
 6. **Show the structure back, unprompted.** A validated DD says the CSV is well-formed, not that
-   it is the right study. So end every DD build — and *especially* every rebuild — with a short
-   **structure table**: instrument by instrument, how many fields, what branches on what, and any
-   field you added that isn't on the printed form (with why). It is how the database manager
-   confirms the build is right before anything is uploaded, and it costs one table.
+   it is the right study. End every build and rebuild with a short **structure table**:
+   instrument by instrument, field count, what branches on what, and every field you added that
+   isn't on the printed form, with why. It is how the database manager confirms the build before
+   anything is uploaded.
 
-**Path B (audit):** run `validate_dd.py`, then compare field-by-field against the Word source.
-Categorize CRITICAL / ERROR / WARNING, present, fix via Edit (justify each), re-validate to clean.
-Check: duplicate/missing fields, choice-code mismatches, MDC gaps, `yesno` (convert to radio),
-branching, identifier flags, exact labels. Sister studies (same PI/HREC, separate SIRs) must share
-instrument structure — run `make_roles_csv.py` on both and compare `Forms detected`.
+**Path B (audit):** run `validate_dd.py`, then compare field by field against the questionnaire.
+Sort findings CRITICAL / ERROR / WARNING, present them, fix via Edit (justify each), re-validate
+to clean. Check: duplicate/missing fields, choice-code mismatches, MDC gaps, `yesno` (→ radio),
+branching, identifier flags, exact labels. Sister studies (same PI/HREC, separate SIRs) must
+share instrument structure — run `make_roles_csv.py` on both and compare `Forms detected`.
 
-User uploads the clean CSV via Designer → Upload Data Dictionary. Then mark `dd_uploaded`. **Full DD
-column reference: [[dd-column-spec]]. Read [[build-pitfalls]] first.**
+The user uploads the clean CSV via Designer → Upload Data Dictionary. Then mark it, passing the
+DD so `contains_phi` follows from its identifier flags:
+`sir_update.py <RID> --mark-step dd_uploaded --dd <csv>`.
+
+**Revised the DD after upload?** The step isn't done any more — the project holds the old one.
+Reset it at once with `sir_update.py <RID> --unmark-step dd_uploaded`, and mark it again only
+when the user confirms the new CSV is uploaded. ("The tracker says done and the project isn't.")
 
 ## Step 4 — Roles & users → `user_rights_complete`
-Build the roles file — no access key needed, this is the normal path:
 
 ```bash
-M=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name make_roles_csv.py 2>/dev/null | head -1)
-python3 "$M" <path-to-DD-CSV> [--clinical form1,form2,...] [--out path]
+make_roles_csv.py <path-to-DD-CSV> [--clinical form1,form2,...] [--out path]
 ```
 
-It writes `<study>_roles.csv` — the 4 standard ARGO roles ([[standard-roles]], which also
-carries REDCap's exact column order and the access-level codes) — next to the data dictionary,
-i.e. in `database-manager/<study>/`. The user uploads it at **User Rights → User Roles → Upload
-user roles (CSV)**; REDCap generates the `unique_role_name` values on upload.
+Writes `<study>_roles.csv` — the 4 standard ARGO roles ([[standard-roles]]) — next to the DD. No
+key needed. Study Builder and Project Manager export with identifier fields removed (decided
+2026-10-09), so the DD's `Identifier?` flags are what keep identifiers out of their exports. The
+user uploads it at **User Rights → User Roles → Upload user roles (CSV)**; REDCap generates the
+`unique_role_name` values. Multi-site study: create one Data Access Group
+per institution (`inst_name_*`) on the same page.
 
-Then people are added to those roles **in the REDCap UI**, on the same User Rights page. We
-don't know anyone's real REDCap username, so present who→role as a table for the user to work
-from — never generate an assignment file. Someone with no REDCap account at all needs an
-administrator to create one: record that in the Study Personnel Request tracker (PID 221).
+People are then added in the REDCap UI. We don't know anyone's real REDCap username, so present
+who→role as a table for the user to work from — never generate an assignment file. Someone with
+no REDCap account needs an administrator to create one: log them in the Study Personnel Request
+tracker (PID 221).
 
-Mark `user_rights_complete` as soon as the roles are uploaded and users assigned.
+Mark `user_rights_complete` once roles are uploaded and users assigned.
 
 ## Step 5 — Data import → `data_imported`
-Prospective study (`data_collection` = prospective) → no historical data: `--set data_imported=2`.
-Retrospective data exists → map source → `import_ready.csv`, validate with `validate_import.py`
-(branching-aware), then the user imports it in the REDCap UI (Data Import Tool → review changes
-before saving), then `--set data_imported=1`.
 
-## Step 6 — Setup: File Repository, weekly reports, DAGs (the MANUAL_SETUP_BRIEF)
-Generate the per-study UI checklist with `setup_brief.py`:
+- **Prospective** (`data_collection` = prospective): nothing to import —
+  `sir_update.py <RID> --set data_imported=2`.
+- **Retrospective data exists:** map the source to `import_ready.csv` (the questionnaire is
+  canonical — reshape the source to fit the DD; blanks stay blank, never MDC-filled), check it
+  with `validate_import.py <dd_csv> import_ready.csv` (branching-aware), and the user imports it
+  in the REDCap UI (Data Import Tool → review changes before saving). Then
+  `sir_update.py <RID> --mark-step data_imported`.
+
+## Step 6 — Setup and the outstanding list (the MANUAL_SETUP_BRIEF)
+
 ```bash
-B=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name setup_brief.py 2>/dev/null | head -1)
-python3 "$B" <RID> --out database-manager/<study> --moniker <Moniker>
+setup_brief.py <RID> --out database-manager/<study> --moniker <Moniker>
 ```
-It derives — from the SIR record — the File Repository rename table, the Data Access Groups, the
-user→role table, the IRB-expiry flag, and the `build_tracking` commands, so the manual work is
-copy-paste-and-click. (Works without an access key too: add `--from-json rec.json` to run from a
-`sir_update.py --pull` dump.) Review/augment the generated brief, which covers:
-- **File Repository:** the `irb_file_*` / `consent_file_*` / `sop` / `eligibility_checklist` /
-  questionnaire docs, each **renamed with the study moniker**, into Study Documents vs IRB/Ethics.
-  Site-numbered documents take their site tag from this study's own `inst_name_*` institutions —
-  a blank institution becomes a `[TODO]` in the rename table, never a site name from elsewhere.
-- **Data Access Groups:** one per institution (`inst_name_*`) for multi-site studies; assign users.
-- **Weekly reports:** from `weekly_stat` / `category` (skip/confirm with PM if blank).
-- **Form vs survey:** default to **data-entry forms** — ARGO's standard model is paper
-  questionnaire → RA enters. Only enable **survey mode** if the protocol/methods explicitly say
-  respondents *self-complete* (online link / app). Don't infer "survey" from the instrument being a
-  questionnaire — check the proposal. (Check the proposal for study **design** too, but build only
-  what the questionnaire contains — see Step 3's over-materialize note.)
-Flag anything the SIR leaves blank (PM not named, roles for co-investigators, etc.) as TODO.
 
-The study's folder under `database-manager/` should end up self-contained for handoff: the ported
-document folders from Step 1b, the DD CSV, the roles CSV, the `CREATE_NEW_PROJECT_<RID>.txt` paste
-sheet, the renamed File Repository docs, `OPEN_QUESTIONS.md` (Step 3 — written even if you guessed
-nothing), any `<name>_redcap_changes.docx` / `.md` beside the questionnaire it marks up (Step 3 —
-absent when the form needs no changes), and the `MANUAL_SETUP_BRIEF.md`.
+Add `--from-json intake.json` to work from the Step 1 pull without a key. The brief opens with
+the **Outstanding** table: the 7 tracker steps in tracker order, each with what to do, who does
+it, what it waits on, and done / not done read from the Study Tracker. Setup work the tracker
+has no flag for — File Repository, weekly report, survey settings — sits inside
+`review_internal`, because it has to be finished before the internal check.
+
+Then come the user's own requests that aren't tracker steps ("mark the identifiers so exports
+drop them"), read from `outstanding_requests.csv` in the build folder (columns `item, who,
+waiting_on, status`). Add a row the moment the user asks; set `status` to `done` when it is.
+In a real build such a request vanished from the final status because it lived only in the chat.
+
+This table is the build's status. Regenerate the brief after every mark or request and show the
+table whenever the user asks where things stand — including "are we done?". The brief is
+rewritten whole each run, never edited by hand.
+
+Below the table the brief derives, from the SIR: the File Repository rename table (each document
+**renamed with the study moniker**, into Study Documents vs IRB and Ethics; site-numbered files
+take their site tag from this study's own `inst_name_*` — a blank institution is a `[TODO]`,
+never a site name from elsewhere), the DAGs, the user→role table, the survey-setup clicks, and
+the IRB flags. Review it; a blank the SIR should hold is named with who fills it (Step 1).
+
+The study's folder ends up self-contained for handoff: the Step 1b document folders, the DD CSV,
+the roles CSV, `CREATE_NEW_PROJECT_<RID>.txt`, the staged `file-repository/` folder,
+`OPEN_QUESTIONS.md` (always), any `<name>_redcap_changes.docx` / `.md` beside the questionnaire
+it marks up, and `MANUAL_SETUP_BRIEF.md`.
 
 ## Steps 7–8 — Review → Production
-These are **human sign-off / go-live gates** (see the flag note above) — confirm with the
-responsible person before flipping each; never auto-mark them.
-- `review_internal` — internal QA pass on the built project.
-- `review_pi` — PM/PI sign-off.
-- **Before `study_production`:** check `irb_approval_expires` against today's date — if it's
-  **past**, the approval has lapsed: flag for renewal and do NOT move to production until confirmed
-  (backfill the renewed date via `--irb-expires`). Also confirm `user_rights_complete`. Then Project
-  Setup → Move to Production (`study_production` — the portfolio's "done" signal).
+
+Human gates (see "Two kinds of flags"): confirm with the responsible person before each.
+- `review_internal` — setup finished and the build checked.
+- `review_pi` — PI sign-off.
+- **Before `study_production`:** check `irb_approval_expires` against today. If it has passed,
+  the approval has lapsed: flag it and don't move to production until the renewal is confirmed
+  (backfill with `--irb-expires`). A *blank* `irb_number` or `irb_approval_expires` is a warning,
+  not a stop: name the field and that the PM / requester updates it on the Study Tracker, and
+  keep it on the Outstanding list (`sir_update.py` warns too). Then Project Setup →
+  Move to Production, and mark `study_production` — the portfolio's "done" signal.
 
 ---
 
 ## sir_update.py — the Study Tracker tool
-All build-state writes go through it (confirms the project is the Study Tracker before writing).
-Dates are `YYYY-MM-DD` on import ([[redcap-date-import]]).
 
-It shows the diff and pauses for a yes. In a session with no keyboard on the prompt, show the
-user the proposed change yourself, get their OK, then re-run with `--yes` (or
-`ARGO_ASSUME_YES=1`).
+Every Study Tracker write goes through it — never a hand-written `import_records` call. It
+confirms the key opens the Study Tracker, shows the current values and the diff, and asks before
+writing. In a session with no keyboard it stops at
+the question: show the user the change yourself, get their OK, then re-run with `--yes` (or
+`ARGO_ASSUME_YES=1`). Dates are `YYYY-MM-DD` ([[redcap-date-import]]).
 
 ```bash
-S=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name sir_update.py 2>/dev/null | head -1)
-
-# mark steps as they land
-python3 "$S" <RID> --pid 242 --mark-step project_created
-python3 "$S" <RID> --mark-step dd_uploaded
-python3 "$S" <RID> --mark-step user_rights_complete --set data_imported=2
-# IRB backfill any time
-python3 "$S" <RID> --irb-number IPH/OAU/12/3275 --irb-expires 2027-04-16
+sir_update.py <RID> --pid 242 --mark-step project_created
+sir_update.py <RID> --mark-step dd_uploaded --dd <csv>
+sir_update.py <RID> --irb-number IPH/OAU/12/3275 --irb-expires 2027-04-16   # any time
 ```
-### Which flag to use when
 
-`--mark-step` is **the** way progress reaches the tracker, from the first step to the last —
-including the final one. There is no separate "finish the build" command in the normal flow: you
-mark `study_production` with `--mark-step` like every other step, once the responsible person has
-confirmed it ([[access-tiers]]).
+`--mark-step` is the normal flow — one step, one push, as it happens. When the 7th step lands it
+also sets the `build_tracking` form to Complete. `--close-out` is the one-push ending (above).
+Other flags: `--pull`, `--pid`, `--status`, `--irb-number` / `--irb-expires`, `--yes`,
+`--dd <csv>` (adds `contains_phi=1` when the DD flags an identifier), `--close-out`,
+`--unmark-step <step>` (a step that stopped being true — Step 3), `--reopen` (clears
+`study_production`, status back to Building).
 
-| Situation | Use | Why |
+**Escape hatches — not the normal flow.** Each can move a study to "done" in one go, which is why
+none is a routine close-out:
+
+| Flag | Only for | Rule |
 |---|---|---|
-| A build step just landed — including the last one | `--mark-step <field>` | One step, one push, as it happens. This is the whole normal flow |
-
-**Escape hatches — not part of the normal flow.** Each of these can move a study to "done" in one
-go, which is exactly why none of them is a routine close-out path:
-
-| Flag | Only for | Warning |
-|---|---|---|
-| `--mark-built` | Retro-recording a build that was completed outside ARGO | It flips the human sign-off gates (`review_internal`, `review_pi`, `study_production`) in one shot. Run it only when the responsible person has confirmed all three |
-| `--close` | A study going live whose build was already marked complete | Sets production + open to accrual. Same rule: confirm with the responsible person first |
-| `--set F=V` | Two uses: `data_imported=2` for a prospective study (Step 5 — the documented path), and fixing one wrong value after the fact | Outside those, it bypasses the step-by-step record the tracker exists to keep |
-
-Other flags: `--pull`, `--pid`, `--status`, `--irb-number/--irb-expires`, `--reopen`, `--yes`.
-
-If the Study Tracker key isn't configured, set the same `build_tracking` fields by hand in the
-Study Tracker and say so — see the access note at the top of this skill.
+| `--mark-built` | Recording a build finished outside ARGO | Flips all 7 steps, including the three human gates. Only when the responsible person has confirmed all three |
+| `--close` | Opening a production study to accrual | Sets `study_production` + status Open to accrual. Same rule |
+| `--set F=V` | `data_imported=2` for a prospective study (Step 5); clearing a survey's `missing_data_codes` boxes with the `dd_uploaded` mark (Step 3); fixing one wrong value | Outside those it bypasses the step-by-step record the tracker exists to keep |
 
 ## Scripts in this skill
-`fill_new_project.py` (Step 2 paste sheet) · `dd_builder.py` + `validate_dd.py` (Step 3 build) ·
-`make_roles_csv.py` (Step 4 roles CSV) ·
-`validate_import.py` (Step 5) · `setup_brief.py` (Step 6 MANUAL_SETUP_BRIEF generator) ·
-`sir_update.py` (the tracker tool) ·
-`backfill_sir_from_csv.py` (bulk SIR loads from a spreadsheet — not part of the per-study loop;
-requires both `--commit` and an explicit `--record-id-range` before it will write anything).
+
+`fill_new_project.py` (Step 2) · `dd_builder.py` + `validate_dd.py` (Step 3) ·
+`make_roles_csv.py` (Step 4) · `validate_import.py` (Step 5) · `setup_brief.py` (Step 6) ·
+`sir_update.py` (the tracker tool) · `backfill_sir_from_csv.py` — a one-off bulk load from the
+retired Active Databases sheet, not part of the per-study loop. Its record matching is hardcoded
+to that migration, so don't point it at a new spreadsheet; it writes nothing without both
+`--commit` and `--record-id-range`.
+
+The **docx skill** produces the Step 3 `<name>_redcap_changes.docx` — it can put real tracked
+changes into a Word document. Don't hand-roll that file.
 
 ## Not here
-- **Adding people to a live project** → the REDCap UI, on the study's User Rights page. There
-  is no add-users skill; the people queue in [[weekly-check]] says what to do.
-- **Seeing what's waiting to be built** → [[weekly-check]] (say "what's waiting for me"), which
-  shows programme status and your open queues in one run.
+
+- **Adding people to a live project** → the REDCap UI, the study's User Rights page. There is no
+  add-users skill; the people queue in [[weekly-check]] says what to do.
+- **Seeing what's waiting to be built** → [[weekly-check]] ("what's waiting for me").
 
 ## References
-[[build-pitfalls]] (READ FIRST) · [[mdc-rules]] · [[dd-column-spec]] · [[token-optional]] ·
+
+[[build-pitfalls]] (read first) · [[mdc-rules]] · [[dd-column-spec]] · [[token-optional]] ·
 [[token-confirmation]] · [[record-id-safety]] · [[redcap-date-import]] · [[redcap-api-gotchas]] ·
 [[standard-roles]] · [[decision-protocol]]
-
-The **docx skill** produces the Step 3 `<name>_redcap_changes.docx` — it is the thing that can put
-real tracked changes into a Word document. Don't hand-roll that file.

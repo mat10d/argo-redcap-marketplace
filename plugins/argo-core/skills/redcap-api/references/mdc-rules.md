@@ -24,7 +24,7 @@ Append the four MDC values to the choice list:
 1, Yes | 0, No | -666, Patient does not know | -777, Patient refused to answer | -888, Missing in case notes | -999, Other missing
 ```
 
-**Import-CSV caveat for checkbox fields:** REDCap rejects checkbox bit columns named `field___-666` (with hyphen) on data import. Ingest scripts must either (a) omit the MDC bit columns entirely from the import CSV when no record actually has MDC for that checkbox (the common case for retrospective data), or (b) rename to `field___666` (hyphen stripped). Radio/dropdown fields are unaffected — they take the raw value (`-666`) as a single cell.
+**Import-CSV caveat for checkbox fields:** REDCap rejects checkbox bit columns named `field___-666` (with hyphen) on data import. Ingest scripts must either (a) omit the MDC bit columns entirely from the import CSV when no record actually has MDC for that checkbox (the common case for retrospective data), or (b) rename to `field___666` (hyphen stripped). Radio/dropdown fields are unaffected — they take the raw value (`-666`) as a single cell. `qa-worklists/upload_mdc.py` takes the column name from REDCap's own export of the project (e.g. `field____888`) and refuses if there isn't one.
 
 ### date fields (text with any `date*` / `datetime*` validation)
 ARGO dates are `date_dmy` (see [[dd-column-spec]]), but the rule is the validation *family*, not
@@ -53,6 +53,9 @@ The following field types do NOT need MDC:
 
 - **Record identifier** (first field in the DD) — does not need MDC
 - **Administrative / system fields** — fields like `hospital_site` that are set by the study team, not by the patient, do not need MDC. These are listed in `MDC_EXEMPT_VARS` in `argo-database-manager/skills/build-study/validate_dd.py`.
+- **Self-completed survey instruments carry no MDCs, programme-wide (decided 2026-10-09).** Build
+  with `dd_builder.py --survey`, validate with `validate_dd.py --survey`; the build also clears
+  the SIR's `missing_data_codes` boxes. MDCs are for data abstracted by staff.
 - **Validated psychometric / Likert instruments** — a published, scored scale is administered as published; adding MDC options changes the instrument. These are exempt, but the exemption has to be **declared**: mark them `@MDC-EXEMPT` (below).
 
 ## Declaring an exemption: `@MDC-EXEMPT`

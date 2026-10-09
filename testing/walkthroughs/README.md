@@ -26,5 +26,5 @@ Protocol per task:
    say what you'd wait for and continue as if the user did it".
 3. Agent returns: the Q/A log, every command it ran, files written, and its own claim of pass.
 4. The orchestrator grades: outputs vs MANIFEST counts; transcript vs the round's pass criteria
-   (testing/cowork/round.py ROLES + RUN-SHEET); any raw traceback or improvised client call
+   (written into the walkthrough brief); any raw traceback or improvised client call
    = fail.

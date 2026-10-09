@@ -191,7 +191,8 @@ computer can actually run, and [[run-analysis]] checks again before it writes an
 
 RAs aren't a role in this toolkit — QA specialists build *for* them. If someone says "I'm the
 new RA and was told to fix the yellow cells", they need no skill: the worklist Excel plus REDCap
-in a browser. Walk them through the RA workflow section of [[qa-worklists]].
+in a browser. Walk them through "What the RA sees" and the steps in "Hand it to the RAs" in
+[[qa-worklists]].
 
 ## Agent-facing: if they've already named a task
 

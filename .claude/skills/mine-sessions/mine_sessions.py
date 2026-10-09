@@ -81,7 +81,9 @@ def is_injected(text: str) -> bool:
 def sessions() -> list:
     if not STORE.is_dir():
         return []
-    return sorted((p for p in STORE.glob("*/*/local_*/audit.jsonl")),
+    # Cowork moved from `local_<uuid>/` to bare 8-hex folders around 2026-09-25; match both,
+    # or every session after the change is silently invisible.
+    return sorted((p for p in STORE.glob("*/*/*/audit.jsonl")),
                   key=lambda p: p.stat().st_mtime, reverse=True)
 
 
@@ -123,7 +125,10 @@ def read_session(path: Path) -> dict:
         if not argo and any(m in line for m in ARGO_MARKERS):
             argo = True
         if version is None:
-            m = re.search(r"ARGO toolkit (\d+\.\d+\.\d+)", line)
+            # Setup prints the stamp; the init event lists each loaded plugin's version even
+            # when setup never ran — without it most sessions read "no version stamp".
+            m = (re.search(r"ARGO toolkit (\d+\.\d+\.\d+)", line)
+                 or re.search(r'"name":\s*"argo-[a-z-]+"[^}]*?"version":\s*"(\d+\.\d+\.\d+)"', line))
             if m:
                 version = m.group(1)
         kind = e.get("type")

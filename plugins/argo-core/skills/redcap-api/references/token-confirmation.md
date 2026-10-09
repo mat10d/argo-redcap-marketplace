@@ -1,3 +1,8 @@
+---
+name: token-confirmation
+description: Every write through the shared client confirms the target project first — pass expect_pid= (or expect_title=) to each write call.
+---
+
 # Token confirmation
 
 Many ARGO projects share one API endpoint. The only thing distinguishing them is the access

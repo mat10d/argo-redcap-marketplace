@@ -377,7 +377,7 @@ class TestNewStudyPipelineDocMatchesTheProcedure(unittest.TestCase):
             "SKILL.md names template files the procedure doesn't have — a session will hunt the "
             f"File Repository for something that isn't there: {stray}")
         self.assertNotIn("ARGO IPH Protocol Template", self.doc,
-                         "there is no ARGO protocol template yet; that is Gate 1's stated gap")
+                         "the old protocol template name; the real one is ARGO Protocol Template.docx")
 
     def test_the_first_move_is_the_gate_question(self):
         opener = self.flatten(self.doc.split("## Your first move", 1)[1].split("\n## ", 1)[0])
@@ -428,6 +428,16 @@ class TestNewStudyPipelineDocMatchesTheProcedure(unittest.TestCase):
                         "consent scenario"):
             self.assertIn(blocker, fill_map,
                           f"the map must list {blocker!r} among what cannot be drafted")
+
+    def test_one_name_for_two_roles_fills_both(self):
+        """A real Gate-1 session (2026-09-24) asked for the PI and the biostatistician in one
+        question, got one name for both, recorded the biostatistician as missing and blocked
+        circulation. One role per question; a single name given for both fills both."""
+        mine = self.flatten(self.doc.split("## Before drafting anything", 1)[1].split("\n## ", 1)[0])
+        self.assertRegex(mine, r"(?i)one role per question")
+        self.assertRegex(mine, r"(?i)holds both roles")
+        self.assertRegex(mine, r"(?i)never mark a role missing that the answer filled")
+        self.assertRegex(self.gate[1], r"(?i)a person to bring in, not a gap to draft around")
 
     def test_gate_1_asks_about_collaborators_instead_of_assuming_them(self):
         """The keep-note's worked example taught the opposite of ARGO's house practice.
@@ -1341,6 +1351,17 @@ class TestScriptsDegradeGracefully(unittest.TestCase):
             if var.endswith(("_TOKEN", "_REQUEST", "_INITIATION")) or var == "REDCAP_URL":
                 env.pop(var)
         env["ARGO_PM_ROOT"] = str(Path(os.environ.get("TMPDIR", "/tmp")) / "argo-test-pm")
+        # Stripping variables is not enough: the client also searches ~/.argo/.env and
+        # ~/argo-work/.env, so on a developer's Mac every script loaded the REAL keys and read
+        # the live REDCap (NITS 87) — and the test timed out whenever the network was slow.
+        # An empty home is what "nothing configured" actually means.
+        empty_home = tempfile.mkdtemp(prefix="argo-empty-home-")
+        self.addCleanup(shutil.rmtree, empty_home, True)
+        env["HOME"] = empty_home
+        # ...but keep finding packages installed per-user (openpyxl, requests), which Python
+        # locates through HOME unless told otherwise.
+        import site
+        env.setdefault("PYTHONUSERBASE", site.getuserbase())
 
         failures = []
         for py in sorted(PLUGINS.rglob("*.py")):
