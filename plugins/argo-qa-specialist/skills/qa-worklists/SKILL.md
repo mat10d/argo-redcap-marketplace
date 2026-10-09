@@ -47,6 +47,9 @@ pre-lock QA before a data freeze, or to re-check after RAs have updated REDCap.
    looking (see *Where the data is* above).
 2. (Optional) **Scope CSV** — one column of record IDs to restrict to. Use when the project has
    rows the RA cohort doesn't own (e.g. linkage to a parent study).
+3. (Optional) **Field comments** — with the study's key they are read from the project's logging
+   automatically; without one, download the Field Comment Log (Applications → Field Comment Log
+   → CSV) and pass it with `--comments`. They make the worklist shorter (see *What the RA sees*).
 
 That is the whole list. *Which* fields get chased is your call and I ask you first; how they are
 split into workbooks is mine — next section.
@@ -134,7 +137,8 @@ your REDCap address isn't on the `REDCAP_URL` line of that file.
 
 *No key?* Replace `--token-env` with `--records-csv export.csv --metadata-csv
 data_dictionary.csv` — everything else is the same, and the Data Dictionary's human column
-headers are mapped automatically.
+headers are mapped automatically. Add `--comments field_comment_log.csv` for the field comments
+(with a key they are read from logging, no file needed).
 
 Outputs (`build_worklists.py` appends a per-round subdir, today's date by default):
 ```
@@ -145,7 +149,15 @@ qa-specialist/<study>/worklists/<round>/
   no_MDC/      # flags only true blanks (sentinels treated as "RA already looked")
     clinical_<DAG>.xlsx
     followup_<DAG>.xlsx
+  comment_checks.csv   # only with field comments — for you, not the RAs (below)
 ```
+
+`comment_checks.csv` lists two kinds of cell for you to look at: a blank whose field comment
+looks like the value (*value may be in the comment — enter it in the field*), and a filled cell
+whose comment clearly says the opposite — "No surgery done" on Surgery = Yes (*comment and
+value may disagree — check*). The rules are deliberately narrow and live in one place,
+`field_comments.py`; an explanation ("not in chart", "transferred", "died", "pending" …) always
+wins over a value-like match.
 
 Write the config to `qa-specialist/<study>/worklists/qa_fields.yaml` — one level above the
 round folders, so every round shares it and a change to the plan shows up as a diff.
@@ -155,6 +167,12 @@ round folders, so every round shares it and a change to the plan shows up as a d
 - One row per patient, one column per field.
 - Cells that are **applicable per branching logic AND blank** (or sentinel, in `with_MDC`) are
   highlighted **yellow** — these are confirmed gaps: the field applies and has no value.
+- Cells in **blue** (only when field comments were available) are blank, but someone already
+  explained why in a REDCap field comment — the comment is in the cell's note (hover over it).
+  *Confirm or ignore.* They are not counted as gaps to fill; the run says how many there were.
+  A comment that reads like the **value itself** ("Adenocarcinoma" on a blank biopsy result)
+  explains nothing: that cell stays yellow, and its note says *value may be in the comment —
+  enter it in the field*. The comment is never copied into the cell.
 - Cells in **amber** mean *"we couldn't read this field's condition — please check whether it
   applies"*. They are not an accusation that something was missed; the tool is telling you it
   doesn't know. Every condition that caused one is listed at the end of the run so the parser
@@ -187,7 +205,8 @@ Send each site its own workbook, and tell them:
 
 1. Open the workbook for your site.
 2. For each highlighted cell — yellow, or amber if the column asks you to check whether the
-   field applies — open the patient in REDCap, check source notes, fill in REDCap.
+   field applies — open the patient in REDCap, check source notes, fill in REDCap. Blue cells
+   are already explained by a field comment: leave them, unless the explanation is wrong.
 3. In the spreadsheet, type either the actual value, `filled`, or an MDC code into that cell to
    mark it resolved. The last column, `RESPONSE`, is for per-row context (why you couldn't
    fill it, a "RESOLVED" marker, patient died, etc.) — `review_responses.py` reads it, and
@@ -220,7 +239,8 @@ python3 "$W/review_responses.py" \
   value — with the RA's RESPONSE note next to them. Yellow *and* amber cells count: an answer
   in an amber cell is still an answer. Amber ones are tagged `[AMBER …]` in the output, because
   amber meant "we couldn't read this field's condition" — confirm the field applies at all
-  before you act on the value.
+  before you act on the value. A blue cell the RA answered anyway is an answer too, tagged
+  `[BLUE …]`.
 - **Records with RA notes but no cell changes** (often "RESOLVED" without filling, or "patient
   died/care elsewhere") — the REDCap check below looks at each of their flagged cells
 - **Cells changed that were NOT on the worklist** — a gate-context column, an ID column, any
@@ -272,7 +292,11 @@ no action, or a question.
 
 Field comments sit beside their cells. Comments are evidence, never values: a flagged cell still
 blank with a comment explaining it stays blank until you decide — it is never turned into a
-missing-data code for you. Comments on cells that weren't on the worklist are listed separately.
+missing-data code for you. Comments on this worklist's other cells are listed separately. Two
+more lists, same rules as `comment_checks.csv` in Task 1, for this worklist's patients:
+**value may be in the comment** (a question for the RA, already in the paste-ready block) and
+**comment and value may disagree** (for you to check — not sent as a question). Blue cells the
+RA left alone are counted once and need nothing.
 
 The report is short: counts first, then only what needs action, then a block ready to paste into
 `RA_questions.md`. Cells changed that were never on the worklist (from `review_responses.py`)

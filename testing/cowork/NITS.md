@@ -464,3 +464,11 @@ Refused unapproved questionnaire wording (IRB); tracked deletions rather than si
 the ethics document before acting; never flipped review/production/phi_confirm unasked; diff
 before every tracker write; refused to hand-roll a delete; a verifier subagent fact-checked the
 weekly report; "No data this week — not a quiet week" on a failed run.
+
+101. **Field comments put to work in QA (0.27.0).** Matteo: comments are where RAs explain blanks
+    and sometimes where the value itself was written. `field_comments.py` (one home): blanks
+    already explained by a comment turn blue and leave the "to fill" count; "value may be in the
+    comment" flags (choice label / date / number / free text, explanation words always win);
+    "comment and value may disagree" flags, strict. OPEN: measure noise on a real study (needs
+    Matteo's OK to read records), and whether rows with only blue cells should drop off.
+

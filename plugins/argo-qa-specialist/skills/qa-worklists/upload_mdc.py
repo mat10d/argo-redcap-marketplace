@@ -4,7 +4,8 @@ The one write a QA round allows (decided 2026-10-09, see argo-core access-tiers.
 value an RA returns, the RA enters in REDCap themselves. This script uploads a cell only when
 ALL of these hold, and refuses everything else, out loud:
 
-  1. the cell was on the worklist (flagged), and was a confirmed gap (yellow, not amber);
+  1. the cell was on the worklist (flagged), and was a confirmed gap (yellow, or blue — a field
+     comment had explained the blank — but not amber);
   2. the RA's answer is a missing-data code: -666 / -777 / -888 / -999 (mdc-rules.md) —
      in date form (8888-08-08) for a date field, as the code's option for a checkbox;
   3. the field can hold that code (a choice field must list it; yes/no, calculated, file,
@@ -16,6 +17,8 @@ ALL of these hold, and refuses everything else, out loud:
      or Field Note), isn't a validated scale or a self-completed survey (--survey-forms), and
      the RA's note / field comment fits it — "-999" needs a reason, "-666" for a patient who
      died, or a note saying the value is in the paper chart, is held back as a question.
+     Field comments come from field_comments.py (the log file, or logging with a key), the
+     same reader reconcile_return.py and build_worklists.py use.
 
 How a real upload is gated (like push_updates.py):
   --dry-run first      shows exactly what would be sent and what was refused; records a preview

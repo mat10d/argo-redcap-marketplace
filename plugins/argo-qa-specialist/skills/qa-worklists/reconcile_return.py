@@ -16,7 +16,14 @@ each flagged cell on that row is either in REDCap now, or still blank.
 
 Field comments (REDCap's Field Comment Log) are shown beside the cells they belong to. They are
 evidence, never values: a blank cell with a comment explaining it stays blank until the QA
-specialist decides what to do with it.
+specialist decides what to do with it. Two more checks read them (rules in field_comments.py),
+for the records on this worklist:
+  - a blank cell whose comment looks like the value itself -> "value may be in the comment —
+    enter it in the field" (a question for the RA);
+  - a filled cell whose comment clearly says the opposite ("not done", "declined") -> "comment
+    and value may disagree — check" (for you to look at).
+Blue cells (a comment had already explained the blank) the RA left alone are not counted as
+untouched — nothing was asked there.
 
 Where REDCap's current state comes from — one of:
   --token-env CRC_TOKEN                          the study's access key (pulls directly)
@@ -58,6 +65,14 @@ for _cand in (_here / "scripts",
 # The workbooks are read exactly once, by the same code the audit uses. A second reader is how
 # two tools end up disagreeing about which cells the RA answered.
 from review_responses import diff  # noqa: E402
+# Field comments are read, indexed and judged in ONE place, shared with build_worklists.py; the
+# names below stay importable from here (upload_mdc.py and the tests use them).
+from field_comments import (  # noqa: E402,F401
+    BUILTIN_CHOICES, FIELD_COMMENT_HEADERS, FIELD_COMMENT_REQUIRED, Comment, _norm, _read_csv,
+    choices_for, comment_text, comments_from_logging, comments_through_key, disagrees_with_value,
+    index_comments, parse_choices, read_comment_log, validation, value_in_comment,
+    DISAGREES, VALUE_IN_COMMENT,
+)
 
 IN_REDCAP = "IN REDCAP"
 NOT_ENTERED = "NOT ENTERED"
@@ -85,31 +100,6 @@ FILLED_MARKERS = {"filled", "done", "entered", "updated", "resolved", "corrected
 RESOLVED_NOTE_WORDS = ("resolv", "filled", "entered", "updated", "corrected", "fixed", "done")
 
 CHOICE_TYPES = ("radio", "dropdown", "yesno", "truefalse")
-BUILTIN_CHOICES = {"yesno": {"1": "Yes", "0": "No"}, "truefalse": {"1": "True", "0": "False"}}
-
-# REDCap's Field Comment Log download. Its exact column headings have not been confirmed
-# against a real download (OAU, REDCap 13.11.4) — so headings are matched by alias, in this one
-# table, and a file whose headings don't match fails loudly and names them.
-FIELD_COMMENT_HEADERS = {
-    "record": ("record", "record id", "record_id"),
-    "field": ("field", "field name", "variable", "variable name"),
-    "event": ("event", "event name"),
-    "instance": ("instance", "repeat instance"),
-    "user": ("user", "username"),
-    "comment": ("comment", "comments"),
-    "time": ("datetime", "date/time", "timestamp", "date", "time"),   # OAU 13.11.4 says "Datetime"
-}
-FIELD_COMMENT_REQUIRED = ("record", "field", "comment")
-
-
-class Comment(NamedTuple):
-    record: str
-    field: str
-    text: str
-    user: str = ""
-    time: str = ""
-    event: str = ""
-
 
 class Check(NamedTuple):
     """One cell checked against REDCap."""
@@ -139,34 +129,21 @@ class Reconciliation(NamedTuple):
     comment_source: str
     held_back: tuple = ()  # [(Check, reason)] — RA-returned MDCs that need the RA's word first
     mdc_share_note: str = ""
+    explained_left: int = 0     # blue cells (comment already explained the blank), not answered
+    comment_flags: tuple = ()   # [CommentFlag] — value in the comment / comment disagrees
+
+
+class CommentFlag(NamedTuple):
+    """A field comment that needs a look (field_comments.value_in_comment / disagrees_with_value)."""
+    record: str
+    header: str            # the worklist heading if the field is on it, else the field's label
+    field: str
+    redcap_now: str        # "blank", or the value as a person reads it
+    comment: str
+    reason: str
 
 
 # ---------------------------------------------------------------------------- reading REDCap
-
-def _norm(s) -> str:
-    return re.sub(r"\s+", " ", str(s or "").strip().lower())
-
-
-def parse_choices(spec: str) -> dict:
-    """'1, Yes | 0, No' -> {'1': 'Yes', '0': 'No'}."""
-    out = {}
-    for part in (spec or "").split("|"):
-        part = part.strip()
-        if not part:
-            continue
-        code, sep, label = part.partition(",")
-        out[code.strip()] = label.strip() if sep else code.strip()
-    return out
-
-
-def choices_for(meta: dict) -> dict:
-    ftype = meta.get("field_type", "")
-    return BUILTIN_CHOICES.get(ftype) or parse_choices(meta.get("select_choices_or_calculations", ""))
-
-
-def validation(meta: dict) -> str:
-    return (meta.get("text_validation_type_or_show_slider_number") or "").strip().lower()
-
 
 def is_date_field(meta: dict) -> bool:
     return meta.get("field_type") == "text" and validation(meta).startswith(("date", "datetime"))
@@ -196,16 +173,6 @@ _DD_TO_META = {
     "Branching Logic (Show field only if...)": "branching_logic",
     "Field Annotation": "field_annotation", "Field Note": "field_note",
 }
-
-
-def _read_csv(path: str, what: str) -> "tuple[list, list]":
-    p = Path(path).expanduser()
-    if not p.is_file():
-        raise SystemExit(f"I couldn't find the {what}:\n    {p}\n\nCheck the file name and folder.")
-    with open(p, newline="", encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)
-        return rows, list(reader.fieldnames or [])
 
 
 def load_metadata_file(path: str) -> list:
@@ -376,139 +343,6 @@ def mdc_code_of(value, meta: dict) -> str:
     return str(value) if str(value) in MDC_MEANINGS else ""
 
 
-# ---------------------------------------------------------------------------- field comments
-
-def _header_role(header: str) -> str:
-    h = _norm(header)
-    for role, aliases in FIELD_COMMENT_HEADERS.items():
-        if h in aliases:
-            return role
-    return ""
-
-
-def read_comment_log(path: str) -> list:
-    """The Field Comment Log CSV -> [Comment]. Headings matched by alias, never by position."""
-    rows, headers = _read_csv(path, "Field Comment Log")
-    roles = {}
-    unrecognised = []
-    for h in headers:
-        role = _header_role(h)
-        if role and role not in roles:
-            roles[role] = h
-        else:
-            unrecognised.append(h)
-    missing = [r for r in FIELD_COMMENT_REQUIRED if r not in roles]
-    if missing:
-        raise SystemExit(
-            "I can't read this Field Comment Log — I don't recognise its column headings.\n"
-            f"    file: {path}\n"
-            f"    headings found: {', '.join(repr(h) for h in headers) or '(none)'}\n"
-            f"    not recognised: {', '.join(repr(h) for h in unrecognised) or '(none)'}\n"
-            f"    still needed:   {', '.join(missing)}\n"
-            "\n"
-            "Download it from REDCap: Applications -> Field Comment Log -> export (CSV). If that\n"
-            "is what this is, REDCap has named its columns differently from what ARGO expects —\n"
-            "send this message to the ARGO team so the heading list can be updated.")
-    out = []
-    for r in rows:
-        get = lambda role: str(r.get(roles.get(role, ""), "") or "").strip()  # noqa: E731
-        if not get("record") or not get("comment"):
-            continue
-        out.append(Comment(get("record"), get("field"), get("comment"),
-                           get("user"), get("time"), get("event")))
-    return out
-
-
-_LOG_DETAIL = re.compile(r"^\s*(Add|Edit|Delete) field comment\s*\((.*)\)\s*$", re.S | re.I)
-
-
-def _split_details(inner: str) -> dict:
-    """'Record: 7, Event: "x, y", Field: "f", Comment: "a \\"b\\""' -> dict. Quote-aware."""
-    parts, buf, quoted, esc = [], [], False, False
-    for ch in inner:
-        if esc:
-            buf.append(ch); esc = False
-        elif ch == "\\" and quoted:
-            esc = True
-        elif ch == '"':
-            quoted = not quoted
-        elif ch == "," and not quoted:
-            parts.append("".join(buf)); buf = []
-        else:
-            buf.append(ch)
-    parts.append("".join(buf))
-    out = {}
-    for p in parts:
-        key, sep, val = p.partition(":")
-        if sep:
-            out[key.strip().lower()] = val.strip()
-    return out
-
-
-def comments_from_logging(entries: list) -> list:
-    """Replay REDCap logging (logtype=manage) into the field comments that exist now.
-
-    Kept: action 'Manage/Design' (REDCap 13 returns it with a trailing space) whose details read
-    'Add|Edit|Delete field comment (Record: …, Field: …, Comment: …)'. Replayed oldest first:
-    an edit replaces the latest comment by the same person on that cell, a delete removes it.
-    Verified 2026-10-09 on OAU REDCap 13.11.4 (CRC: 1,601 comment lines -> 1,398 live comments).
-    The field name is NOT quoted in `details`; the comment text is.
-    """
-    def ts(e):
-        return str(e.get("timestamp", ""))
-    live = {}
-    for e in sorted(entries, key=ts):
-        if str(e.get("action", "")).strip() != "Manage/Design":
-            continue
-        m = _LOG_DETAIL.match(str(e.get("details", "")))
-        if not m:
-            continue
-        verb, d = m.group(1).lower(), _split_details(m.group(2))
-        rec, field = d.get("record", "").strip(), d.get("field", "").strip()
-        if not rec or not field:
-            continue
-        key, user = (rec, field), str(e.get("username", ""))
-        c = Comment(rec, field, d.get("comment", ""), user, ts(e), d.get("event", ""))
-        thread = live.setdefault(key, [])
-        mine = [i for i, x in enumerate(thread) if x.user == user] or list(range(len(thread)))
-        if verb == "add":
-            thread.append(c)
-        elif verb == "edit" and mine:
-            thread[mine[-1]] = c
-        elif verb == "edit":
-            thread.append(c)
-        elif verb == "delete" and mine:
-            hit = [i for i in mine if thread[i].text == c.text]
-            thread.pop(hit[-1] if hit else mine[-1])
-    return [c for thread in live.values() for c in thread]
-
-
-def comments_through_key(client, since: str) -> "tuple[list, str]":
-    """Field comments from the project's logging, or ([], why-not). Never raises."""
-    params = {"content": "log", "logtype": "manage"}
-    if since:
-        params["beginTime"] = f"{since} 00:00"
-    try:
-        entries = client._post(**params)      # the shared client's transport; read-only
-    except Exception:                        # no Logging right, or an older REDCap
-        return [], "not available through the access key"
-    if not isinstance(entries, list):
-        return [], "not available through the access key"
-    return comments_from_logging(entries), f"project logging since {since or 'the start'}"
-
-
-def index_comments(comments: list, meta_by: dict, header_to_field) -> dict:
-    out = {}
-    for c in comments:
-        field = c.field
-        if field not in meta_by:
-            # the log may name a checkbox column, or a label rather than a field name
-            base = field.split("___")[0]
-            field = base if base in meta_by else (header_to_field(field)[0] or field)
-        out.setdefault((c.record, field), []).append(c)
-    return out
-
-
 # ---------------------------------------------------------------------------- MDC judgement
 
 # An RA-returned missing-data code is not taken on trust. Each one is checked before it can be
@@ -665,8 +499,12 @@ def reconcile(original: str, returned: str, rows: list, columns: list, metadata:
 
     # Rows with a note and no cell change: check each flagged cell on that row.
     answered = set(audit.by_record)
-    untouched = 0
+    untouched = explained_left = 0
     for (rid, header), (orig_text, kind) in sorted(flagged.items()):
+        if kind == "explained" and not any(a.field == header
+                                           for a in audit.by_record.get(rid, [])):
+            explained_left += 1          # a comment already explained it; nothing was asked
+            continue
         if rid in answered:
             if not any(a.field == header for a in audit.by_record[rid]):
                 untouched += 1
@@ -696,6 +534,8 @@ def reconcile(original: str, returned: str, rows: list, columns: list, metadata:
         site = max(set(dags), key=dags.count) if dags else Path(original).stem
 
     comment_index = index_comments(comments or [], meta_by, to_field)
+    flags = comment_flags(comment_index, {k[0] for k in flagged}, flagged, by_id, meta_by,
+                          columns, to_field)
     held = []
     for c in checks:
         if _mdc_candidate(c):
@@ -705,7 +545,39 @@ def reconcile(original: str, returned: str, rows: list, columns: list, metadata:
                 held.append((c, why))
     return Reconciliation(site, id_field, checks, explained, audit.notes, comment_index,
                           flagged_fields, audit.out_of_scope, untouched, source, comment_source,
-                          held, mdc_share_note(checks))
+                          held, mdc_share_note(checks), explained_left, tuple(flags))
+
+
+def comment_flags(comment_index: dict, records: set, flagged: dict, by_id: dict, meta_by: dict,
+                  columns, to_field) -> list:
+    """Field comments on this worklist's records that look like the value, or contradict it.
+
+    Judged against what REDCap holds NOW. Rules: field_comments.py. Never changes a value.
+    """
+    from build_worklists import clean_label
+    heading = {}
+    for (rid, header) in flagged:
+        f, _ = to_field(header)
+        if f:
+            heading[f] = header
+    out = []
+    for (rid, field), cs in sorted(comment_index.items()):
+        meta, row = meta_by.get(field), by_id.get(rid)
+        if rid not in records or meta is None or row is None:
+            continue
+        now = current_value(row, field, meta, columns)
+        if meta.get("field_type") == "checkbox":
+            raw = ",".join(sorted(now))
+        else:
+            raw = str(row.get(field, "") or "").strip()
+        header = heading.get(field) or clean_label(meta.get("field_label", "")) or field
+        for c in cs:
+            reason = (value_in_comment(c.text, meta) if is_blank(now)
+                      else disagrees_with_value(c.text, raw, meta))
+            if reason:
+                out.append(CommentFlag(rid, header, field, show(now, meta), c.text, reason))
+                break
+    return out
 
 
 # ---------------------------------------------------------------------------- the report
@@ -715,8 +587,7 @@ def _cell(text) -> str:
 
 
 def _comment_text(rec: Reconciliation, rid: str, field: str) -> str:
-    cs = rec.comments.get((rid, field), [])
-    return " / ".join(f"{c.text}" + (f" ({c.user})" if c.user else "") for c in cs)
+    return comment_text(rec.comments.get((rid, field), []))
 
 
 def _mdc_candidate(c: Check) -> bool:
@@ -756,6 +627,15 @@ def render(rec: Reconciliation) -> str:
     if rec.untouched:
         L.append(f"{rec.untouched} flagged cell(s) came back untouched. The next worklist "
                  "build will list them again.")
+    if rec.explained_left:
+        L.append(f"{rec.explained_left} blue cell(s) — already explained by a field comment — "
+                 "came back unanswered. Nothing to do.")
+    in_comment = [f for f in rec.comment_flags if f.reason.startswith(VALUE_IN_COMMENT)]
+    disagree = [f for f in rec.comment_flags if f.reason == DISAGREES]
+    if in_comment:
+        L.append(f"{len(in_comment)} blank cell(s) where the value may be in the field comment.")
+    if disagree:
+        L.append(f"{len(disagree)} cell(s) where the field comment and the value may disagree.")
     L.append("")
 
     def note(rid):
@@ -803,7 +683,19 @@ def render(rec: Reconciliation) -> str:
           blank_with_comment, ["Record", "Field", "Field comment"], lambda c: (
               c.record, c.header, _comment_text(rec, c.record, c.field)))
 
-    off = sorted((k, v) for k, v in rec.comments.items() if k not in rec.flagged_fields)
+    table("Value may be in the comment — ask the RA to enter it in the field", in_comment,
+          ["Record", "Field", "REDCap now", "Field comment", "Why"], lambda f: (
+              f.record, f.header, f.redcap_now, f.comment,
+              f.reason.replace(VALUE_IN_COMMENT, "").strip(" ()") or "free-text field"))
+    table("Comment and value may disagree — check", disagree,
+          ["Record", "Field", "REDCap now", "Field comment"], lambda f: (
+              f.record, f.header, f.redcap_now, f.comment))
+
+    # Only this worklist's records: a key run reads the WHOLE project's comments, and another
+    # site's comments are not this site's business.
+    on_list = {k[0] for k in rec.flagged_fields}
+    off = sorted((k, v) for k, v in rec.comments.items()
+                 if k not in rec.flagged_fields and k[0] in on_list)
     if off:
         L += ["## Field comments on cells not on the worklist", "",
               "| Record | Field | Field comment |", "|---|---|---|"]
@@ -826,13 +718,19 @@ def questions_block(rec: Reconciliation) -> list:
     items = {}
     held = {(c.record, c.field): why for c, why in rec.held_back}
     ok_mdc = uploadable_mdc(rec)
+    asked = set()
     for c in rec.checks:
+        if c.status != IN_REDCAP:
+            asked.add((c.record, c.field))
         if (c.record, c.field) in held and not c.from_note:
             items.setdefault(c.record, {}).setdefault("held", []).append(c)
         elif c.status == NOT_ENTERED and c not in ok_mdc:
             items.setdefault(c.record, {}).setdefault("enter", []).append(c)
         elif c.status in (DIFFERS, UNCLEAR):
             items.setdefault(c.record, {}).setdefault(c.status, []).append(c)
+    for f in rec.comment_flags:
+        if f.reason.startswith(VALUE_IN_COMMENT) and (f.record, f.field) not in asked:
+            items.setdefault(f.record, {}).setdefault("in_comment", []).append(f)
     if not items:
         return []
     L = ["## For RA_questions.md", "", "Copy the block below into RA_questions.md.", "",
@@ -859,6 +757,10 @@ def questions_block(rec: Reconciliation) -> list:
         for c in it.get(UNCLEAR, []):
             L.append(f"### {rid} — {c.header}: you wrote \"{c.ra_wrote}\". What did you mean? "
                      "Please enter the answer in REDCap.")
+        for f in it.get("in_comment", []):
+            L.append(f"### {rid} — {f.header}: the field is blank in REDCap, but its field "
+                     f"comment reads \"{f.comment}\". If that is the answer, could you enter it "
+                     "in the field itself?")
     L.append("")
     return L
 

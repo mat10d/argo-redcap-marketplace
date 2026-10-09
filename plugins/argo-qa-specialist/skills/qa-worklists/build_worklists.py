@@ -12,6 +12,14 @@ For each configured workbook (a named bundle of fields), this:
 Highlighted yellow cells = the RA needs to resolve these in REDCap. A second
 header row shows each field's branching prerequisite in plain language.
 
+Field comments (optional: --comments <Field Comment Log CSV>, or read from the project's logging
+when you use an access key). A blank cell that already carries a field comment explaining it is
+painted blue instead of yellow — "already explained in REDCap, confirm or ignore" — with the
+comment in the cell's note, and it is not counted as a gap to fill. A comment that looks like the
+VALUE ("Adenocarcinoma" on a blank biopsy result) keeps the cell yellow and says so in the note.
+Those, and filled cells whose comment contradicts the value, are listed in comment_checks.csv in
+the round folder. Rules: field_comments.py. No comments -> exactly the old behaviour.
+
 Usage (it finds your ARGO settings file by itself — there is nothing to load first):
   python build_worklists.py \\
       --token-env CRC_TOKEN \\
@@ -20,6 +28,7 @@ Usage (it finds your ARGO settings file by itself — there is nothing to load f
       [--scope-ids ids.csv]            # optional: limit to these record IDs
       [--id-field record_id]           # record-id field name (default: record_id)
       [--extra-id-cols research_number,collaboration_identifier]
+      [--comments field_comment_log.csv]  # optional; with a key, logging is read instead
 
 fields.yaml:
   workbooks:
@@ -45,12 +54,14 @@ import pandas as pd
 import requests
 import yaml
 from openpyxl import Workbook
+from openpyxl.comments import Comment as CellNote
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 # Same-folder imports, always: this skill carries its own copy of everything it needs.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from qa_colours import AMBER_HEX, YELLOW_HEX  # noqa: E402
+from qa_colours import AMBER_HEX, EXPLAINED_HEX, YELLOW_HEX  # noqa: E402
+import field_comments as fc  # noqa: E402  — reading and judging field comments, in one place
 
 # The shared ARGO scripts are vendored into this skill's own scripts/ folder by release.py,
 # so imports never depend on where — or whether — other plugins are installed. The parents walk
@@ -386,6 +397,8 @@ YELLOW          = PatternFill(start_color=YELLOW_HEX, end_color=YELLOW_HEX, fill
 # nothing is ever silently dropped, but they are NOT an assertion that the RA missed something —
 # they mean "we couldn't tell whether this applies; please check".
 UNCERTAIN       = PatternFill(start_color=AMBER_HEX, end_color=AMBER_HEX, fill_type="solid")
+# Blank, but a REDCap field comment already explains why: "confirm or ignore", not a gap to fill.
+EXPLAINED       = PatternFill(start_color=EXPLAINED_HEX, end_color=EXPLAINED_HEX, fill_type="solid")
 HEADER_FILL     = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
 RESPONSE_HEADER = PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid")
 HEADER_FONT     = Font(bold=True, color="FFFFFF")
@@ -430,10 +443,58 @@ def missing_and_certainty_for(field: str, raw_row: pd.Series, meta_by: dict,
     return flag_sentinels and val in SENTINEL_CODES, certain
 
 
+def is_blank_raw(field: str, raw_row: pd.Series, meta_by: dict) -> bool:
+    """Nothing at all in this cell (a checkbox: no option ticked) — not even a missing-data code."""
+    if (meta_by.get(field) or {}).get("field_type") == "checkbox":
+        return not any(str(raw_row.get(k, "")) == "1" for k in raw_row.index
+                       if k == field or k.startswith(f"{field}___"))
+    return str(raw_row.get(field, "")).strip() == ""
+
+
+NOTE_CHARS = 600     # a cell note is for reading at a glance; the full text is in REDCap
+
+
+def _quote(comments: list) -> str:
+    text = fc.comment_text(comments)
+    return f"\u201c{text[:NOTE_CHARS]}{'…' if len(text) > NOTE_CHARS else ''}\u201d"
+
+
+def cell_note(rid: str, field: str, rrow: pd.Series, meta_by: dict, comment_index: dict,
+              certain: bool) -> "tuple[str, str]":
+    """(kind, note) for a flagged cell that carries a field comment, else ("", "").
+
+    kind: "explained" — blank, and the comment explains it (painted blue, not counted to fill);
+          "value"     — blank, and the comment looks like the value itself (stays a gap);
+          "comment"   — anything else with a comment (shown, nothing changes).
+    Explained only on a yellow cell: amber means we don't know whether the field applies at all,
+    and a comment doesn't settle that.
+    """
+    cs = comment_index.get((rid, field)) if comment_index else None
+    if not cs:
+        return "", ""
+    meta = meta_by.get(field, {})
+    if is_blank_raw(field, rrow, meta_by):
+        for c in cs:
+            if fc.value_in_comment(c.text, meta):
+                return "value", (f"Field comment in REDCap: {_quote(cs)}\n\nThe value may be in "
+                                 "the comment — enter it in the field itself.")
+        if certain:
+            return "explained", (f"Already explained in REDCap — field comment: {_quote(cs)}\n\n"
+                                 "Confirm, or ignore this cell.")
+    return "comment", f"Field comment in REDCap: {_quote(cs)}"
+
+
 def build_workbook(labeled: pd.DataFrame, raw_by_id: dict, meta_by: dict,
                     prereq_map: dict, fields: list, label_map: dict,
-                    id_cols: list, title: str, flag_sentinels: bool) -> Workbook | None:
-    """One workbook = wide table, applicable-but-blank cells in yellow."""
+                    id_cols: list, title: str, flag_sentinels: bool,
+                    comment_index: "dict | None" = None,
+                    tally: "dict | None" = None) -> Workbook | None:
+    """One workbook = wide table, applicable-but-blank cells in yellow.
+
+    With `comment_index` ({(record, field): [Comment]}), a blank cell a field comment already
+    explains is blue, not yellow, and every flagged cell with a comment carries it as a note.
+    `tally`, if given, gets {"to_fill": n, "explained": n, "value": n} added to it.
+    """
     rows_with_work, fields_with_work = [], set()
     join_id = id_cols[0]
     for _, lrow in labeled.iterrows():
@@ -441,16 +502,25 @@ def build_workbook(labeled: pd.DataFrame, raw_by_id: dict, meta_by: dict,
         rrow = raw_by_id.get(rid)
         if rrow is None:
             continue
-        missing, uncertain = [], set()
+        missing, uncertain, notes = [], set(), {}
         for f in fields:
             flag, certain = missing_and_certainty_for(f, rrow, meta_by, flag_sentinels)
             if flag:
                 missing.append(f)
                 if not certain:
                     uncertain.add(f)
+                if comment_index:
+                    kind, note = cell_note(rid, f, rrow, meta_by, comment_index, certain)
+                    if kind:
+                        notes[f] = (kind, note)
         if missing:
-            rows_with_work.append((lrow, rrow, set(missing), uncertain))
+            rows_with_work.append((lrow, rrow, set(missing), uncertain, notes))
             fields_with_work.update(missing)
+            if tally is not None:
+                kinds = [notes.get(f, ("",))[0] for f in missing]
+                tally["explained"] = tally.get("explained", 0) + kinds.count("explained")
+                tally["value"] = tally.get("value", 0) + kinds.count("value")
+                tally["to_fill"] = tally.get("to_fill", 0) + len(missing) - kinds.count("explained")
 
     if not rows_with_work:
         return None
@@ -497,7 +567,7 @@ def build_workbook(labeled: pd.DataFrame, raw_by_id: dict, meta_by: dict,
         cell.alignment = Alignment(vertical="center", wrap_text=True)
     ws.freeze_panes = f"{get_column_letter(len(id_cols) + 1)}3"
 
-    for lrow, rrow, missing, uncertain in rows_with_work:
+    for lrow, rrow, missing, uncertain, notes in rows_with_work:
         out = [lrow.get(c, "") for c in id_cols]
         for f in display_fields:
             # By field NAME. Reading the cell back by its label is what crashed the builder on
@@ -508,8 +578,12 @@ def build_workbook(labeled: pd.DataFrame, raw_by_id: dict, meta_by: dict,
         row_idx = ws.max_row
         for i, f in enumerate(display_fields):
             if f in missing:
-                ws.cell(row=row_idx, column=len(id_cols) + 1 + i).fill = (
-                    UNCERTAIN if f in uncertain else YELLOW)
+                cell = ws.cell(row=row_idx, column=len(id_cols) + 1 + i)
+                kind, note = notes.get(f, ("", ""))
+                cell.fill = (EXPLAINED if kind == "explained"
+                             else UNCERTAIN if f in uncertain else YELLOW)
+                if note:
+                    cell.comment = CellNote(note, "ARGO", width=320, height=160)
 
     for i in range(1, len(header) + 1):
         ws.column_dimensions[get_column_letter(i)].width = max(14, min(32, len(str(header[i-1])) + 4))
@@ -536,6 +610,78 @@ def _expand_checkbox_columns(fields: list, raw_cols: list, meta_by: dict) -> lis
         elif f in raw_cols and f not in seen:
             out.append(f); seen.add(f)
     return out
+
+
+def _shown(field: str, raw_row: pd.Series, meta: dict) -> str:
+    """What REDCap holds, as a person reads it (choice codes as their labels)."""
+    choices = fc.choices_for(meta)
+    if meta.get("field_type") == "checkbox":
+        codes = [_option_code(k, field) for k in raw_row.index
+                 if k.startswith(f"{field}___") and str(raw_row.get(k, "")) == "1"]
+        return ", ".join(choices.get(c, c) for c in codes)
+    v = str(raw_row.get(field, "")).strip()
+    return choices.get(v, v) if choices else v
+
+
+def _stored(field: str, raw_row: pd.Series, meta: dict) -> str:
+    """What REDCap holds, as REDCap stores it (codes; a checkbox's ticked codes, comma-joined)."""
+    if meta.get("field_type") == "checkbox":
+        return ",".join(_option_code(k, field) for k in raw_row.index
+                        if k.startswith(f"{field}___") and str(raw_row.get(k, "")) == "1")
+    return str(raw_row.get(field, "")).strip()
+
+
+COMMENT_CHECK_COLUMNS = ["Site", "Record", "Field", "Label", "REDCap now", "Field comment", "Check"]
+
+
+def comment_findings(raw_by_id: dict, fields: list, meta_by: dict, comment_index: dict) -> list:
+    """Rows for comment_checks.csv: field comments that need a person to look.
+
+    - an applicable, BLANK cell whose comment looks like the value  -> fc.VALUE_IN_COMMENT
+    - a FILLED cell whose comment clearly contradicts the value     -> fc.DISAGREES
+    Only the fields this round asks about. Comments are evidence: nothing here changes a value.
+    """
+    out, wanted = [], set(fields)
+    for (rid, field), cs in sorted(comment_index.items()):
+        meta = meta_by.get(field)
+        if field not in wanted or meta is None:
+            continue
+        row = raw_by_id.get(rid)
+        if row is None:
+            continue
+        if is_blank_raw(field, row, meta_by):
+            if not missing_and_certainty_for(field, row, meta_by, False)[0]:
+                continue                     # the field doesn't apply here: nothing is missing
+            judge = lambda text: fc.value_in_comment(text, meta)  # noqa: E731
+        else:
+            stored = _stored(field, row, meta)
+            judge = lambda text: fc.disagrees_with_value(text, stored, meta)  # noqa: E731
+        for c in cs:
+            reason = judge(c.text)
+            if reason:
+                out.append({"Site": row.get("redcap_data_access_group", ""), "Record": rid,
+                            "Field": field, "Label": clean_label(meta.get("field_label", "")),
+                            "REDCap now": _shown(field, row, meta) or "blank",
+                            "Field comment": c.text, "Check": reason})
+                break
+    return out
+
+
+def load_comments(args, url: str = "", token: str = "") -> "tuple[list, str]":
+    """(comments, where from). The downloaded log if given; with a key, the project's logging."""
+    if args.comments:
+        comments = fc.read_comment_log(args.comments)
+        return comments, f"{Path(args.comments).name} ({len(comments)} comment(s))"
+    if token:
+        from argo_redcap_client import RedcapClient
+        try:
+            client = RedcapClient(token, url=url, label=args.token_env)
+        except Exception:
+            return [], ""
+        comments, why = fc.comments_through_key(client)
+        if comments or "logging" in why:
+            return comments, f"{why} ({len(comments)} comment(s))"
+    return [], ""
 
 
 # REDCap "Download Data Dictionary" CSV (human headers) -> API metadata keys, for no-token mode.
@@ -576,6 +722,8 @@ def main():
     ap.add_argument("--scope-ids", help="Optional CSV of record IDs to restrict to (one column, first row is header)")
     ap.add_argument("--id-field", default="record_id", help="REDCap record-id field name")
     ap.add_argument("--extra-id-cols", default="", help="Comma-separated extra ID columns to include in the worklist")
+    ap.add_argument("--comments", help="Optional: the Field Comment Log CSV (Applications -> Field "
+                                       "Comment Log). With an access key it is read from logging.")
     args = ap.parse_args()
     if args.round_tag is None:
         args.round_tag = ""
@@ -609,6 +757,7 @@ def main():
         print(f"No-token mode: reading {args.records_csv} + {args.metadata_csv} ...")
         raw = pd.read_csv(args.records_csv, dtype=str, keep_default_na=False)
         metadata = load_metadata_csv(args.metadata_csv)
+        comments, comment_source = load_comments(args)
     elif args.token_env:
         # Load the ARGO settings file ourselves. There is nothing for the user to source first,
         # and --url is only needed if their REDCap address isn't in that file already.
@@ -643,6 +792,7 @@ def main():
         print(f"Pulling records + metadata from {url} ...")
         raw = pull_records(url, token)
         metadata = pull_metadata(url, token)
+        comments, comment_source = load_comments(args, url, token)
     else:
         sys.exit(
             "I need to know where to get the study's data from, and you haven't told me yet.\n"
@@ -655,6 +805,9 @@ def main():
             "      --token-env YOUR_STUDY_TOKEN"
         )
     meta_by = {m["field_name"]: m for m in metadata}
+    comment_index = fc.index_comments(comments, meta_by)
+    if comment_source:
+        print(f"Field comments: {comment_source}")
 
     if args.id_field not in raw.columns:
         sys.exit(f"--id-field {args.id_field!r} not in record columns: {list(raw.columns)[:8]}...")
@@ -673,6 +826,7 @@ def main():
     dags = sorted(raw["redcap_data_access_group"].unique())
     print(f"DAGs: {dags}")
 
+    totals, findings = {}, []
     for wb_cfg in workbooks_cfg:
         wb_name = wb_cfg["name"]
         title = wb_cfg.get("title", wb_name)
@@ -693,8 +847,10 @@ def main():
             if sub.empty:
                 continue
             for flag_sentinels, subfolder in [(True, "with_MDC"), (False, "no_MDC")]:
+                tally = {}
                 wb = build_workbook(sub, raw_by_id, meta_by, prereq_map,
-                                    fields, label_map, id_cols, title, flag_sentinels)
+                                    fields, label_map, id_cols, title, flag_sentinels,
+                                    comment_index=comment_index, tally=tally)
                 folder = os.path.join(args.out, subfolder)
                 os.makedirs(folder, exist_ok=True)
                 tag = f"{wb_name}_{dag}"
@@ -704,10 +860,43 @@ def main():
                 path = os.path.join(folder, f"{tag}.xlsx")
                 wb.save(path)
                 ws = wb.active
-                print(f"  wrote {path}  ({ws.max_row - 2} patients × {ws.max_column - len(id_cols)} fields)")
+                counts = ""
+                if comment_index:
+                    counts = (f"; {tally.get('to_fill', 0)} to fill, "
+                              f"{tally.get('explained', 0)} already explained")
+                print(f"  wrote {path}  ({ws.max_row - 2} patients × "
+                      f"{ws.max_column - len(id_cols)} fields{counts})")
+                if subfolder == "with_MDC":
+                    for k, v in tally.items():
+                        totals[k] = totals.get(k, 0) + v
+        if comment_index:
+            findings += comment_findings(raw_by_id, fields, meta_by, comment_index)
 
     print("Done.")
+    if comment_index:
+        print_comment_summary(totals, findings, args.out)
     report_unparseable_logic()
+
+
+def print_comment_summary(totals: dict, findings: list, out_dir: str) -> None:
+    """What the field comments changed, in three plain lines (counts from the with_MDC set)."""
+    print(f"\nField comments: {totals.get('explained', 0)} gap(s) were already explained in "
+          "REDCap — painted blue, not counted as to fill.")
+    print(f"  {totals.get('to_fill', 0)} gap(s) left to fill (with_MDC workbooks).")
+    # Two workbooks may share a field; a cell is listed once.
+    findings = list({(f["Record"], f["Field"]): f for f in findings}.values())
+    in_comment = sum(1 for f in findings if f["Check"].startswith(fc.VALUE_IN_COMMENT))
+    disagree = sum(1 for f in findings if f["Check"] == fc.DISAGREES)
+    if not findings:
+        return
+    path = os.path.join(out_dir, "comment_checks.csv")
+    pd.DataFrame(findings, columns=COMMENT_CHECK_COLUMNS).to_csv(path, index=False)
+    if in_comment:
+        print(f"  {in_comment} blank cell(s) where the value may be in the comment — enter it in "
+              "the field (the worklist note says so).")
+    if disagree:
+        print(f"  {disagree} filled cell(s) where the comment and the value may disagree — check.")
+    print(f"  Listed in {path}")
 
 
 if __name__ == "__main__":

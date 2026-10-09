@@ -4,7 +4,8 @@ Reports, grouped by record:
   - ANSWERS: a cell the worklist flagged (yellow "this applies and is blank", or amber
     "we couldn't read this field's condition — please check") that now holds a different,
     non-blank value. Amber answers are reported and tagged as such: an answer in an amber
-    cell is still an answer.
+    cell is still an answer. So is an answer in a blue cell ("already explained in a REDCap
+    field comment"), tagged too.
   - The RA's per-row RESPONSE / comment note.
   - OUT-OF-SCOPE EDITS: any other cell the RA changed — a gate-context column, an ID
     column, a field that was never flagged. These are reported separately because they are
@@ -98,7 +99,7 @@ def _row_to_dict(ws, header_row=1, prereq_row=2):
 # The fills the builder paints, from the one place they're defined. Retyping them here is
 # how a returned workbook stops being recognised at all — every RA answer in it silently
 # discarded — so this imports rather than copies. See qa_colours.py.
-from qa_colours import AMBER_HEX, LEGACY_FLAG_HEXES, YELLOW_HEX  # noqa: E402
+from qa_colours import AMBER_HEX, EXPLAINED_HEX, LEGACY_FLAG_HEXES, YELLOW_HEX  # noqa: E402
 
 # Fill colour -> what the worklist was asking the RA to do.
 #
@@ -106,7 +107,9 @@ from qa_colours import AMBER_HEX, LEGACY_FLAG_HEXES, YELLOW_HEX  # noqa: E402
 # painted. A site that received a worklist before the colour changed sends it back in the old
 # rose months later; the RA did the work either way. Reading only the current yellow made one
 # live round report 5 of 36 answers and say nothing about the other 31.
-FLAG_KINDS = {YELLOW_HEX: "yellow", AMBER_HEX: "amber"}
+# EXPLAINED_HEX ("blue") reads as flagged too: the builder painted it because a field comment
+# already explained the blank, so the RA wasn't asked to fill it — but an answer there is an answer.
+FLAG_KINDS = {YELLOW_HEX: "yellow", AMBER_HEX: "amber", EXPLAINED_HEX: "explained"}
 FLAG_KINDS.update({h: "yellow" for h in LEGACY_FLAG_HEXES})
 LEGACY_HEXES = frozenset(LEGACY_FLAG_HEXES)
 
@@ -125,7 +128,8 @@ class Answer(NamedTuple):
     field: str
     was: str
     now: str
-    kind: str          # "yellow" (confirmed gap) or "amber" (condition unreadable)
+    kind: str          # "yellow" (confirmed gap), "amber" (condition unreadable), or
+                       # "explained" (blue: a field comment already explained the blank)
 
 
 class OutOfScopeEdit(NamedTuple):
@@ -164,7 +168,7 @@ def _flag_hex(cell) -> str:
 
 
 def _fill_kind(cell) -> str:
-    """"yellow" / "amber" / "" for a cell, by its fill colour.
+    """"yellow" / "amber" / "explained" / "" for a cell, by its fill colour.
 
     A retired fill (see qa_colours.LEGACY_FLAG_HEXES) reads as "yellow": it asked the RA the
     same question, in the colour the builder used at the time.
@@ -343,6 +347,7 @@ def main():
     audit = diff(orig, resp)
     by_record, notes, id_field = audit.by_record, audit.notes, audit.id_field
     amber_total = sum(1 for cells in by_record.values() for a in cells if a.kind == "amber")
+    blue_total = sum(1 for cells in by_record.values() for a in cells if a.kind == "explained")
     print(f"Original: {orig}")
     print(f"Response: {resp}")
     print(f"RESPONSE column present: {audit.has_response_col}")
@@ -353,6 +358,9 @@ def main():
     if amber_total:
         print(f"{amber_total} of the answers are in amber cells "
               "(we could not read the field's condition — check the field really applies)")
+    if blue_total:
+        print(f"{blue_total} of the answers are in blue cells "
+              "(a field comment in REDCap had already explained the blank)")
     print("=" * 100)
     for rid in sorted(by_record):
         note = notes.get(rid, "")
@@ -360,8 +368,10 @@ def main():
         if note:
             print(f"  RA note: {note}")
         for ans in by_record[rid]:
-            tag = "   [AMBER — we could not read this field's condition; confirm it applies]" \
-                if ans.kind == "amber" else ""
+            tag = {"amber": "   [AMBER — we could not read this field's condition; "
+                            "confirm it applies]",
+                   "explained": "   [BLUE — a field comment in REDCap had already explained "
+                                "this blank]"}.get(ans.kind, "")
             print(f"    {ans.field}{tag}")
             print(f"      was: {ans.was!r}")
             print(f"      now: {ans.now!r}")
