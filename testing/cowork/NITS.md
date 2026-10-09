@@ -453,8 +453,11 @@ the `local_*` glob saw none of them; it also missed the version in the init even
     was recorded missing. One role per question; one name fills both.
 100. **QA re-uploaded RA answers / checked only indirectly.** Matteo: QA checks REDCap reflects
     the returned form, uses the Field Comment Log, and uploads only judged MDCs into blank
-    cells. `reconcile_return.py`, `upload_mdc.py`. OPEN: confirm the Field Comment Log CSV
-    headings and the logging `details` format on OAU 13.11.4 with a real comment.
+    cells. `reconcile_return.py`, `upload_mdc.py`. **Confirmed 2026-10-09 (0.26.1):** the
+    downloaded log's headings are `Record, Field, User, Datetime, Comment` (Datetime was not an
+    alias); logging rebuilds the log with a key (CRC: 1,601 lines -> 1,398 comments; field name
+    unquoted). The key path had defaulted to the round date and saw 50 of them — comments that
+    explain a blank predate the round by years, so it now replays the whole history.
 
 ### What went right — don't "fix" these
 Refused unapproved questionnaire wording (IRB); tracked deletions rather than silent edits; read

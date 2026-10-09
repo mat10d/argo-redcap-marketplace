@@ -633,5 +633,48 @@ class TestDoctrineIsConsistent(unittest.TestCase):
                     self.assertNotIn(s, text)
 
 
+
+
+class FieldCommentsInOAUsRealShape(unittest.TestCase):
+    """Shapes confirmed against OAU REDCap 13.11.4 on 2026-10-09 (values here are synthetic)."""
+
+    def test_the_downloaded_log_with_its_real_headings(self):
+        import reconcile_return as rr
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "Study_CommentLog_2026-10-09.csv"
+            p.write_text('Record,Field,User,Datetime,Comment\n'
+                         '1-001,core_result,ra_one,"2023-07-18 11:16:08","not in chart, asked"\n')
+            [c] = rr.read_comment_log(str(p))
+        self.assertEqual((c.record, c.field, c.text, c.user), ("1-001", "core_result",
+                                                               "not in chart, asked", "ra_one"))
+        self.assertEqual(c.time, "2023-07-18 11:16:08", "'Datetime' is the real heading")
+
+    def test_logging_lines_with_an_unquoted_field_name(self):
+        import reconcile_return as rr
+        log = [
+            {"timestamp": "2023-01-01 09:00", "username": "ra", "action": "Manage/Design ",
+             "details": 'Add field comment (Record: 1-001, Field: tx_date, Comment: "first, draft")'},
+            {"timestamp": "2023-01-02 09:00", "username": "ra", "action": "Manage/Design ",
+             "details": 'Edit field comment (Record: 1-001, Field: tx_date, Comment: "chart lost")'},
+            {"timestamp": "2023-01-03 09:00", "username": "ra", "action": "Manage/Design ",
+             "details": 'Add field comment (Record: 1-002, Field: tx_date, Comment: "gone")'},
+            {"timestamp": "2023-01-04 09:00", "username": "ra", "action": "Manage/Design ",
+             "details": 'Delete field comment (Record: 1-002, Field: tx_date, Comment: "gone")'},
+        ]
+        live = rr.comments_from_logging(log)
+        self.assertEqual([(c.record, c.field, c.text) for c in live],
+                         [("1-001", "tx_date", "chart lost")])
+
+    def test_a_key_run_replays_the_whole_history_by_default(self):
+        import reconcile_return as rr
+        seen = {}
+
+        class Client:
+            def _post(self, **params):
+                seen.update(params)
+                return []
+        rr.comments_through_key(Client(), "")
+        self.assertNotIn("beginTime", seen, "comments explaining a blank often predate the round")
+
 if __name__ == "__main__":
     unittest.main()

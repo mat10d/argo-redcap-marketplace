@@ -97,7 +97,7 @@ FIELD_COMMENT_HEADERS = {
     "instance": ("instance", "repeat instance"),
     "user": ("user", "username"),
     "comment": ("comment", "comments"),
-    "time": ("date/time", "timestamp", "date", "time"),
+    "time": ("datetime", "date/time", "timestamp", "date", "time"),   # OAU 13.11.4 says "Datetime"
 }
 FIELD_COMMENT_REQUIRED = ("record", "field", "comment")
 
@@ -451,7 +451,8 @@ def comments_from_logging(entries: list) -> list:
     Kept: action 'Manage/Design' (REDCap 13 returns it with a trailing space) whose details read
     'Add|Edit|Delete field comment (Record: …, Field: …, Comment: …)'. Replayed oldest first:
     an edit replaces the latest comment by the same person on that cell, a delete removes it.
-    Unverified against a live project — no comments existed in the projects probed.
+    Verified 2026-10-09 on OAU REDCap 13.11.4 (CRC: 1,601 comment lines -> 1,398 live comments).
+    The field name is NOT quoted in `details`; the comment text is.
     """
     def ts(e):
         return str(e.get("timestamp", ""))
@@ -898,7 +899,7 @@ def gather(args) -> tuple:
         comments = read_comment_log(args.comments)
         comment_source = f"{Path(args.comments).name} ({len(comments)} comment(s))"
     elif client is not None:
-        comments, why = comments_through_key(client, args.comments_since or _round_date(args.original))
+        comments, why = comments_through_key(client, args.comments_since)
         comment_source = (f"{why} ({len(comments)} comment(s))" if comments or "logging" in why
                           else "not included — download Applications → Field Comment Log and "
                                "pass it with --comments")
@@ -922,8 +923,9 @@ def add_source_args(ap: argparse.ArgumentParser) -> None:
     ap.add_argument("--metadata-csv", help="No-key mode: the Data Dictionary CSV")
     ap.add_argument("--comments", help="The Field Comment Log CSV downloaded from REDCap")
     ap.add_argument("--comments-since", default="",
-                    help="With a key: read field comments from this date (YYYY-MM-DD). "
-                         "Defaults to the worklist's round date.")
+                    help="With a key: only replay logging from this date (YYYY-MM-DD). Leave it out — "
+                         "comments explaining a blank often predate the round by years, and "
+                         "a cut-off history replays edits and deletes wrongly.")
     ap.add_argument("--site", help="Site name for the report (defaults to the records' DAG)")
     ap.add_argument("--survey-forms", default="",
                     help="Comma-separated forms that are self-completed surveys (no codes there)")

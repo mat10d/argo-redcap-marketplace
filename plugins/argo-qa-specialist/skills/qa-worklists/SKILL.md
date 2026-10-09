@@ -249,11 +249,11 @@ python3 "$W/reconcile_return.py" \
 ```
 
 *Have the study's key?* Replace the two `--…-csv` options with `--token-env CRC_TOKEN`. With a
-key and no `--comments` file, field comments are read from the project's logging if the key is
-allowed to; if not, the report says so and you download the log instead. (Reading comments from
-logging is untested on a live project — none existed when it was built. The downloaded log's
-column headings aren't confirmed against a real download either: if they don't match, the script
-stops and names them.)
+key and no `--comments` file, field comments are rebuilt from the project's whole logging
+history — no download needed. REDCap has no API for the Field Comment Log itself, but every
+comment add, edit and delete is logged. If the key isn't allowed to read logging, the report says
+so and you download the log instead (Applications → Field Comment Log → CSV; columns
+`Record, Field, User, Datetime, Comment`).
 
 It reads only. Each answered cell gets one status — compared the way REDCap stores values
 (labels and codes, any date layout, checkbox options):
