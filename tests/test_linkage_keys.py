@@ -23,6 +23,16 @@ class Sites(unittest.TestCase):
         self.assertEqual(lk.site_code("uith_ilorin"), "UITH")
         self.assertIsNone(lk.site_code("somewhere new"))
 
+    def test_coded_site_fields_decode_to_the_same_site_across_projects(self):
+        crc = lk.site_choices("0, OAUTHC, Ile-Ife | 15, NHA, Abuja | 2, FMC, Owo | 8, FMC, Abeokuta")
+        breast = lk.site_choices("1, OAUTHC, Ile-Ife | 19, NH, Abuja | 21, AEFUTH, Abakaliki "
+                                 "| 2, FMC, Owo | 15, FMC Kebbi | -888, Missing in case notes")
+        self.assertEqual((crc["0"], crc["15"]), (breast["1"], breast["19"]))
+        self.assertEqual((crc["2"], crc["8"], breast["15"]), ("FMC-OWO", "FMC-ABEOKUTA", "FMC-KEBBI"))
+        self.assertNotIn("-888", breast)
+        self.assertEqual(lk.site_choices("8, FMC, Abeokuta"), {"8": "FMC-ABEOKUTA"},
+                         "a lone FMC label still keeps its town")
+
 
 class HospitalNumbers(unittest.TestCase):
     def test_missing_values_are_missing_never_keys(self):

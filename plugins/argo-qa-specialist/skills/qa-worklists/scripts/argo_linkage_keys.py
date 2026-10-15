@@ -36,24 +36,31 @@ SITE_ALIASES = {
     "LUTH": ["luth", "lagos university teaching hospital"],
     "LASUTH": ["lasuth"],
     "UITH": ["uith", "uith_ilorin", "ilorin"],
-    "NHA": ["nha", "nha_abuja", "national hospital abuja"],
+    "NHA": ["nha", "nha_abuja", "national hospital abuja", "nh", "nh abuja"],   # Breast spells it NH
     "UMTH": ["umth", "maiduguri"],
     "UCH": ["uch", "uch_ibadan", "ibadan"],
     "EKSUTH": ["eksuth"],
     "OOUTH": ["oouth"],
     "OSTC": ["ostc"],
     # Breast_FTHA.Rmd treats these two DAGs as one site (Alex Ekwueme FUTH, Abakaliki).
-    "AEFUTHA": ["aefutha", "aefutha_abakaliki", "ftha"],
+    "AEFUTHA": ["aefutha", "aefutha_abakaliki", "ftha", "aefuth", "aefuth abakaliki"],
     # Breast_FMC.Rmd treats 'fmc' and 'fmc_owo' as one site.
     "FMC-OWO": ["fmc_owo", "fmc owo", "fmc"],
 }
-_ALIAS = {a: code for code, names in SITE_ALIASES.items() for a in names + [code.lower()]}
+def _norm_site(s) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(s or "").lower()).strip()
+
+
+_ALIAS = {_norm_site(a): code for code, names in SITE_ALIASES.items()
+          for a in names + [code.lower()]}
 
 
 def site_code(raw) -> str | None:
     """The site code for any known spelling, or None if the spelling is unknown."""
-    s = re.sub(r"\s+", " ", str(raw or "").strip().lower())
-    return _ALIAS.get(s) or _ALIAS.get(s.replace(" ", "_"))
+    return _ALIAS.get(_norm_site(raw))
+
+
+SHARED_NAMES = {"fmc", "lth", "fth"}   # several hospitals carry these names: never a site alone
 
 
 def site_choices(choices: str) -> dict:
@@ -71,12 +78,13 @@ def site_choices(choices: str) -> dict:
     for (code, label), first in zip(pairs, firsts):
         if code in MDC_CODES:
             continue
-        known = site_code(first)
-        if known and firsts.count(first) == 1:
-            out[code] = known
+        whole = re.sub(r"[^A-Za-z0-9]+", "-", label).strip("-").upper()
+        if site_code(label):                                  # 'NH, Abuja' -> NHA
+            out[code] = site_code(label)
+        elif first not in SHARED_NAMES and site_code(first) and firsts.count(first) == 1:
+            out[code] = site_code(first)                      # 'OAUTHC, Ile-Ife' -> OAUTHC
         else:
-            whole = re.sub(r"[^A-Za-z0-9]+", "-", label).strip("-").upper()
-            out[code] = site_code(label) or whole
+            out[code] = whole                                 # 'FMC, Abeokuta' -> FMC-ABEOKUTA
     return out
 
 
