@@ -5,7 +5,7 @@ description: The record ID field in REDCap is not always literally `record_id`. 
 
 # Record ID safety
 
-REDCap names the record ID field whatever the project creator chose. Common ARGO values: `record_id`, `study_id`, `participant_id`, `mrn`.
+REDCap names the record ID field whatever the project creator chose. Common ARGO values: `redcap_id` (every patient-level build since May 2026), `record_id`, `study_id`, `participant_id`, `respondent_id`, `mrn`.
 
 **Before any import:**
 1. Export project metadata

@@ -12,8 +12,8 @@ This is the running list of mistakes we've made on real ARGO builds and the rule
 ### 1. `yesno` field type — never use it
 `yesno` cannot hold MDC codes. Always use `radio` with `1, Yes | 0, No | -666, ... | -777, ... | -888, ... | -999, ...`. Validator enforces this.
 
-### 2. `hospital_number` is required for patient-level DDs
-Even if the Word proforma omits it. ARGO standard: text field, Identifier=`y`, position 2 (right after the record-id field). The validator can be run with `--patient-level` to enforce. Non-patient studies (training, capacity-building surveys, biobank specimen tracking with no patient link) may skip — record the deviation on the study's Study Tracker (SIR, PID 224) record, where all
+### 2. Patient-level DDs: the `eligibility_consent` form, then `hospital_number`
+Even if the Word proforma omits them. Every patient-level build starts with the standard `eligibility_consent` form: `redcap_id` (text, "Patient Study ID" — the record ID), `patient_consent` (file, "Patient Consent & Eligibility Checklist"), `patient_questionnaire` (file, "Patient Questionnaire"). `dd_builder.py --patient-level` writes it. Then `hospital_number`: text field, Identifier=`y`, the first field of the study's own first form. The validator can be run with `--patient-level` to enforce. Non-patient studies (training, capacity-building surveys, biobank specimen tracking with no patient link) may skip — record the deviation on the study's Study Tracker (SIR, PID 224) record, where all
 study metadata now lives.
 
 ### 3. DD column 11 is `Identifier?`, column 13 is `Required?`

@@ -6,7 +6,7 @@
 
 Creates testing/walkthroughs/runs/<task>/workspace (scaffolded by argo_setup.py, so the role
 folders exist) and .../uploads/ holding that task's inputs copied from the dogfood kit at
-~/Desktop/ARGO-test-data — the way Cowork exposes attachments. Prints the opening message.
+~/Desktop/ARGO/REDCap/dev-kit/test-data — the way Cowork exposes attachments. Prints the opening message.
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-KIT = Path.home() / "Desktop" / "ARGO-test-data"
+KIT = Path.home() / "Desktop" / "ARGO" / "REDCap" / "dev-kit" / "test-data"
 RUNS = REPO / "testing" / "walkthroughs" / "runs"
 SETUP = REPO / "plugins/argo-core/skills/redcap-api/scripts/argo_setup.py"
 

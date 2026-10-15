@@ -116,20 +116,20 @@ status; PLAN keeps the history and the spec.
 - naqiya's study session (real work — unexamined)
 
 ## Outstanding tests (all on 0.21.0 after the org refresh)
-- K  Export with no key — the CRC line is ALREADY commented out in ~/Desktop/ARGO-cowork/.env;
+- K  Export with no key — the CRC line is ALREADY commented out in ~/Desktop/ARGO/ARGO-cowork/.env;
      fresh chat "Export the CRC study to disk." → at the solicitation, tell Claude "restore the key"
 - M  Table 1 in R — now a HAND-OFF by design (Cowork can't run Mac R): expect the R script + the
      command to run it yourself; run it, report the numbers
 - Q  Audit on the regenerated kit (new colours; fresh chat, same audit prompt)
 - O  Repeat weekly-check + Table 1 once each (demo reproducibility)
 - Fresh-folder onboarding once more on 0.19.0 (the door now PUTS the file on screen)
-- P  WINDOWS probe (friend's machine; ARGO-test-data/WINDOWS-PROBE.md) — the last real unknown
+- P  WINDOWS probe (friend's machine; ~/Desktop/ARGO/REDCap/dev-kit/test-data/WINDOWS-PROBE.md) — the last real unknown
 
 ## Outstanding non-test
 - Study 17 user_rights_complete: REDCap admin (User Rights on 7436) or UI by hand
 - Live CRC data quality (from round C+L): 5 staging fields missing branching logic; 44
   duplicate field labels — a report for the database manager / study team
-- File Repository fixes for Rivka — staged at ~/Desktop/ARGO-file-repo-fixes/ with a README:
+- File Repository fixes for Rivka — staged at ~/Desktop/ARGO/REDCap/dev-kit/file-repo-fixes/ with a README:
   (1) the ICF template is the only legacy .doc left; needs a Word "Save As .docx" (auto-convert
   drops its five bordered boxes, so it must be done in Word); (2) the ICF's companion
   *Consent Form Instructional Template* is referenced but not in the repository; (3) optional —

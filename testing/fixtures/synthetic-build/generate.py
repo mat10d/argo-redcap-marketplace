@@ -251,6 +251,7 @@ CHECK_META = {
     "redundant_mdc_in_field_note":     ("warning", r"redundant mdc in field note"),
     # --- errors only raised with --patient-level ---
     "patient_level_identifier_flag":   ("error", r"hospital_number must have identifier"),
+    "patient_level_intake_form":       ("error", r"standard eligibility_consent form", False),
 }
 
 ENTRIES = []  # (cells, [check_name, ...])
@@ -272,7 +273,8 @@ LONG_MATRIX = "a_matrix_group_name_that_is_deliberately_longer_than_sixty_chars"
 MDC_EXEMPT_ANNOTATION = "@MDC-EXEMPT"
 
 # Row 2 — first field must be 'text'; everything else on the row is clean.
-dirty(["first_field_not_text"], "reg_id", ftype="radio",
+# Under --patient-level row 2 also raises the missing standard eligibility_consent form.
+dirty(["first_field_not_text", "patient_level_intake_form"], "reg_id", ftype="radio",
       label="Registration ID (wrong type on purpose)",
       choices="1, Prospective | 2, Retrospective",
       section="SYNTHETIC TEST FIXTURE — engineered violations, not a real study")
@@ -451,7 +453,8 @@ def main():
 
     # --- MANIFEST.json -----------------------------------------------------
     checks = build_manifest_checks()
-    default_mode = {k: v for k, v in checks.items() if k != "patient_level_identifier_flag"}
+    patient_level = {"patient_level_identifier_flag", "patient_level_intake_form"}
+    default_mode = {k: v for k, v in checks.items() if k not in patient_level}
     manifest = {
         "contract_version": 1,
         "synthetic": True,
@@ -475,7 +478,7 @@ def main():
             "patient_level_only": {
                 "flag": "--patient-level",
                 "checks": {k: v for k, v in checks.items()
-                           if k == "patient_level_identifier_flag"},
+                           if k in patient_level},
                 "note": "With --patient-level these fire IN ADDITION to every check above.",
             },
             "not_engineerable": NOT_ENGINEERABLE,

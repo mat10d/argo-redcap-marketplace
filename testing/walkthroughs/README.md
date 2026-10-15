@@ -11,7 +11,7 @@ on disk — graded against testing/fixtures/*/MANIFEST.json where engineered tru
 What it cannot test (Cowork rounds stay for these): setup/onboarding, the file card and
 widgets, sandbox PATH/mount quirks, Windows.
 
-Inputs: ~/Desktop/ARGO-test-data/ (the dogfood kit, outside the workspace) — never the
+Inputs: ~/Desktop/ARGO/REDCap/dev-kit/test-data/ (the dogfood kit, outside the workspace) — never the
 fixtures dir directly, so the walkthrough sees files the way a user provides them.
 Outputs: a scratch workspace per walkthrough (testing/walkthroughs/runs/<task>/, gitignored),
 scaffolded with argo_setup.py so the role folders exist; no keys unless the task needs one

@@ -311,13 +311,18 @@ doesn't change the build.
    intended code. Grids of same-scale items → a **matrix group** (shared `Matrix Group Name` +
    identical choices).
 3. Emit with `dd_builder.py`, never a hand-written CSV — import its `DD` class or feed a JSON
-   spec: `dd_builder.py fields.json out.csv` (add `--survey` for a self-completed survey).
-4. Save as `database-manager/<study>/<Project>_DataDictionary_<YYYY-MM-DD>.csv`. The first field
-   is the record ID (a meaningful name, not always `record_id` — [[record-id-safety]]).
-   Patient-level DDs also get `hospital_number` (identifier); surveys and non-patient-level DDs
-   skip it.
-5. Validate: `validate_dd.py <csv>` (`--patient-level` requires `hospital_number`; `--survey`
-   expects no MDC).
+   spec: `dd_builder.py fields.json out.csv`. Add `--patient-level` for a study of consented
+   patients, `--survey` for a self-completed survey.
+4. Save as `database-manager/<study>/<Project>_DataDictionary_<YYYY-MM-DD>.csv`.
+   - **Patient-level:** the DD starts with the standard `eligibility_consent` form —
+     `redcap_id` ("Patient Study ID"), then file uploads for the consent + eligibility
+     checklist and the questionnaire. `--patient-level` writes it. `redcap_id` is the record
+     ID: don't add the form's own study-ID item. `hospital_number` (identifier) follows, as the
+     first field of the study's first form.
+   - **Surveys, training studies:** no intake form, no `hospital_number`. The first field is
+     the record ID, named for what it counts (`respondent_id`, `participant_id`).
+5. Validate: `validate_dd.py <csv>` (`--patient-level` requires the intake form and
+   `hospital_number`; `--survey` expects no MDC).
 6. **Show the structure back, unprompted.** A validated DD says the CSV is well-formed, not that
    it is the right study. End every build and rebuild with a short **structure table**:
    instrument by instrument, field count, what branches on what, and every field you added that
@@ -326,7 +331,8 @@ doesn't change the build.
 
 **Path B (audit):** run `validate_dd.py`, then compare field by field against the questionnaire.
 Sort findings CRITICAL / ERROR / WARNING, present them, fix via Edit (justify each), re-validate
-to clean. Check: duplicate/missing fields, choice-code mismatches, MDC gaps, `yesno` (→ radio),
+to clean (`--patient-level` for a patient study). Check: the intake form on a patient study,
+duplicate/missing fields, choice-code mismatches, MDC gaps, `yesno` (→ radio),
 branching, identifier flags, exact labels. Sister studies (same PI/HREC, separate SIRs) must
 share instrument structure — run `make_roles_csv.py` on both and compare `Forms detected`.
 

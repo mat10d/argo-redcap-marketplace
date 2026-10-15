@@ -10,6 +10,10 @@ can be waived explicitly by putting `@MDC-EXEMPT` in its Field Annotation column
 (on any field of a matrix group, that waives the whole group) — the mechanism for
 validated psychometric / Likert scales, which ARGO policy exempts.
 
+`--patient-level` (a study of consented patients) also requires the standard first form,
+`eligibility_consent` (redcap_id, patient_consent, patient_questionnaire — dd_builder.py
+--patient-level writes it), and `hospital_number` flagged as an identifier.
+
 A self-completed survey carries no MDC at all (ARGO policy, 2026-10-09): `--survey` skips every
 MDC check.
 
@@ -73,6 +77,11 @@ EXPECTED_HEADER = [
 
 COL = {name: i for i, name in enumerate(EXPECTED_HEADER)}
 
+# The standard first form of a patient-level build — keep identical to dd_builder.INTAKE_FIELDS.
+INTAKE_FORM = "eligibility_consent"
+INTAKE_FIELDS = [("redcap_id", "text"), ("patient_consent", "file"),
+                 ("patient_questionnaire", "file")]
+
 
 def validate(filepath, patient_level=False, survey=False):
     errors = []
@@ -102,6 +111,14 @@ def validate(filepath, patient_level=False, survey=False):
     # --patient-level: hospital_number must exist and be Identifier=y
     # See build-pitfalls.md item #2.
     if patient_level:
+        got = [(r[COL["Variable / Field Name"]], r[COL["Field Type"]], r[COL["Form Name"]])
+               for r in rows[:len(INTAKE_FIELDS)]]
+        want = [(v, ftype, INTAKE_FORM) for v, ftype in INTAKE_FIELDS]
+        if got != want:
+            errors.append("Row 2: --patient-level: the dictionary must start with the standard "
+                          "eligibility_consent form — redcap_id (text), patient_consent (file), "
+                          "patient_questionnaire (file), in that order. Build it with "
+                          "dd_builder.py --patient-level.")
         hosp_row = next((r for r in rows if r[COL["Variable / Field Name"]] == "hospital_number"), None)
         if hosp_row is None:
             errors.append("--patient-level: required field 'hospital_number' not present (ARGO standard, see build-pitfalls.md)")
@@ -283,8 +300,9 @@ def main():
     survey = "--survey" in args
     args = [a for a in args if a != "--survey"]
     if not args:
-        print("Usage: python3 validate_dd.py [--patient-level] <csv_file> [csv_file2 ...]")
-        print("  --patient-level   require hospital_number field (ARGO standard for patient-level DDs)")
+        print("Usage: python3 validate_dd.py [--patient-level] [--survey] <csv_file> [csv_file2 ...]")
+        print("  --patient-level   require the eligibility_consent form and hospital_number (patient studies)")
+        print("  --survey          a self-completed survey: no missing-data codes expected")
         print("  --survey          a self-completed survey: no missing-data codes expected")
         sys.exit(1)
 

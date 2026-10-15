@@ -97,9 +97,42 @@ class TestDdBuilderProducesACleanDictionary(unittest.TestCase):
         self.assertEqual(errors, [], "dd_builder output must validate with zero errors")
         self.assertEqual(warnings, [], "dd_builder output must validate with zero warnings")
 
-    def test_built_dd_validates_clean_at_patient_level(self):
+    def test_a_dictionary_without_the_intake_form_fails_at_patient_level(self):
         errors, _ = self.validate_dd.validate(str(self.out), patient_level=True)
-        self.assertEqual(errors, [], "fixture carries hospital_number (Identifier? = y)")
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("eligibility_consent", errors[0])
+
+    def test_patient_level_build_starts_with_the_standard_intake_form(self):
+        """Every patient-level ARGO build opens with eligibility_consent (the June 2026 builds)."""
+        import csv
+        spec = json.loads((FIXTURE / "fields.json").read_text())[1:]  # redcap_id replaces synb_id
+        with tempfile.TemporaryDirectory() as tmp:
+            fields, out = Path(tmp) / "fields.json", Path(tmp) / "PL_DataDictionary.csv"
+            fields.write_text(json.dumps(spec))
+            proc = subprocess.run([sys.executable, str(DD_BUILDER), "--patient-level",
+                                   str(fields), str(out)], capture_output=True, text=True)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            rows = list(csv.reader(out.open(newline="")))[1:]
+            self.assertEqual([(r[0], r[1], r[3], r[4]) for r in rows[:3]], [
+                ("redcap_id", "eligibility_consent", "text", "Patient Study ID"),
+                ("patient_consent", "eligibility_consent", "file",
+                 "Patient Consent & Eligibility Checklist"),
+                ("patient_questionnaire", "eligibility_consent", "file", "Patient Questionnaire")])
+            self.assertEqual(rows[3][0], "hospital_number")
+            for r in rows[:3]:
+                self.assertNotIn("-666", r[5] + r[6], f"{r[0]} must carry no MDC")
+            errors, warnings = self.validate_dd.validate(str(out), patient_level=True)
+            self.assertEqual((errors, warnings), ([], []))
+
+    def test_builder_and_validator_agree_on_the_intake_form(self):
+        builder = load_dd_builder()
+        self.assertEqual(builder.INTAKE_FORM, self.validate_dd.INTAKE_FORM)
+        self.assertEqual([(v, t) for v, t, _ in builder.INTAKE_FIELDS],
+                         self.validate_dd.INTAKE_FIELDS)
+
+    def test_a_study_cannot_be_both_survey_and_patient_level(self):
+        with self.assertRaises(ValueError):
+            load_dd_builder().DD(survey=True, patient_level=True)
 
     def test_mdc_applied_to_every_non_exempt_field(self):
         """dd_builder's headline promise: MDC by construction. Assert it field by field."""

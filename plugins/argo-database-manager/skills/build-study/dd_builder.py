@@ -29,6 +29,13 @@ staff member couldn't abstract a value, and a respondent filling in a form has n
 Build it with `DD(survey=True)` (CLI: `--survey`) — no codes, and no `@MDC-EXEMPT` annotations
 either, since nothing is being waived — and validate with `validate_dd.py --survey`.
 
+A PATIENT-LEVEL study (individual consented patients) starts with ARGO's standard intake form,
+`eligibility_consent`: `redcap_id` (the record ID, "Patient Study ID") and two file uploads for
+the signed consent + eligibility checklist and the completed paper questionnaire. Build it with
+`DD(patient_level=True)` (CLI: `--patient-level`): the form is written first, and `redcap_id` IS
+the record ID, so don't add your own (`exercise_id`, `study_id`...). `hospital_number` comes next,
+as the first field of the study's own first form. Surveys and training studies skip all of this.
+
 `yesno` is refused at build time — it cannot hold MDC codes. Use `radio` with
 "1, Yes | 0, No" and dd_builder adds the MDC choices for you.
 
@@ -46,7 +53,10 @@ Two ways to use it:
   dd.field("age", "text", "Age (years)", valid="integer")
   dd.write("Study_DataDictionary_2026-06-26.csv")
 
-  # (b) CLI from a JSON field spec (add --survey for a self-completed survey):
+  # a patient-level study: DD(patient_level=True), then start with hospital_number
+
+  # (b) CLI from a JSON field spec (add --survey for a self-completed survey,
+  #     --patient-level for a patient study):
   python3 dd_builder.py fields.json out.csv
   # where fields.json = [{"var": "...", "type": "...", "label": "...", "choices": "...",
   #                       "branching": "...", "section": "...", "valid": "...", ...}, ...]
@@ -79,12 +89,25 @@ EXEMPT_TYPES = {"descriptive", "calc", "file"}
 EXEMPT_VARS = {"hospital_number", "hospital_site"}  # identifiers set by study team, not MDC-coded
 CHOICE_TYPES = {"radio", "dropdown", "checkbox"}
 
+# The standard first form of every patient-level ARGO build. validate_dd.py checks for it.
+INTAKE_FORM = "eligibility_consent"
+INTAKE_FIELDS = [  # (variable, type, label)
+    ("redcap_id", "text", "Patient Study ID"),
+    ("patient_consent", "file", "Patient Consent & Eligibility Checklist"),
+    ("patient_questionnaire", "file", "Patient Questionnaire"),
+]
+
 
 class DD:
-    def __init__(self, form="data", survey=False):
+    def __init__(self, form="data", survey=False, patient_level=False):
+        if survey and patient_level:
+            raise ValueError("a study is either a self-completed survey or patient-level, not both")
         self.form = form
         self.survey = survey
         self.rows = []
+        if patient_level:
+            for var, ftype, label in INTAKE_FIELDS:
+                self.field(var, ftype, label, form=INTAKE_FORM)
 
     def field(self, var, type, label, choices="", note="", valid="", min="", max="",
               identifier="", branching="", required="", section="", align="",
@@ -123,7 +146,8 @@ class DD:
 
 def main():
     survey = "--survey" in sys.argv
-    sys.argv = [a for a in sys.argv if a != "--survey"]
+    patient_level = "--patient-level" in sys.argv
+    sys.argv = [a for a in sys.argv if a not in ("--survey", "--patient-level")]
     if len(sys.argv) != 3:
         sys.exit(
         "Give me two file names: the field definitions to read, and where to save the data\n"
@@ -131,10 +155,16 @@ def main():
         "\n"
         "    python3 dd_builder.py fields.json my_study_datadictionary.csv\n"
         "\n"
-        "Add --survey for a questionnaire respondents fill in themselves (no missing-data codes)."
+        "Add --survey for a questionnaire respondents fill in themselves (no missing-data codes),\n"
+        "or --patient-level for a study of consented patients (adds the standard eligibility_consent\n"
+        "form first)."
     )
     spec = json.load(open(sys.argv[1]))
-    dd = DD(form=spec[0].get("form", "data") if spec else "data", survey=survey)
+    try:
+        dd = DD(form=spec[0].get("form", "data") if spec else "data", survey=survey,
+                patient_level=patient_level)
+    except ValueError as e:
+        sys.exit(f"I can't build this: {e}.")
     for n, fld in enumerate(spec, 1):
         try:
             dd.field(**{k: v for k, v in fld.items()})

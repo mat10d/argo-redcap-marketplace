@@ -435,6 +435,18 @@
             3
           ],
           "severity": "error"
+        },
+        "patient_level_intake_form": {
+          "count": 1,
+          "field_named_in_message": false,
+          "fields": [
+            "reg_id"
+          ],
+          "match_regex": "standard eligibility_consent form",
+          "rows": [
+            2
+          ],
+          "severity": "error"
         }
       },
       "flag": "--patient-level",

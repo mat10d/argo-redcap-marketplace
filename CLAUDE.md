@@ -77,9 +77,8 @@ don't relitigate them silently; revise them explicitly, with the reason, dated.
 
 ## Secrets and safety
 
-- Local credentials: `~/.argo/.env` (0600). Test baseline with real keys lives **outside** the
-  connected workspace (`~/Desktop/ARGO-cowork-rounds/baseline/`) — a connected folder is
-  readable in full by every session.
+- Local credentials: `~/.argo/.env` (0600), and the workspace's own `.env`. Keep no other copies
+  of real keys — a connected folder is readable in full by every session.
 - Writes to REDCap: project confirmation before every write (client does it), diff-shown,
   receipt-gated for patient data (`push_updates.py`). Read the Tier table before adding any
   write path.

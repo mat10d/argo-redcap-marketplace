@@ -25,11 +25,11 @@ Next, in order:
 1. DONE: 0.17.2 released. **Matteo: org refresh (plugin names unchanged from 0.17.0).**
 2. Matteo reviews REVIEW-2026-08-24.md: are the QUESTIONS right? Adjust skills accordingly.
 3. Cowork sweep on 0.17.2, from a WIPED workspace, user-provided data only
-   (~/Desktop/ARGO-test-data is the kit): (a) fresh setup incl. the Analysis-tools line;
+   (~/Desktop/ARGO/REDCap/dev-kit/test-data is the kit): (a) fresh setup incl. the Analysis-tools line;
    (b) widget correctness per question; (c) wire weekly-check as a Cowork scheduled task
    (template: weekly-check/references/scheduled-weekly-check.md); (d) study-17 step-marking
    writes when the project exists.
-4. Windows probe (friend's machine; ARGO-test-data/WINDOWS-PROBE.md) → fixes → SETUP.md
+4. Windows probe (friend's machine; ~/Desktop/ARGO/REDCap/dev-kit/test-data/WINDOWS-PROBE.md) → fixes → SETUP.md
    Windows section.
 5. Matteo: OAU batch key request (send first — longest lead time).
 6. Fri/Sat: one-page handout; demo = onboarding + analyst rounds.
@@ -188,7 +188,7 @@ the synthetic study. Built by subagents; results reviewed before merge.
 Protocol per round, no exceptions:
 1. Org plugins refreshed → verified by the **toolkit stamp in the session's first output**.
    If the stamp is wrong, STOP — don't run the round.
-2. One round = one fresh chat (never in a Project), `~/Desktop/ARGO-cowork` connected.
+2. One round = one fresh chat (never in a Project), `~/Desktop/ARGO/ARGO-cowork` connected.
 3. Collect + grade. Showstopper → fix-batch next morning. Nit → NITS.md.
 
 | # | Round | Prompt | Pass |
@@ -219,13 +219,13 @@ PM/portfolio: already witnessed live in round 5's continuation; re-run only if t
 - `release.py` is the only release path (it gates on the suite).
 - Block-edits to files: verify anchor ORDER before slicing; grep the file on disk afterwards.
 - After layered edits to any SKILL.md: read it whole before shipping.
-- Never stage credentials inside the connected workspace (baseline lives in
-  `~/Desktop/ARGO-cowork-rounds/baseline/`).
+- Never stage credentials or test data inside the connected workspace.
 
 ## Where things live
 
 - Session mining: `.claude/skills/mine-sessions/` (writes `testing/cowork/mined-sessions.json`)
-- Round reports: `~/Desktop/ARGO-cowork-rounds/round-NN-role/`
-- Workspace under test: `~/Desktop/ARGO-cowork`
+- Old round reports (loop removed 2026-09-14): `~/Desktop/ARGO/REDCap/dev-kit/cowork-rounds/`
+- Test kit: `~/Desktop/ARGO/REDCap/dev-kit/test-data/`
+- Live Cowork workspace: `~/Desktop/ARGO/ARGO-cowork`
 - Session transcripts: `~/Library/Application Support/Claude/local-agent-mode-sessions/`
 - Live-witnessed full journey: round-05 report + its continuation in the same audit file
