@@ -387,6 +387,9 @@ def compare_pair(a: dict, b: dict) -> PairFinding:
                            "Same hospital number recorded at two hospitals: which is right?")
     if agree and name_ok and not typo:
         return PairFinding(hosp, histo, names, "agree", "The keys agree.")
+    if agree and not typo and names[1] == "missing":
+        # One side has no names (a pathology database): the numbers are all there is.
+        return PairFinding(hosp, histo, names, "agree", "The numbers agree; no names to compare.")
     if (agree and typo) or (typo and name_ok):
         what = {"one_digit": "differ in one digit", "transposed": "have two digits swapped",
                 "digit_missing": "differ by a missing digit", "year_differs": "differ in the year",

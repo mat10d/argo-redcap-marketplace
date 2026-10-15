@@ -73,6 +73,7 @@ VENDOR_TARGETS = [
     REPO / "plugins/argo-database-manager/skills/build-study/scripts",
     REPO / "plugins/argo-database-manager/skills/export-data/scripts",
     REPO / "plugins/argo-database-manager/skills/link-data/scripts",
+    REPO / "plugins/argo-database-manager/skills/link-patients/scripts",
     REPO / "plugins/argo-database-manager/skills/weekly-check/scripts",
     REPO / "plugins/argo-data-analyst/skills/run-analysis/scripts",
     REPO / "plugins/argo-project-manager/skills/new-study-documents/scripts",

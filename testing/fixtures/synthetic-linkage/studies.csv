@@ -1,0 +1,7 @@
+study,name,file,record_id_field,site_field,single_site,hosp_field,histology_fields,first_name_field,last_name_field,parent_links
+crc,CRC registry,crc.csv,research_number,redcap_data_access_group,,hospital_no,histology_number,first_name,surname,
+breast,Breast registry,breast.csv,record_id,hospital_site,,hospital_number,surg_histopath_no,first_name,surname,
+r01,R01,r01.csv,record_id,redcap_data_access_group,,hospital_number,,first_name,last_name,colorectal_record_id=crc
+brca,BRCA,brca.csv,record_id,,OAUTHC,hosp_num,,first_name,surname,breast_record_id=breast
+fintox,Financial toxicity,fintox.csv,record_id,,OAUTHC,hospital_no,,first_name,surname,colorectal_record_id=crc;breast_record_id=breast
+path,Pathology database,path.csv,record_id,redcap_data_access_group,,hospital_number,histology_number_biopsy;histology_number_surgery,,,
