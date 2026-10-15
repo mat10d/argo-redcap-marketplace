@@ -130,6 +130,50 @@ class TestDdBuilderProducesACleanDictionary(unittest.TestCase):
         self.assertEqual([(v, t) for v, t, _ in builder.INTAKE_FIELDS],
                          self.validate_dd.INTAKE_FIELDS)
 
+    def test_a_child_study_records_its_parent_registry(self):
+        """The hidden parent link sits in the intake form and names the parent project."""
+        import csv
+        b = load_dd_builder()
+        dd = b.DD(form="identifying_information", patient_level=True,
+                  parents=[("colorectal_record_id", 77), ("breast_record_id", "78")])
+        dd.field("hospital_number", "text", "Hospital number", identifier="y")
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "child.csv"
+            dd.write(out)
+            rows = list(csv.reader(out.open(newline="")))[1:]
+            self.assertEqual([r[0] for r in rows[3:5]], ["colorectal_record_id", "breast_record_id"])
+            for r, pid in zip(rows[3:5], ("77", "78")):
+                self.assertEqual((r[1], r[3]), ("eligibility_consent", "text"))
+                self.assertEqual(r[17], f"@HIDDEN @ARGO-PARENT-PID={pid}")
+                self.assertNotIn("-666", r[5] + r[6], "a link field carries no MDC")
+            self.assertEqual(self.validate_dd.validate(str(out), patient_level=True), ([], []))
+
+    def test_a_malformed_parent_link_is_refused(self):
+        b = load_dd_builder()
+        with self.assertRaises(ValueError):
+            b.DD(patient_level=True, parents=[("crc_link", 77)])
+        with self.assertRaises(ValueError):
+            b.DD(patient_level=True, parents=[("colorectal_record_id", "CRC")])
+        with self.assertRaises(ValueError):
+            b.DD(parents=[("colorectal_record_id", 77)])  # not patient-level
+
+    def test_the_validator_flags_a_visible_or_misplaced_parent_link(self):
+        import csv
+        b = load_dd_builder()
+        dd = b.DD(form="identifying_information", patient_level=True)
+        dd.field("hospital_number", "text", "Hospital number", identifier="y")
+        dd.rows.append(["colorectal_record_id", "identifying_information", "", "text", "CRC ID",
+                        "", "", "", "", "", "", "", "", "", "", "", "", "@ARGO-PARENT-PID=77"])
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "bad.csv"
+            dd.write(out)
+            errors, _ = self.validate_dd.validate(str(out), patient_level=True)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("hidden", errors[0])
+
+    def test_builder_and_validator_share_the_parent_tag(self):
+        self.assertEqual(load_dd_builder().PARENT_TAG, self.validate_dd.PARENT_TAG)
+
     def test_a_study_cannot_be_both_survey_and_patient_level(self):
         with self.assertRaises(ValueError):
             load_dd_builder().DD(survey=True, patient_level=True)

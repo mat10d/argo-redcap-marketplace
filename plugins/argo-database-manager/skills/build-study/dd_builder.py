@@ -36,6 +36,14 @@ the signed consent + eligibility checklist and the completed paper questionnaire
 the record ID, so don't add your own (`exercise_id`, `study_id`...). `hospital_number` comes next,
 as the first field of the study's own first form. Surveys and training studies skip all of this.
 
+A patient-level CHILD study also carries one hidden field per parent registry, in the intake form
+right after the three standard fields: `parents=[("colorectal_record_id", 77)]` (CLI:
+`--parent colorectal_record_id=77`, repeatable). The field holds the patient's record ID in the
+parent project; its annotation `@HIDDEN @ARGO-PARENT-PID=77` records which project that is, so
+the child says in its own dictionary what it links to. Only the linkage process fills it: no
+MDC, never typed by an RA. Established names: `colorectal_record_id` (CRC, PID 77),
+`breast_record_id` (Breast, PID 78). Ask Matteo for any other registry's field name.
+
 `yesno` is refused at build time — it cannot hold MDC codes. Use `radio` with
 "1, Yes | 0, No" and dd_builder adds the MDC choices for you.
 
@@ -91,6 +99,7 @@ CHOICE_TYPES = {"radio", "dropdown", "checkbox"}
 
 # The standard first form of every patient-level ARGO build. validate_dd.py checks for it.
 INTAKE_FORM = "eligibility_consent"
+PARENT_TAG = "@ARGO-PARENT-PID"  # validate_dd.py reads the same tag
 INTAKE_FIELDS = [  # (variable, type, label)
     ("redcap_id", "text", "Patient Study ID"),
     ("patient_consent", "file", "Patient Consent & Eligibility Checklist"),
@@ -99,15 +108,30 @@ INTAKE_FIELDS = [  # (variable, type, label)
 
 
 class DD:
-    def __init__(self, form="data", survey=False, patient_level=False):
+    def __init__(self, form="data", survey=False, patient_level=False, parents=()):
         if survey and patient_level:
             raise ValueError("a study is either a self-completed survey or patient-level, not both")
+        if parents and not patient_level:
+            raise ValueError("a parent registry link needs a patient-level study (--patient-level)")
         self.form = form
         self.survey = survey
         self.rows = []
         if patient_level:
             for var, ftype, label in INTAKE_FIELDS:
                 self.field(var, ftype, label, form=INTAKE_FORM)
+            for var, pid in parents:
+                self._parent_field(var, pid)
+
+    def _parent_field(self, var, pid):
+        if not str(var).endswith("_record_id") or not str(pid).isdigit():
+            raise ValueError(f"parent link '{var}={pid}': the field name must end in _record_id "
+                             "and the parent must be a REDCap project number, e.g. "
+                             "colorectal_record_id=77")
+        # Written directly: no MDC and no @MDC-EXEMPT, since nothing is being waived — the
+        # linkage process fills this field, never an RA.
+        self.rows.append([var, INTAKE_FORM, "", "text",
+                          f"Record ID in the parent registry (REDCap project {pid})", "", "", "",
+                          "", "", "", "", "", "", "", "", "", f"@HIDDEN {PARENT_TAG}={pid}"])
 
     def field(self, var, type, label, choices="", note="", valid="", min="", max="",
               identifier="", branching="", required="", section="", align="",
@@ -147,7 +171,15 @@ class DD:
 def main():
     survey = "--survey" in sys.argv
     patient_level = "--patient-level" in sys.argv
-    sys.argv = [a for a in sys.argv if a not in ("--survey", "--patient-level")]
+    parents, args = [], []
+    it = iter(sys.argv[1:])
+    for a in it:
+        if a == "--parent":
+            var, _, pid = next(it, "").partition("=")
+            parents.append((var, pid))
+        elif a not in ("--survey", "--patient-level"):
+            args.append(a)
+    sys.argv = sys.argv[:1] + args
     if len(sys.argv) != 3:
         sys.exit(
         "Give me two file names: the field definitions to read, and where to save the data\n"
@@ -157,12 +189,12 @@ def main():
         "\n"
         "Add --survey for a questionnaire respondents fill in themselves (no missing-data codes),\n"
         "or --patient-level for a study of consented patients (adds the standard eligibility_consent\n"
-        "form first)."
+        "form first). A child of a registry adds --parent colorectal_record_id=77 (repeatable)."
     )
     spec = json.load(open(sys.argv[1]))
     try:
         dd = DD(form=spec[0].get("form", "data") if spec else "data", survey=survey,
-                patient_level=patient_level)
+                patient_level=patient_level, parents=parents)
     except ValueError as e:
         sys.exit(f"I can't build this: {e}.")
     for n, fld in enumerate(spec, 1):

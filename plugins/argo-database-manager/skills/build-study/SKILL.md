@@ -319,6 +319,11 @@ doesn't change the build.
      checklist and the questionnaire. `--patient-level` writes it. `redcap_id` is the record
      ID: don't add the form's own study-ID item. `hospital_number` (identifier) follows, as the
      first field of the study's first form.
+   - **Child of a registry:** when the study's Study Tracker record names a parent registry,
+     add one hidden link field per parent: `--parent colorectal_record_id=77` (CRC) or
+     `--parent breast_record_id=78` (Breast). It lands in `eligibility_consent` after the
+     three standard fields, tagged `@HIDDEN @ARGO-PARENT-PID=<PID>`, so the study records what
+     it links to. Only the linkage process fills it. Another registry's field name: ask.
    - **Surveys, training studies:** no intake form, no `hospital_number`. The first field is
      the record ID, named for what it counts (`respondent_id`, `participant_id`).
 5. Validate: `validate_dd.py <csv>` (`--patient-level` requires the intake form and

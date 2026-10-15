@@ -79,6 +79,7 @@ COL = {name: i for i, name in enumerate(EXPECTED_HEADER)}
 
 # The standard first form of a patient-level build — keep identical to dd_builder.INTAKE_FIELDS.
 INTAKE_FORM = "eligibility_consent"
+PARENT_TAG = "@ARGO-PARENT-PID"  # keep identical to dd_builder.PARENT_TAG
 INTAKE_FIELDS = [("redcap_id", "text"), ("patient_consent", "file"),
                  ("patient_questionnaire", "file")]
 
@@ -245,7 +246,18 @@ def validate(filepath, patient_level=False, survey=False):
         is_first_field = (i == 2)
         # An explicit waiver (on the field, or on its matrix group) exempts it from every
         # MDC check below — that is how validated Likert/psychometric scales stay clean.
-        mdc_waived = (MDC_EXEMPT_ANNOTATION in annotation.upper()
+        # A parent-registry link field (filled by the linkage process) takes no MDC; check its shape.
+        is_parent_link = PARENT_TAG in annotation.upper()
+        if is_parent_link:
+            pid = re.search(re.escape(PARENT_TAG) + r"=(\S*)", annotation.upper())
+            if not (pid and pid.group(1).isdigit()):
+                errors.append(f"Row {i} ({var_name}): {PARENT_TAG} needs the parent's project number, "
+                              f"e.g. {PARENT_TAG}=77")
+            if (field_type != "text" or "@HIDDEN" not in annotation.upper()
+                    or form_name != INTAKE_FORM or not var_name.endswith("_record_id")):
+                errors.append(f"Row {i} ({var_name}): a parent-registry link must be a hidden (@HIDDEN) "
+                              f"text field named *_record_id on the {INTAKE_FORM} form")
+        mdc_waived = (is_parent_link or MDC_EXEMPT_ANNOTATION in annotation.upper()
                       or (matrix_group and matrix_group in mdc_exempt_groups))
         if (not is_first_field
                 and not survey
