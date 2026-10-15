@@ -116,7 +116,7 @@ status; PLAN keeps the history and the spec.
 - naqiya's study session (real work — unexamined)
 
 ## Outstanding tests (all on 0.21.0 after the org refresh)
-- K  Export with no key — the CRC line is ALREADY commented out in ~/Desktop/ARGO/ARGO-cowork/.env;
+- K  Export with no key — the CRC line is ALREADY commented out in ~/Desktop/ARGO/REDCap/ARGO-cowork/.env;
      fresh chat "Export the CRC study to disk." → at the solicitation, tell Claude "restore the key"
 - M  Table 1 in R — now a HAND-OFF by design (Cowork can't run Mac R): expect the R script + the
      command to run it yourself; run it, report the numbers

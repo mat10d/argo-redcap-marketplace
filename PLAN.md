@@ -188,7 +188,7 @@ the synthetic study. Built by subagents; results reviewed before merge.
 Protocol per round, no exceptions:
 1. Org plugins refreshed → verified by the **toolkit stamp in the session's first output**.
    If the stamp is wrong, STOP — don't run the round.
-2. One round = one fresh chat (never in a Project), `~/Desktop/ARGO/ARGO-cowork` connected.
+2. One round = one fresh chat (never in a Project), `~/Desktop/ARGO/REDCap/ARGO-cowork` connected.
 3. Collect + grade. Showstopper → fix-batch next morning. Nit → NITS.md.
 
 | # | Round | Prompt | Pass |
@@ -226,6 +226,6 @@ PM/portfolio: already witnessed live in round 5's continuation; re-run only if t
 - Session mining: `.claude/skills/mine-sessions/` (writes `testing/cowork/mined-sessions.json`)
 - Old round reports (loop removed 2026-09-14): `~/Desktop/ARGO/REDCap/dev-kit/cowork-rounds/`
 - Test kit: `~/Desktop/ARGO/REDCap/dev-kit/test-data/`
-- Live Cowork workspace: `~/Desktop/ARGO/ARGO-cowork`
+- Live Cowork workspace: `~/Desktop/ARGO/REDCap/ARGO-cowork`
 - Session transcripts: `~/Library/Application Support/Claude/local-agent-mode-sessions/`
 - Live-witnessed full journey: round-05 report + its continuation in the same audit file
