@@ -142,12 +142,15 @@ expect = {"hard_links": 0, "hard_confirmed": 0, "hard_with_typo": 0, "hard_disag
           "strong": 0, "probable": 0, "near_miss": 0, "conflict": 0, "duplicate": 0,
           "names_to_judge": 0, "blank_key": {}, "unlinked": {}}
 crc_id = {}
+# CRC stores its site as a code, as the real project does; studies.csv carries the choices.
+CRC_SITE_CHOICES = "0, OAUTHC, Ile-Ife | 5, LUTH, Idi-Araba | 2, FMC, Owo | 7, FMC, Ebutte-meta"
+CRC_SITE_CODE = {"OAUTHC": "0", "LUTH": "5"}
 
 # Registries
 for i, p in enumerate(crc_people, 1):
     rid = f"40-{i}"
     crc_id[p.pid] = rid
-    rows["crc"].append({"research_number": rid, "redcap_data_access_group": p.site.lower(),
+    rows["crc"].append({"research_number": rid, "hospital_site": CRC_SITE_CODE[p.site],
                         "hospital_no": p.hosp, "histology_number": hist_text(p.hist),
                         "first_name": p.first, "surname": p.last})
     truth.append(("crc", rid, p.pid))
@@ -163,7 +166,7 @@ for i, p in enumerate(breast_people, 1):
 r01_n = 0
 
 
-def r01(p, *, hosp=None, site=None, first=None, last=None, hard=None, person=None):
+def r01(p, *, hosp=None, site=None, first=None, last=None, hard=None, person=None, cohort="1"):
     global r01_n
     r01_n += 1
     rid = str(r01_n)
@@ -172,7 +175,7 @@ def r01(p, *, hosp=None, site=None, first=None, last=None, hard=None, person=Non
                             site or p.site],
                         "hospital_number": p.hosp if hosp is None else hosp,
                         "first_name": first or p.first, "last_name": last or p.last,
-                        "colorectal_record_id": hard or ""})
+                        "colorectal_record_id": hard or "", "cohort": cohort})
     truth.append(("r01", rid, person or p.pid))
     return rid
 
@@ -211,19 +214,25 @@ for _ in range(2):                                   # hospital number is a miss
 expect["blank_key"]["r01"] = 2
 for _ in range(3):                                   # in no other study
     r01(Person("OAUTHC"))
-expect["unlinked"]["r01"] = 3
+for _ in range(2):                                   # cohort 2: never expected in CRC
+    r01(Person("OAUTHC"), cohort="2")
+expect["unlinked"]["r01"] = 5
+# cohort-1 R01 records with no accepted link: 2 missing-code + 3 in no study + 6 typos + 1 other
+# hospital + 2 probable + 2 conflict + 1 wrong parent ID = 17. BRCA: 2 leading-zero probables + 2 = 4.
+expect["expected_but_not_linked"] = {"r01": 17, "fintox": 0, "brca": 4}
 
 # Financial toxicity (child of both, single site OAUTHC)
 fin_n = 0
 
 
-def fintox(p, crc_hard="", breast_hard=""):
+def fintox(p, crc_hard="", breast_hard="", cancer="2"):
     global fin_n
     fin_n += 1
     rid = f"F{fin_n:02d}"
     rows["fintox"].append({"record_id": rid, "hospital_no": p.hosp, "first_name": p.first,
-                           "surname": p.last, "colorectal_record_id": crc_hard,
-                           "breast_record_id": breast_hard})
+                           "surname": p.last,
+                           "breast_colorectal_record_id": crc_hard or breast_hard,
+                           "cancer_type_cat": cancer})
     truth.append(("fintox", rid, p.pid))
 
 
@@ -233,7 +242,7 @@ b_oau = [p for p in breast_people if p.site == "OAUTHC" and not p.hosp.startswit
 bpool = iter(b_oau)
 for _ in range(4):
     p = next(bpool)
-    fintox(p, breast_hard=breast_id[p.pid]); expect["hard_links"] += 1; expect["hard_confirmed"] += 1
+    fintox(p, breast_hard=breast_id[p.pid], cancer="1"); expect["hard_links"] += 1; expect["hard_confirmed"] += 1
 for p in take(2):
     fintox(p); expect["strong"] += 1
 expect["unlinked"]["fintox"] = 0
@@ -296,7 +305,7 @@ expect["unlinked"]["path"] = 2
 # A patient enrolled twice in CRC
 p = next(pool)
 rows["crc"].append({"research_number": f"40-{len(rows['crc']) + 1}",
-                    "redcap_data_access_group": "oauthc", "hospital_no": p.hosp,
+                    "hospital_site": CRC_SITE_CODE["OAUTHC"], "hospital_no": p.hosp,
                     "histology_number": hist_text(p.hist), "first_name": p.first,
                     "surname": p.last})
 truth.append(("crc", rows["crc"][-1]["research_number"], p.pid))
@@ -307,21 +316,23 @@ expect["duplicate"] += 1
 STUDIES = [
     # study, name, file, record_id_field, site_field, single_site, hosp_field, histology_fields,
     # first_name_field, last_name_field, parent_links
-    ("crc", "CRC registry", "crc.csv", "research_number", "redcap_data_access_group", "",
-     "hospital_no", "histology_number", "first_name", "surname", ""),
+    ("crc", "CRC registry", "crc.csv", "research_number", "hospital_site", "",
+     "hospital_no", "histology_number", "first_name", "surname", "", CRC_SITE_CHOICES),
     ("breast", "Breast registry", "breast.csv", "record_id", "hospital_site", "",
-     "hospital_number", "surg_histopath_no", "first_name", "surname", ""),
+     "hospital_number", "surg_histopath_no", "first_name", "surname", "", ""),
     ("r01", "R01", "r01.csv", "record_id", "redcap_data_access_group", "", "hospital_number", "",
-     "first_name", "last_name", "colorectal_record_id=crc"),
+     "first_name", "last_name", "colorectal_record_id=crc[cohort=1]", ""),
     ("brca", "BRCA", "brca.csv", "record_id", "", "OAUTHC", "hosp_num", "", "first_name",
-     "surname", "breast_record_id=breast"),
+     "surname", "breast_record_id=breast", ""),
     ("fintox", "Financial toxicity", "fintox.csv", "record_id", "", "OAUTHC", "hospital_no", "",
-     "first_name", "surname", "colorectal_record_id=crc;breast_record_id=breast"),
+     "first_name", "surname",
+     "breast_colorectal_record_id=breast[cancer_type_cat=1];"
+     "breast_colorectal_record_id=crc[cancer_type_cat=2]", ""),
     ("path", "Pathology database", "path.csv", "record_id", "redcap_data_access_group", "",
-     "hospital_number", "histology_number_biopsy;histology_number_surgery", "", "", ""),
+     "hospital_number", "histology_number_biopsy;histology_number_surgery", "", "", "", ""),
 ]
 HEAD = ["study", "name", "file", "record_id_field", "site_field", "single_site", "hosp_field",
-        "histology_fields", "first_name_field", "last_name_field", "parent_links"]
+        "histology_fields", "first_name_field", "last_name_field", "parent_links", "site_choices"]
 
 
 def write_csv(path, header, data):

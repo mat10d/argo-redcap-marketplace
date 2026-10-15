@@ -28,7 +28,9 @@ from dataclasses import dataclass, field
 
 # --- sites -------------------------------------------------------------------------------------
 
-# Every spelling seen in DAGs, choice labels and number prefixes -> one site code.
+# Every spelling seen in DAGs, choice labels and number prefixes -> one site code. A name that
+# several hospitals share (FMC, LTH) is never a site on its own: FMC Owo, FMC Ebute-Metta and FMC
+# Abeokuta are different hospitals, so they carry their town.
 SITE_ALIASES = {
     "OAUTHC": ["oauthc", "oauthc_ife", "oau", "ife", "oauthc ife", "oauthc-ife"],
     "LUTH": ["luth", "lagos university teaching hospital"],
@@ -37,8 +39,13 @@ SITE_ALIASES = {
     "NHA": ["nha", "nha_abuja", "national hospital abuja"],
     "UMTH": ["umth", "maiduguri"],
     "UCH": ["uch", "uch_ibadan", "ibadan"],
-    "FMC": ["fmc"],
-    "FTHA": ["ftha"],
+    "EKSUTH": ["eksuth"],
+    "OOUTH": ["oouth"],
+    "OSTC": ["ostc"],
+    # Breast_FTHA.Rmd treats these two DAGs as one site (Alex Ekwueme FUTH, Abakaliki).
+    "AEFUTHA": ["aefutha", "aefutha_abakaliki", "ftha"],
+    # Breast_FMC.Rmd treats 'fmc' and 'fmc_owo' as one site.
+    "FMC-OWO": ["fmc_owo", "fmc owo", "fmc"],
 }
 _ALIAS = {a: code for code, names in SITE_ALIASES.items() for a in names + [code.lower()]}
 
@@ -47,6 +54,30 @@ def site_code(raw) -> str | None:
     """The site code for any known spelling, or None if the spelling is unknown."""
     s = re.sub(r"\s+", " ", str(raw or "").strip().lower())
     return _ALIAS.get(s) or _ALIAS.get(s.replace(" ", "_"))
+
+
+def site_choices(choices: str) -> dict:
+    """Decode a REDCap site field: its choices text, exactly as the data dictionary holds it
+    ('0, OAUTHC, Ile-Ife | 1, UITH, Ilorin | 2, FMC, Owo | ...'), to {code: site}. A label's first
+    word is the site when it is a known name no other label shares; otherwise the whole label is
+    (FMC, Owo -> FMC-OWO). Missing-data codes map to nothing."""
+    pairs = []
+    for part in str(choices or "").split("|"):
+        code, _, label = part.strip().partition(",")
+        if code.strip() and label.strip():
+            pairs.append((code.strip(), label.strip()))
+    firsts = [re.split(r"[,\s]", l)[0].lower() for _, l in pairs]
+    out = {}
+    for (code, label), first in zip(pairs, firsts):
+        if code in MDC_CODES:
+            continue
+        known = site_code(first)
+        if known and firsts.count(first) == 1:
+            out[code] = known
+        else:
+            whole = re.sub(r"[^A-Za-z0-9]+", "-", label).strip("-").upper()
+            out[code] = site_code(label) or whole
+    return out
 
 
 # --- missing values ----------------------------------------------------------------------------

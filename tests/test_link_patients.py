@@ -47,6 +47,18 @@ class LinkPatientsOnTheFixture(unittest.TestCase):
             self.assertEqual(s["per_study"][study].get("blank_key", 0), n, study)
         for study, n in want["unlinked"].items():
             self.assertEqual(s["per_study"][study].get("unlinked", 0), n, study)
+        for study, n in want["expected_but_not_linked"].items():
+            self.assertEqual(s["per_study"][study].get("expected_but_not_linked", 0), n, study)
+
+    def test_a_condition_decides_which_records_should_have_a_parent(self):
+        r01 = [r for r in self.records if r.study == "r01"]
+        self.assertEqual(sum(1 for r in r01 if not r.expects), 2, "cohort 2 expects no CRC parent")
+        fin = {r.rid: r for r in self.records if r.study == "fintox"}
+        self.assertEqual(sorted({tuple(r.expects) for r in fin.values()}), [("breast",), ("crc",)])
+
+    def test_a_coded_site_is_decoded(self):
+        sites = {r.site for r in self.records if r.study == "crc"}
+        self.assertEqual(sites, {"OAUTHC", "LUTH"})
 
     def test_no_accepted_link_joins_two_different_people(self):
         wrong = [l for l in self.out["links"] if not self.same_person(l)]
@@ -80,6 +92,43 @@ class LinkPatientsOnTheFixture(unittest.TestCase):
         for row in self.out["names_to_judge"]:
             self.assertEqual(set(row), {"pair", "name_a", "name_b"})
             self.assertFalse(any(ch.isdigit() for ch in row["name_a"] + row["name_b"]))
+
+
+class RealExportShapes(unittest.TestCase):
+    def write(self, tmp, header, rows):
+        path = Path(tmp) / "x.csv"
+        with open(path, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(header)
+            w.writerows(rows)
+        return {"study": "x", "name": "X", "file": "x.csv", "record_id_field": "record_id",
+                "site_field": "", "single_site": "OAUTHC", "hosp_field": "hospital_number",
+                "histology_fields": "histology_number", "first_name_field": "",
+                "last_name_field": "", "parent_links": "", "site_choices": ""}
+
+    def test_repeating_rows_become_one_record_with_every_histology_number(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            spec = self.write(tmp, ["record_id", "redcap_repeat_instrument", "hospital_number",
+                                    "histology_number"],
+                              [["1", "", "123456", ""], ["1", "pathology", "", "H100/21"],
+                               ["1", "pathology", "", "H200/22"]])
+            recs = lp.read_records(spec, tmp)
+        self.assertEqual(len(recs), 1)
+        self.assertEqual(recs[0].raw["hospital_number"], "123456")
+        self.assertEqual(recs[0].raw["histology"], ["H100/21", "H200/22"])
+
+    def test_a_label_export_is_refused_in_words(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            spec = self.write(tmp, ["Record ID", "Hospital number"], [["1", "123456"]])
+            with self.assertRaises(SystemExit) as e:
+                lp.read_records(spec, tmp)
+        self.assertIn("raw data", str(e.exception))
+
+    def test_a_malformed_parent_link_is_refused_in_words(self):
+        with self.assertRaises(SystemExit):
+            lp.parse_parent_links("colorectal_record_id")
+        self.assertEqual(lp.parse_parent_links("a_record_id=crc[cohort=1|2]"),
+                         [("a_record_id", "crc", "cohort", {"1", "2"})])
 
 
 class TheCommandLine(unittest.TestCase):

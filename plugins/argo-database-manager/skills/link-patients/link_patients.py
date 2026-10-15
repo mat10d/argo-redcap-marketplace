@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -41,7 +42,7 @@ STRONG_HIST = {"exact", "exact_no_prefix"}
 
 
 class Record:
-    __slots__ = ("study", "rid", "site", "raw", "hosp", "hist", "parents")
+    __slots__ = ("study", "rid", "site", "raw", "hosp", "hist", "parents", "expects")
 
     def __init__(self, study, rid, site, raw, parents):
         self.study, self.rid, self.site, self.raw, self.parents = study, rid, site, raw, parents
@@ -67,28 +68,81 @@ def read_studies(path):
     return studies
 
 
+def parse_parent_links(text):
+    """'colorectal_record_id=crc[cohort=1];breast_colorectal_record_id=breast[cancer_type_cat=1]'
+    -> [(field, parent_study, condition_column, allowed_values)]. The condition says which records
+    should have this parent: R01's cohort 1 only, or Financial toxicity's one parent field pointing
+    at Breast or CRC depending on cancer type. No condition: every record."""
+    links = []
+    for part in filter(None, (x.strip() for x in str(text or "").split(";"))):
+        m = re.match(r"^([a-z0-9_]+)\s*=\s*([A-Za-z0-9_-]+)\s*(?:\[\s*([a-z0-9_]+)\s*=\s*([^\]]+)\])?$", part)
+        if not m:
+            sys.exit(f"I can't read the parent link '{part}'. Write it as field=study, or "
+                     "field=study[column=value|value], e.g. colorectal_record_id=crc[cohort=1].")
+        field, parent, col, vals = m.groups()
+        links.append((field, parent, col, set(v.strip() for v in vals.split("|")) if vals else None))
+    return links
+
+
+def _merge_rows(rows, rid_field):
+    """One record per ID. Projects with repeating forms or events export several rows per record:
+    keep the first non-blank value of each field, and every distinct value under '__all__'."""
+    merged, order = {}, []
+    for r in rows:
+        rid = r[rid_field]
+        if rid not in merged:
+            merged[rid] = {"__all__": {}}
+            order.append(rid)
+        m = merged[rid]
+        for k, v in r.items():
+            v = (v or "").strip()
+            if v and not m.get(k):
+                m[k] = v
+            if v:
+                m["__all__"].setdefault(k, [])
+                if v not in m["__all__"][k]:
+                    m["__all__"][k].append(v)
+    return [merged[i] for i in order]
+
+
 def read_records(spec, folder):
     path = Path(folder) / spec["file"]
     if not path.exists():
         sys.exit(f"I can't find the export for {spec['name']}: {path}. Download it from REDCap "
                  "(Data Exports, all records, CSV) and save it under that name.")
     with open(path, newline="", encoding="utf-8-sig") as f:
-        rows = list(csv.DictReader(f))
-    parents = {}
-    for part in filter(None, spec["parent_links"].split(";")):
-        field, _, parent = part.partition("=")
-        parents[field.strip()] = parent.strip()
+        reader = csv.DictReader(f)
+        header = reader.fieldnames or []
+        rows = list(reader)
+    rid_field = spec["record_id_field"]
+    if rid_field not in header:
+        sys.exit(f"The export for {spec['name']} has no column '{rid_field}'. Export it again "
+                 "choosing 'CSV / Microsoft Excel (raw data)', so the columns carry variable names, "
+                 "not question labels.")
+    links = parse_parent_links(spec["parent_links"])
+    sites = lk.site_choices(spec.get("site_choices", "")) if spec.get("site_choices") else {}
     hist_fields = [h for h in spec["histology_fields"].split(";") if h]
     out = []
-    for r in rows:
-        site = spec["single_site"] or r.get(spec["site_field"], "")
-        hist = [v for h in hist_fields for v in lk.split_histology(r.get(h, ""))]
+    for r in _merge_rows(rows, rid_field):
+        site = spec["single_site"] or (r.get(spec["site_field"], "") if spec["site_field"] else "")
+        site = sites.get(site, site)          # a coded site field: 0 -> OAUTHC
+        hist = []
+        for h in hist_fields:
+            for v in r["__all__"].get(h, []):
+                hist.extend(x for x in lk.split_histology(v) if x not in hist)
         raw = {"site": site, "hospital_number": r.get(spec["hosp_field"], ""), "histology": hist,
                "first_name": r.get(spec["first_name_field"], "") if spec["first_name_field"] else "",
                "last_name": r.get(spec["last_name_field"], "") if spec["last_name_field"] else ""}
-        links = {parent: r.get(field, "").strip() for field, parent in parents.items()
-                 if r.get(field, "").strip()}
-        out.append(Record(spec["study"], r[spec["record_id_field"]], site, raw, links))
+        hard, expects = {}, []
+        for field, parent, col, vals in links:
+            if col and r.get(col, "") not in vals:
+                continue
+            expects.append(parent)
+            if r.get(field, "").strip():
+                hard[parent] = r[field].strip()
+        rec = Record(spec["study"], r[rid_field], site, raw, hard)
+        rec.expects = expects
+        out.append(rec)
     return out
 
 
@@ -260,6 +314,10 @@ def link(studies, records):
                 c["blank_key"] += 1
             else:
                 c["unlinked"] += 1
+        scoped = [r for r in recs if r.expects]
+        if scoped:
+            c["expected_a_parent"] = len(scoped)
+            c["expected_but_not_linked"] = sum(1 for r in scoped if r.ref not in in_link)
         per_study[s["study"]] = {"records": len(recs), **c}
     hard_states = defaultdict(int)
     for h in out["hard_check"]:

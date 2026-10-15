@@ -5,7 +5,7 @@
  "records": {
   "crc": 73,
   "breast": 37,
-  "r01": 39,
+  "r01": 41,
   "brca": 15,
   "fintox": 10,
   "path": 20
@@ -25,10 +25,15 @@
    "r01": 2
   },
   "unlinked": {
-   "r01": 3,
+   "r01": 5,
    "fintox": 0,
    "brca": 2,
    "path": 2
+  },
+  "expected_but_not_linked": {
+   "r01": 17,
+   "fintox": 0,
+   "brca": 4
   }
  }
 }

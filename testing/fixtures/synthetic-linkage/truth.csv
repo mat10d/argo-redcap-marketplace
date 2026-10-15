@@ -147,6 +147,8 @@ r01,36,P113
 r01,37,P114
 r01,38,P115
 r01,39,P116
+r01,40,P117
+r01,41,P118
 fintox,F01,P036
 fintox,F02,P037
 fintox,F03,P038
@@ -170,8 +172,8 @@ brca,10,P086
 brca,11,P087
 brca,12,P098
 brca,13,P099
-brca,14,P117
-brca,15,P118
+brca,14,P119
+brca,15,P120
 path,PA-1,P042
 path,PA-2,P043
 path,PA-3,P044
@@ -190,6 +192,6 @@ path,PA-15,P056
 path,PA-16,P057
 path,PA-17,P058
 path,PA-18,P059
-path,PA-19,P119
-path,PA-20,P120
+path,PA-19,P121
+path,PA-20,P122
 crc,40-73,P060
