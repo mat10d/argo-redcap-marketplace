@@ -12,12 +12,11 @@
  },
  "expect": {
   "hard_links": 31,
-  "hard_confirmed": 28,
-  "hard_with_typo": 2,
-  "hard_disagrees": 1,
+  "hard_keys_agree": 28,
+  "hard_keys_differ": 3,
   "strong": 25,
   "probable": 6,
-  "near_miss": 13,
+  "near_miss": 11,
   "conflict": 2,
   "duplicate": 1,
   "names_to_judge": 2,
@@ -31,7 +30,7 @@
    "path": 2
   },
   "expected_but_not_linked": {
-   "r01": 17,
+   "r01": 16,
    "fintox": 0,
    "brca": 4
   }

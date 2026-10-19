@@ -138,7 +138,7 @@ take = lambda n: [next(pool) for _ in range(n)]  # noqa: E731
 
 rows: dict[str, list[dict]] = {k: [] for k in ("crc", "breast", "r01", "brca", "fintox", "path")}
 truth: list[tuple] = []
-expect = {"hard_links": 0, "hard_confirmed": 0, "hard_with_typo": 0, "hard_disagrees": 0,
+expect = {"hard_links": 0, "hard_keys_agree": 0, "hard_keys_differ": 0,
           "strong": 0, "probable": 0, "near_miss": 0, "conflict": 0, "duplicate": 0,
           "names_to_judge": 0, "blank_key": {}, "unlinked": {}}
 crc_id = {}
@@ -183,10 +183,10 @@ def r01(p, *, hosp=None, site=None, first=None, last=None, hard=None, person=Non
 # R01 (child of CRC)
 for p in take(12):                                   # hard link, keys agree
     r01(p, hard=crc_id[p.pid])
-    expect["hard_links"] += 1; expect["hard_confirmed"] += 1
+    expect["hard_links"] += 1; expect["hard_keys_agree"] += 1
 for p in take(2):                                    # hard link, hospital number typed wrong
     r01(p, hosp=typo(p.hosp, "one_digit"), hard=crc_id[p.pid])
-    expect["hard_links"] += 1; expect["hard_with_typo"] += 1; expect["near_miss"] += 1
+    expect["hard_links"] += 1; expect["hard_keys_differ"] += 1   # kept: a stored link is never questioned
 for p in take(6):                                    # no hard link, keys agree -> new link
     r01(p); expect["strong"] += 1
 for p in take(2):                                    # names swapped
@@ -203,9 +203,9 @@ for p in take(2):                                    # same number, different pe
         impostor.first, impostor.last = new_name()
     r01(p, first=impostor.first, last=impostor.last, person=impostor.pid)
     expect["conflict"] += 1
-x, y = take(2)                                       # hard link points at the wrong patient
-r01(y, hard=crc_id[x.pid])
-expect["hard_links"] += 1; expect["hard_disagrees"] += 1
+x, y = take(2)                                       # stored link, hospital no. typed wrong
+r01(y, hosp=typo(y.hosp, "transposed"), hard=crc_id[y.pid])
+expect["hard_links"] += 1; expect["hard_keys_differ"] += 1   # kept as it is (Matteo, 2026-10-19)
 p = next(pool)                                       # same number recorded at the other hospital
 r01(p, site="LUTH"); expect["near_miss"] += 1
 for _ in range(2):                                   # hospital number is a missing-data code
@@ -218,8 +218,8 @@ for _ in range(2):                                   # cohort 2: never expected 
     r01(Person("OAUTHC"), cohort="2")
 expect["unlinked"]["r01"] = 5
 # cohort-1 R01 records with no accepted link: 2 missing-code + 3 in no study + 6 typos + 1 other
-# hospital + 2 probable + 2 conflict + 1 wrong parent ID = 17. BRCA: 2 leading-zero probables + 2 = 4.
-expect["expected_but_not_linked"] = {"r01": 17, "fintox": 0, "brca": 4}
+# hospital + 2 probable + 2 conflict = 16 (stored parent IDs always count as linked). BRCA: 2 leading-zero probables + 2 = 4.
+expect["expected_but_not_linked"] = {"r01": 16, "fintox": 0, "brca": 4}
 
 # Financial toxicity (child of both, single site OAUTHC)
 fin_n = 0
@@ -237,12 +237,12 @@ def fintox(p, crc_hard="", breast_hard="", cancer="2"):
 
 
 for p in take(4):
-    fintox(p, crc_hard=crc_id[p.pid]); expect["hard_links"] += 1; expect["hard_confirmed"] += 1
+    fintox(p, crc_hard=crc_id[p.pid]); expect["hard_links"] += 1; expect["hard_keys_agree"] += 1
 b_oau = [p for p in breast_people if p.site == "OAUTHC" and not p.hosp.startswith("0")]
 bpool = iter(b_oau)
 for _ in range(4):
     p = next(bpool)
-    fintox(p, breast_hard=breast_id[p.pid], cancer="1"); expect["hard_links"] += 1; expect["hard_confirmed"] += 1
+    fintox(p, breast_hard=breast_id[p.pid], cancer="1"); expect["hard_links"] += 1; expect["hard_keys_agree"] += 1
 for p in take(2):
     fintox(p); expect["strong"] += 1
 expect["unlinked"]["fintox"] = 0
@@ -262,7 +262,7 @@ def brca(p, hosp=None, hard=""):
 
 for _ in range(8):
     p = next(bpool)
-    brca(p, hard=breast_id[p.pid]); expect["hard_links"] += 1; expect["hard_confirmed"] += 1
+    brca(p, hard=breast_id[p.pid]); expect["hard_links"] += 1; expect["hard_keys_agree"] += 1
 for _ in range(3):
     brca(next(bpool)); expect["strong"] += 1
 for p in [p for p in breast_people if p.hosp.startswith("0")]:   # zero dropped -> probable

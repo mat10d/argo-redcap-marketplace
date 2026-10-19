@@ -9,7 +9,8 @@ IDs. It never writes to REDCap and never calls a model. It writes, into --out:
                       (site + hospital number + names agree, or hospital and histology numbers
                       agree where a study holds no names)
   persons.csv         one ARGO person ID per linked group of records
-  hard_link_check.csv every stored parent ID, checked against the keys
+  hard_link_check.csv every stored parent ID and whether the keys agree (information only:
+                      a stored link is confirmed and never questioned)
   review.csv          for a person to decide: conflicts, a patient enrolled twice, parent IDs
                       that point at the wrong patient, and probable links
   near_misses.csv     likely typos, one row per pair; also split per site under worklists/
@@ -192,7 +193,7 @@ def tier(f):
 def link(studies, records):
     by_ref = {r.ref: r for r in records}
     out = {k: [] for k in ("links", "hard_check", "review", "near_misses", "names_to_judge")}
-    hard_pairs, held = set(), set()
+    hard_pairs, linked_to = set(), set()
 
     def row(kind, a, b, f, explain):
         return {"kind": kind, "study_a": a.study, "record_a": a.rid, "study_b": b.study,
@@ -214,22 +215,19 @@ def link(studies, records):
             f = lk.compare_pair(c.raw, p.raw)
             verifiable = (c.hosp.key and p.hosp.key) or (any(h.key for h in c.hist)
                                                         and any(h.key for h in p.hist))
-            if f.kind == "agree" or (f.kind == "unrelated" and not verifiable):
-                state = "confirmed" if f.kind == "agree" else "unverifiable"
-            elif f.kind == "near_miss":
-                state = "typo"
-                out["near_misses"].append(row("near_miss", c, p, f,
-                                              "Already linked; " + f.explain[0].lower() + f.explain[1:]))
+            # A stored parent ID is a confirmed link, whatever the names or numbers say
+            # (Matteo, 2026-10-19: "if links are there they are there"). The check below is
+            # recorded for information only; it never becomes a worklist row or a question.
+            if f.kind == "agree":
+                state = "keys_agree"
+            elif not verifiable:
+                state = "keys_missing"
             else:
-                state = "disagrees"
-                held.add(c.ref)
-                out["review"].append(row("hard_link_disagrees", c, p, f,
-                                         "The stored parent ID points at a patient whose numbers "
-                                         "and name don't match."))
+                state = "keys_differ"
+            linked_to.add((c.ref, p.study))
             out["hard_check"].append({"study": c.study, "record": c.rid, "parent_study": p.study,
                                       "parent_record": p.rid, "state": state})
-            if state in ("confirmed", "unverifiable", "typo"):
-                out["links"].append(row("hard", c, p, f, "Parent ID stored in the study."))
+            out["links"].append(row("hard", c, p, f, "Parent ID stored in the study."))
 
     # 2. Pairs found by the keys.
     judged = 0
@@ -246,12 +244,8 @@ def link(studies, records):
                 out["review"].append(row("duplicate", a, b, f,
                                          "The same patient looks enrolled twice in one study."))
             continue
-        if a.ref in held or b.ref in held:
-            note = next(r for r in out["review"] if r["kind"] == "hard_link_disagrees"
-                        and (r["study_a"], r["record_a"]) in (a.ref, b.ref))
-            note["explain"] += f" The numbers point at {b.study if a.ref in held else a.study} " \
-                               f"{b.rid if a.ref in held else a.rid} instead."
-            continue
+        if (a.ref, b.study) in linked_to or (b.ref, a.study) in linked_to:
+            continue                    # already linked into that study by a stored parent ID
         if t == "strong":
             out["links"].append(row("strong", a, b, f, f.explain))
         elif t == "probable":
@@ -328,8 +322,8 @@ def link(studies, records):
     out["summary"] = {
         "records": len(records), "people": n,
         "hard_links": len(out["hard_check"]) + kinds["hard_link_missing_parent"],
-        "hard_confirmed": hard_states["confirmed"], "hard_with_typo": hard_states["typo"],
-        "hard_disagrees": hard_states["disagrees"], "hard_unverifiable": hard_states["unverifiable"],
+        "hard_keys_agree": hard_states["keys_agree"], "hard_keys_differ": hard_states["keys_differ"],
+        "hard_keys_missing": hard_states["keys_missing"],
         "strong": sum(1 for l in out["links"] if l["kind"] == "strong"),
         "probable": kinds["probable"], "near_miss": len(out["near_misses"]),
         "conflict": kinds["conflict"], "duplicate": kinds["duplicate"],
@@ -388,9 +382,8 @@ def main(argv=None):
     write_outputs(out, records, args.out)
     s = out["summary"]
     print(f"{s['records']} records in {len(studies)} studies -> {s['people']} people.")
-    print(f"Links: {s['hard_confirmed']} stored parent IDs confirmed, {s['strong']} new by numbers "
-          f"and name. Stored parent IDs to check: {s['hard_with_typo']} with a typo, "
-          f"{s['hard_disagrees']} pointing at the wrong patient.")
+    print(f"Links: {s['hard_links']} stored parent IDs (kept as they are), {s['strong']} new by "
+          f"numbers and name.")
     print(f"For a person: {s['conflict']} conflicts, {s['duplicate']} enrolled twice, "
           f"{s['probable']} probable. For the RAs: {s['near_miss']} near-misses. "
           f"Names to judge: {s['names_to_judge']}.")

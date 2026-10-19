@@ -40,7 +40,7 @@ class LinkPatientsOnTheFixture(unittest.TestCase):
 
     def test_counts_match_the_planted_cases(self):
         s, want = self.out["summary"], self.manifest["expect"]
-        for k in ("hard_links", "hard_confirmed", "hard_with_typo", "hard_disagrees", "strong",
+        for k in ("hard_links", "hard_keys_agree", "hard_keys_differ", "strong",
                   "probable", "near_miss", "conflict", "duplicate", "names_to_judge"):
             self.assertEqual(s[k], want[k], k)
         for study, n in want["blank_key"].items():
@@ -79,14 +79,16 @@ class LinkPatientsOnTheFixture(unittest.TestCase):
         self.assertTrue(conflicts)
         self.assertFalse(any(self.same_person(r) for r in conflicts))
 
-    def test_a_wrong_stored_parent_id_is_held_not_linked(self):
-        held = [r for r in self.out["review"] if r["kind"] == "hard_link_disagrees"]
-        self.assertEqual(len(held), 1)
-        self.assertIn("instead", held[0]["explain"], "the review names where the numbers point")
-        ref = (held[0]["study_a"], held[0]["record_a"])
-        linked = {(l["study_a"], l["record_a"]) for l in self.out["links"]} | \
-                 {(l["study_b"], l["record_b"]) for l in self.out["links"]}
-        self.assertNotIn(ref, linked)
+    def test_a_stored_parent_id_is_never_questioned(self):
+        """Matteo, 2026-10-19: "if links are there they are there"."""
+        stored = {frozenset({(l["study_a"], l["record_a"]), (l["study_b"], l["record_b"])})
+                  for l in self.out["links"] if l["kind"] == "hard"}
+        self.assertEqual(len(stored), self.manifest["expect"]["hard_links"])
+        flagged = [r for r in self.out["review"] + self.out["near_misses"]
+                   if frozenset({(r["study_a"], r["record_a"]), (r["study_b"], r["record_b"])})
+                   in stored]
+        self.assertEqual(flagged, [], "no worklist row or question about a stored link")
+        self.assertFalse(any(r["kind"].startswith("hard_link_disagrees") for r in self.out["review"]))
 
     def test_names_to_judge_carry_names_only(self):
         for row in self.out["names_to_judge"]:
