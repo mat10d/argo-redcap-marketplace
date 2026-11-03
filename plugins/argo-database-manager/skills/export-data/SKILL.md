@@ -66,24 +66,26 @@ you'll need before you've looked:
 | `<slug>_datadictionary_<date>.csv` | the field list, with choice codes and `Identifier?` flags | everything |
 | `<slug>_records_raw_<date>.csv` | codes (`1`, `2`) | **[[run-analysis]] and the QA tools — the one they read** |
 | `<slug>_records_labelled_<date>.csv` | the same records, labels (`Male`) | a person reading by eye |
-| `<slug>_records_deidentified_raw_<date>.csv` | raw, minus every field the dictionary flags as an identifier | the one that can leave the building |
-| `<slug>_records_deidentified_labelled_<date>.csv` | the same, labelled | reading by eye, shareable |
 | `<slug>_records_labelled_tidy_<date>.csv` | labelled, each checkbox folded into one column (only when there are checkboxes) | a spreadsheet a person will scroll |
 | `README.md` | what each file is, counts, which the tools read, which is safe to share | whoever opens the folder next |
 
 Tell the user in those words — "raw codes", "readable labels", "de-identified" — never just "the
 export". The script's "Saved" lines say the same; read them back.
 
-**De-identification is a filter, not a judgement.** The `_deidentified_` files drop the fields
-the dictionary marks `Identifier?` — nothing else. A free-text note naming a relative is still
-there. Say so when you hand one over. If the dictionary flags nothing, **no de-identified copy
-is written** (an identical file under that name would be a lie); the README says so, which
-usually means nobody ticked the boxes in the Designer — worth passing on.
+**Identifiers stay in REDCap.** The download asks only for fields the data dictionary does not
+flag `Identifier?` (names, hospital numbers…), so no file here contains them; the README lists
+what was left behind. That is a filter, not a judgement: a field nobody flagged still comes
+through, and a free-text note naming a relative is still there. Say so when you hand a file over.
+If the dictionary flags nothing, say that too: usually nobody ticked the boxes in the Designer.
 
-What an export contains at all is decided by the export rights of the account the key belongs
-to. For an extract de-identified at source, the key must belong to an account with
-"De-Identified" export rights — ask the REDCap administrator. Either way, check a file before
-sharing it.
+**Never add `--include-identifiers`.** It is for the ARGO linkage lead's linkage runs alone, is
+refused unless the private settings file holds `ARGO_ALLOW_IDENTIFIERS=linkage`, and warns when it
+runs. If someone asks for names or hospital numbers, tell them they stay in REDCap; nobody else
+needs them in a file.
+
+REDCap's own export rights are the first lock: for a key that cannot download identifiers at all,
+the account needs "De-Identified" or "Remove All Identifier Fields" export rights (ask the
+administrator). This filter is the second.
 
 Counts are real CSV rows, not lines (a free-text answer with a line break spans several lines).
 They say `records`, and add patients only when the record-ID column proves it: "2,143 records

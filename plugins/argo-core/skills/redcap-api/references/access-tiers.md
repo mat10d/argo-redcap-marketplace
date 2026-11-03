@@ -114,6 +114,23 @@ Two requirements, both non-negotiable:
   `setup_brief.py --from-json`
 - `new-study-documents` — document drafting only
 
+## Identifiers never leave REDCap (decided 2026-11-03)
+
+Every record download asks only for fields the data dictionary does **not** flag `Identifier?`:
+REDCap's export API has no "de-identify" switch (that is a website-only option), but it honours an
+explicit field list, so names and hospital numbers stay on the server. The record ID always comes.
+Enforced in one place, `argo_redcap_client` (`export_records`, `export_records_csv`,
+`record_payload`); the five admin trackers are exempt (no patient data).
+
+- **Override: the ARGO linkage lead only, for linkage runs.** It needs two keys: the call asks for
+  identifiers (`include_identifiers=True`, `export.py --include-identifiers`) **and** the private
+  settings file holds `ARGO_ALLOW_IDENTIFIERS=linkage`. Without both it is refused; with both it
+  warns hard. No other role's settings file gets that line.
+- **Two locks, not one.** REDCap's own export rights stay the real lock ("De-Identified" or "Remove
+  All Identifier Fields" for anyone who doesn't need identifiers); this filter is the second,
+  and it only knows what the dictionary flags. Unflagged identifier fields are a build defect:
+  `validate_dd.py --patient-level` already requires `hospital_number` flagged.
+
 ## Which pathway wins at each fork
 
 Every fork below used to be documented as "here are two options." Each one is now **one

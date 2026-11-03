@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -463,9 +464,15 @@ class FakeRedcapProject:
         self.calls.append(("metadata", params))
         return self.DD
 
-    def export_records_csv(self, **params):
+    def export_records_csv(self, include_identifiers=False, **params):
+        """Like the real client: identifier-flagged fields stay in REDCap unless both keys turn."""
         self.calls.append(("records", params))
-        return self.LABELLED if params.get("rawOrLabel") == "label" else self.RAW
+        text = self.LABELLED if params.get("rawOrLabel") == "label" else self.RAW
+        if include_identifiers:
+            CLIENT.identifiers_allowed()
+            return text
+        flagged = {line.split(",")[0] for line in self.DD.splitlines()[1:] if line.endswith(",y")}
+        return EXPORT.drop_fields(text, sorted(flagged)) if flagged else text
 
     def confirm_project(self, **kwargs):
         return self.project_info()
@@ -475,8 +482,8 @@ class TestExportSavesTheWholeSet(unittest.TestCase):
     """0.17.2 #40: one run, the whole set, and a README saying what each file is.
 
     Defaulting to one encoding meant someone had to choose between "raw" and "labelled" before
-    they knew what they needed — and a live round chose wrong. Both are saved, plus a copy with
-    the dictionary's flagged identifiers removed, and the folder explains itself.
+    they knew what they needed — and a live round chose wrong. Both are saved, and the folder
+    explains itself. Since 0.29.0 identifier fields never leave REDCap, so no file carries `name`.
     """
 
     @classmethod
@@ -513,25 +520,20 @@ class TestExportSavesTheWholeSet(unittest.TestCase):
     def test_both_encodings_are_saved_without_being_asked_for(self):
         raw = self._one("_records_raw_")
         labelled = self._one("_records_labelled_2")   # not the _tidy_ one
-        self.assertIn("1,Ada,1,1,0", raw.read_text())
-        self.assertIn("1,Ada,Male,Pain,", labelled.read_text())
+        self.assertIn("1,1,1,0", raw.read_text())
+        self.assertIn("1,Male,Pain,", labelled.read_text())
 
     def test_the_data_dictionary_comes_too(self):
         self.assertTrue(self._one("_datadictionary_").exists())
 
-    def test_a_de_identified_copy_omits_the_identifier_columns(self):
-        raw = self._one("_records_raw_").read_text()
-        deid = self._one("_records_deidentified_raw_").read_text()
-        self.assertIn("name", raw.splitlines()[0].split(","))
-        self.assertNotIn("name", deid.splitlines()[0].split(","),
-                         "the dictionary flags `name` as an identifier")
-        self.assertNotIn("Ada", deid)
-        # and it is still the same records, not a truncated file
-        self.assertEqual(EXPORT.count_rows(deid, "syn_id"),
-                         EXPORT.count_rows(raw, "syn_id"))
-
-    def test_the_de_identified_copy_exists_in_both_encodings(self):
-        self.assertTrue(self._one("_records_deidentified_labelled_").exists())
+    def test_identifier_fields_never_reach_a_file(self):
+        for name in self.names:
+            if name.endswith(".csv") and "_records_" in name:
+                header = (self.out / name).read_text().splitlines()[0].split(",")
+                self.assertNotIn("name", header, f"{name} carries an identifier column")
+                self.assertNotIn("Ada", (self.out / name).read_text())
+        self.assertEqual([n for n in self.names if "deidentified" in n], [],
+                         "every file is already without identifiers; a second copy would be noise")
 
     def test_the_tidy_file_folds_checkbox_columns(self):
         tidy = self._one("_records_labelled_tidy_").read_text()
@@ -554,12 +556,13 @@ class TestExportSavesTheWholeSet(unittest.TestCase):
         self.assertIn("Which one do I use?", readme)
         self.assertIn("**The raw file**", readme)
         self.assertIn("Which one is safe to share?", readme)
-        self.assertIn("`name`", readme, "the removed identifier fields must be listed by name")
+        self.assertIn("`name`", readme, "the identifier fields left in REDCap are listed by name")
+        self.assertIn("never downloaded", readme)
 
     def test_the_saved_lines_say_the_same_things(self):
         self.assertIn("raw codes", self.stdout)
         self.assertIn("readable labels", self.stdout)
-        self.assertIn("identifiers removed", self.stdout)
+        self.assertIn("Left in REDCap", self.stdout)
         self.assertIn("README.md", self.stdout)
         self.assertIn("2 records", self.stdout)
 
@@ -571,6 +574,42 @@ class TestExportSavesTheWholeSet(unittest.TestCase):
         self.assertNotIn("--labels", help_text, "the raw-vs-labels choice is retired")
         self.assertIn("--only-raw", help_text)
         self.assertIn("--only-labelled", help_text)
+
+
+class TestExportIdentifiersOnlyForLinkage(unittest.TestCase):
+    """--include-identifiers: refused without ARGO_ALLOW_IDENTIFIERS=linkage; with it, the full
+    files come with a _deidentified_ copy beside them."""
+
+    def run_export(self, env):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        fake = FakeRedcapProject()
+        saved, argv = EXPORT.RedcapClient.from_env, sys.argv
+        EXPORT.RedcapClient.from_env = staticmethod(lambda *a, **k: fake)
+        sys.argv = ["export.py", "--token-env", "SYN_TOKEN", "--out", str(tmp / "syn"),
+                    "--include-identifiers"]
+        buf, err = io.StringIO(), io.StringIO()
+        try:
+            with mock.patch.dict(os.environ, env), contextlib.redirect_stdout(buf), \
+                    contextlib.redirect_stderr(err):
+                os.environ.pop(CLIENT.ALLOW_IDENTIFIERS_SETTING, None) if not env else None
+                code = EXPORT.main()
+        finally:
+            EXPORT.RedcapClient.from_env, sys.argv = saved, argv
+        out = tmp / "syn"
+        return code, sorted(p.name for p in out.iterdir()) if out.is_dir() else [], err.getvalue()
+
+    def test_refused_without_the_settings_line(self):
+        code, names, err = self.run_export({})
+        self.assertEqual(code, 1)
+        self.assertFalse([n for n in names if "_records_" in n], "no records file written")
+        self.assertIn("stay in REDCap", err)
+
+    def test_with_the_settings_line_it_warns_and_writes_a_deidentified_copy(self):
+        code, names, err = self.run_export({CLIENT.ALLOW_IDENTIFIERS_SETTING: "linkage"})
+        self.assertEqual(code, 0)
+        self.assertIn("IDENTIFIERS INCLUDED", err)
+        self.assertTrue([n for n in names if "_records_deidentified_raw_" in n])
 
 
 class TestExportWithNoIdentifiersFlagged(unittest.TestCase):
@@ -617,8 +656,8 @@ class TestExportEncodingIsDocumented(unittest.TestCase):
     DOC = (PLUGINS / "argo-database-manager/skills/export-data/SKILL.md").read_text()
 
     def test_the_file_set_is_documented(self):
-        for fragment in ("_records_raw_", "_records_labelled_", "_records_deidentified_raw_",
-                         "README.md"):
+        for fragment in ("_records_raw_", "_records_labelled_", "README.md",
+                         "Identifiers stay in REDCap", "--include-identifiers"):
             self.assertIn(fragment, self.DOC, f"the skill doesn't mention {fragment}")
 
     def test_the_doc_does_not_call_the_two_paths_identical(self):

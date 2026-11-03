@@ -38,16 +38,23 @@ from io import StringIO
 
 import requests
 
+# The shared ARGO scripts are vendored into this skill's own scripts/ folder by release.py.
+from pathlib import Path as _Path
+_here = _Path(__file__).resolve().parent
+for _cand in (_here / "scripts",
+              *(p / "plugins/argo-core/skills/redcap-api/scripts" for p in _here.parents)):
+    if (_cand / "argo_redcap_client.py").exists():
+        sys.path.insert(0, str(_cand))
+        break
+from argo_redcap_client import record_payload  # noqa: E402
+
 
 def pull_records(url: str, token: str, ids: list[str], fields: list[str],
                  id_field: str) -> dict:
     """Pull only the records and fields we need. Returns {rid: {field: value}}."""
-    data = {"token": token, "content": "record", "format": "csv", "type": "flat",
-            "rawOrLabel": "raw", "returnFormat": "json"}
-    for i, rid in enumerate(ids):
-        data[f"records[{i}]"] = rid
-    for i, f in enumerate(fields):
-        data[f"fields[{i}]"] = f
+    # identifier-flagged fields are left out: they never leave REDCap (and QA never pushes them)
+    data = record_payload(url, token, {"format": "csv", "type": "flat", "rawOrLabel": "raw",
+                                       "records": list(ids), "fields": list(fields)})
     r = requests.post(url, data=data, timeout=300)
     r.raise_for_status()
     out = {}

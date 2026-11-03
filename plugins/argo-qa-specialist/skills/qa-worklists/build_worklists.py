@@ -72,7 +72,7 @@ for _cand in (_here / "scripts",
     if (_cand / "argo_redcap_client.py").exists():
         sys.path.insert(0, str(_cand))
         break
-from argo_redcap_client import load_env_file  # noqa: E402
+from argo_redcap_client import load_env_file, record_payload  # noqa: E402
 
 
 # -----------------------------------------------------------------------------
@@ -87,9 +87,12 @@ def redcap_post(url: str, token: str, **fields) -> str:
 
 
 def pull_records(url: str, token: str) -> pd.DataFrame:
-    csv_text = redcap_post(url, token, content="record", type="flat",
-                            rawOrLabel="raw", exportDataAccessGroups="true")
-    return pd.read_csv(StringIO(csv_text), dtype=str, keep_default_na=False)
+    """Every record, minus identifier-flagged fields: those never leave REDCap."""
+    payload = record_payload(url, token, {"format": "csv", "type": "flat", "rawOrLabel": "raw",
+                                          "exportDataAccessGroups": "true"})
+    r = requests.post(url, data=payload, timeout=300)
+    r.raise_for_status()
+    return pd.read_csv(StringIO(r.text), dtype=str, keep_default_na=False)
 
 
 def pull_metadata(url: str, token: str) -> list[dict]:

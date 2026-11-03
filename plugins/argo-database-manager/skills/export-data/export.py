@@ -24,19 +24,22 @@ One run saves the whole set, so nobody has to pick an encoding before knowing wh
     <slug>_datadictionary_<date>.csv                  the field list
     <slug>_records_raw_<date>.csv                     codes (1, 2) — what the ARGO tools read
     <slug>_records_labelled_<date>.csv                the same records, labels — for reading
-    <slug>_records_deidentified_raw_<date>.csv       \\ the same again, with every field the
-    <slug>_records_deidentified_labelled_<date>.csv  / dictionary flags as an identifier removed
     <slug>_records_labelled_tidy_<date>.csv           labelled, checkbox options one per field
     README.md                                         what each file is, which is safe to share
 
+None of these carries a field the dictionary flags as an identifier: those stay in REDCap.
 `--only-raw` / `--only-labelled` narrow the records files; `--what` picks records vs dictionary.
-The de-identified copies are written only when the dictionary actually flags something: an
-identical file under a name promising de-identification is worse than no file at all, so when
-nothing is flagged the README says that instead.
+Only with `--include-identifiers` (linkage lead only) are identifiers downloaded, and then a
+`_deidentified_` copy of each records file is written beside them.
 
 A relative `--out` is taken as relative to the folder your ARGO settings file lives in — your ARGO
 folder — not to whatever directory the command happened to run from. Absolute paths are used
 exactly as given.
+
+Identifier fields never leave REDCap: the download asks only for fields the data dictionary does
+not flag as identifiers (names, hospital numbers…), so the records files carry none. The one
+exception is `--include-identifiers`, for the ARGO linkage lead's linkage runs only; it is refused
+unless the private settings file holds ARGO_ALLOW_IDENTIFIERS=linkage, and it warns when it runs.
 
 A note on identifiable data: REDCap decides how much you can see at all from the permissions of
 the account the access key belongs to. The de-identified copy drops the fields REDCap's own data
@@ -274,7 +277,8 @@ def collapse_checkboxes(csv_text: str, checkbox_fields: list) -> "str | None":
 
 
 def write_readme(out: Path, title: str, pid, stamp: str, id_field: str,
-                 entries: list, identifiers: "list | None" = None) -> Path:
+                 entries: list, identifiers: "list | None" = None,
+                 left_in_redcap: bool = False) -> Path:
     """A README.md in the export folder saying what each file is.
 
     An export folder with three near-identically-named CSVs in it is a puzzle a week later, and
@@ -312,7 +316,21 @@ def write_readme(out: Path, title: str, pid, stamp: str, id_field: str,
         "",
     ]
     deidentified = [e for e in entries if "deidentified" in e["name"]]
-    if deidentified and identifiers:
+    if left_in_redcap and identifiers:
+        lines += [
+            "**All of them, as far as the data dictionary can tell.** Every field it marks as an "
+            "identifier was left in REDCap and never downloaded:",
+            "",
+        ]
+        lines += [f"- `{name}`" for name in identifiers]
+        lines += [
+            "",
+            "That list is REDCap's own `Identifier?` flag, which someone had to tick when the field "
+            "was created — a field nobody flagged is still in these files even if its contents "
+            "identify a person (a free-text note naming a relative, a rare diagnosis in a small "
+            "district). Check before you share.",
+        ]
+    elif deidentified and identifiers:
         lines += [
             "**The `_deidentified_` files, and only those.** Every field the data dictionary "
             "marks as an identifier has been removed from them, columns and all:",
@@ -344,7 +362,7 @@ def write_readme(out: Path, title: str, pid, stamp: str, id_field: str,
         "",
         "## Handle with care",
         "",
-        "These files may contain identifiable patient data. What an export contains at all is "
+        "Patient data, even without names and hospital numbers. What an export contains at all is "
         "decided by the permissions of the account the access key belongs to. Check any file "
         "before sharing it with anyone.",
         "",
@@ -402,6 +420,9 @@ def main() -> int:
                     help=argparse.SUPPRESS)
     ap.add_argument("--info", action="store_true",
                     help="Just say which project this key opens, and stop")
+    ap.add_argument("--include-identifiers", action="store_true",
+                    help="Also download identifier fields. Only for the ARGO linkage lead's linkage "
+                         "runs; refused unless the private settings file allows it")
     ap.add_argument("--expect-project", metavar="NAME_OR_PID",
                     help="Refuse to download unless the key opens this project, by name or number")
     args = ap.parse_args()
@@ -490,7 +511,8 @@ def main() -> int:
                 params = {"rawOrLabel": "label" if labelled else "raw",
                           "exportCheckboxLabel": "true" if labelled else "false",
                           "exportDataAccessGroups": "true", **form_params}
-                texts[name] = client.export_records_csv(**params)
+                texts[name] = client.export_records_csv(
+                    include_identifiers=args.include_identifiers, **params)
                 note = LABELLED_NOTE if labelled else f"{RAW_NOTE} — what the ARGO tools read"
                 entries.append(write_file(
                     out / f"{slug}_records_{name}_{stamp}.csv", texts[name], "records",
@@ -499,7 +521,10 @@ def main() -> int:
             # A copy with every dictionary-flagged identifier removed — the one that can leave
             # the building. Skipped entirely when the dictionary flags nothing: an identical
             # file under a name promising de-identification is worse than no file at all.
-            if identifiers:
+            if identifiers and not args.include_identifiers:
+                print(f"\n  Left in REDCap, never downloaded — the {len(identifiers)} field(s) the "
+                      f"data dictionary flags\n    as identifiers: {', '.join(identifiers)}")
+            elif identifiers:
                 print(f"\n  The data dictionary flags {len(identifiers)} field(s) as "
                       f"identifiers: {', '.join(identifiers)}")
                 for name in encodings:
@@ -526,7 +551,8 @@ def main() -> int:
 
         if entries:
             write_readme(out, title, pid, stamp, id_field, entries,
-                         identifiers if args.what in ("records", "both") else None)
+                         identifiers if args.what in ("records", "both") else None,
+                         left_in_redcap=not args.include_identifiers)
 
         print("\nDone. Nothing in REDCap was changed — this only read data out.")
         return 0

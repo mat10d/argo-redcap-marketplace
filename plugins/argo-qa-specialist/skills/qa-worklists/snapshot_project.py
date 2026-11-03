@@ -19,6 +19,16 @@ import sys
 
 import requests
 
+# The shared ARGO scripts are vendored into this skill's own scripts/ folder by release.py.
+from pathlib import Path as _Path
+_here = _Path(__file__).resolve().parent
+for _cand in (_here / "scripts",
+              *(p / "plugins/argo-core/skills/redcap-api/scripts" for p in _here.parents)):
+    if (_cand / "argo_redcap_client.py").exists():
+        sys.path.insert(0, str(_cand))
+        break
+from argo_redcap_client import record_payload  # noqa: E402
+
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
@@ -49,11 +59,10 @@ def main():
     suffix = f"_{args.tag}" if args.tag else ""
     path = os.path.join(args.out, f"snapshot_{stamp}{suffix}.csv")
 
-    r = requests.post(args.url, data={
-        "token": tok, "content": "record", "format": "csv", "type": "flat",
-        "rawOrLabel": "raw", "exportDataAccessGroups": "true",
-        "returnFormat": "json",
-    }, timeout=600)
+    # identifier-flagged fields stay in REDCap; QA never writes them, so the backup doesn't need them
+    r = requests.post(args.url, data=record_payload(args.url, tok, {
+        "format": "csv", "type": "flat", "rawOrLabel": "raw", "exportDataAccessGroups": "true",
+    }), timeout=600)
     r.raise_for_status()
     with open(path, "w") as f:
         f.write(r.text)

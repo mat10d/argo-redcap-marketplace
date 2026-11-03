@@ -317,6 +317,80 @@ def _expand_lists(params: dict) -> dict:
     return out
 
 
+# --- identifiers stay on the server ---------------------------------------------------------------
+#
+# REDCap's record export has no "de-identify" switch — that lives only on the website's export
+# screen. What the API does honour is an explicit field list. So every download asks only for fields
+# the data dictionary does NOT flag as identifiers (Identifier? = y): names, hospital numbers and
+# the like never leave the server. The record ID always comes, even where it is flagged.
+#
+# REDCap's own export rights are the real lock; this is the toolkit's second one, and it only knows
+# what the dictionary flags. Asking for identifiers is for the ARGO linkage lead alone, and needs two
+# keys: include_identifiers=True in the call AND ALLOW_IDENTIFIERS_SETTING=linkage in the private
+# settings file. Decided 2026-11-03; see access-tiers.md.
+
+ALLOW_IDENTIFIERS_SETTING = "ARGO_ALLOW_IDENTIFIERS"
+
+
+def allowed_record_params(metadata: list, params: dict) -> tuple:
+    """(params asking only for non-identifier fields, [identifier fields left out]).
+
+    Turns `forms=` into the equivalent field list (REDCap returns forms AND fields together, so
+    forms can't stay), adds each form's `<form>_complete` status, and always keeps the record ID."""
+    if not metadata:
+        return dict(params), []
+    record_id = metadata[0]["field_name"]
+    by_form: dict = {}
+    for m in metadata:
+        by_form.setdefault(m["form_name"], []).append(m)
+    flagged = {m["field_name"] for m in metadata if str(m.get("identifier", "")).lower() == "y"}
+
+    def as_list(v):
+        if v in (None, ""):
+            return []
+        return [x.strip() for x in (v if isinstance(v, (list, tuple)) else str(v).split(","))
+                if x.strip()]
+
+    wanted_fields = as_list(params.get("fields"))
+    wanted_forms = as_list(params.get("forms"))
+    if not wanted_fields and not wanted_forms:
+        wanted_forms = list(by_form)                       # everything
+    fields = list(wanted_fields)
+    for form in wanted_forms:
+        fields += [m["field_name"] for m in by_form.get(form, []) if m["field_type"] != "descriptive"]
+        fields.append(f"{form}_complete")
+    keep, dropped, seen = [record_id], [], {record_id}
+    for f in fields:
+        if f in seen:
+            continue
+        seen.add(f)
+        (dropped if f in flagged else keep).append(f)
+    out = {k: v for k, v in params.items() if k not in ("fields", "forms")}
+    out["fields"] = keep
+    return out, dropped
+
+
+def record_payload(url: str, token: str, params: dict) -> dict:
+    """The POST payload for a record download that leaves identifier fields on the server — for
+    scripts that build their own requests. Reads the project's data dictionary first."""
+    meta = RedcapClient(token, url=url).export_metadata()
+    safe, _dropped = allowed_record_params(meta, params)
+    return _expand_lists({"token": token, "content": "record", "returnFormat": "json", **safe})
+
+
+def identifiers_allowed() -> None:
+    """Refuse an identifier download unless the private settings file opts in; warn hard if it does."""
+    if os.environ.get(ALLOW_IDENTIFIERS_SETTING, "").strip().lower() != "linkage":
+        raise RedcapError(
+            "This download asked for names, hospital numbers and other identifiers. ARGO tools never\n"
+            "download those: they stay in REDCap. Run it again without asking for identifiers.\n"
+            "(Identifier downloads are only for the ARGO linkage lead's linkage runs.)")
+    print("\n  ⚠ IDENTIFIERS INCLUDED. This download carries names and hospital numbers.\n"
+          "    It is only for linkage operations by the ARGO linkage lead; nobody else should be\n"
+          "    doing this. Keep the file out of any folder Cowork can read, and delete it when the\n"
+          "    links are pushed.\n", file=sys.stderr)
+
+
 def mask(token: str | None) -> str:
     """Show only the last 4 characters of a token. Never print the whole thing."""
     if not token:
@@ -334,6 +408,9 @@ class RedcapClient:
         self.url = check_url(url or os.environ.get("REDCAP_URL"))
         self.label = label or "this REDCap project"
         self._info: dict | None = None
+        self.env_var: str | None = None             # set by from_env; trackers are recognised by it
+        self._metadata: list | None = None
+        self.dropped_identifiers: list = []         # identifier fields left out of the last download
 
     # ---------------------------------------------------------------- construction
 
@@ -359,7 +436,9 @@ class RedcapClient:
             token = os.environ.get(env_var)
         if not token:
             return None
-        return cls(token, label=label or env_var)
+        client = cls(token, label=label or env_var)
+        client.env_var = env_var
+        return client
 
     @staticmethod
     def explain_missing_token(env_var: str, what_for: str, fallback: str | None = None) -> str:
@@ -472,13 +551,40 @@ class RedcapClient:
         result = self._post(raw=True, content="metadata", format="csv", **params)
         return result if isinstance(result, str) else ""
 
-    def export_records(self, **params) -> list:
+    # ------------------------------------------------------------ record downloads
+
+    def _is_tracker(self) -> bool:
+        """ARGO's own admin trackers hold no patient data; the identifier rule doesn't apply."""
+        try:
+            import argo_trackers
+            return self.env_var in argo_trackers.env_vars()
+        except ImportError:
+            return False
+
+    def _safe_params(self, params: dict, include_identifiers: bool) -> dict:
+        """Ask REDCap only for fields that aren't flagged as identifiers (see the module notes)."""
+        if self._is_tracker():
+            return params
+        if include_identifiers:
+            identifiers_allowed()          # refuses unless the settings file opts in; warns hard
+            return params
+        if self._metadata is None:
+            self._metadata = self.export_metadata()
+        safe, dropped = allowed_record_params(self._metadata, params)
+        if dropped:
+            self.dropped_identifiers = dropped
+        return safe
+
+    def export_records(self, include_identifiers: bool = False, **params) -> list:
+        """Download records — without identifier-flagged fields unless deliberately asked."""
+        params = self._safe_params(params, include_identifiers)
         result = self._post(content="record", **params)
         return result if isinstance(result, list) else []
 
-    def export_records_csv(self, **params) -> str:
+    def export_records_csv(self, include_identifiers: bool = False, **params) -> str:
         params.setdefault("rawOrLabel", "label")
         params.setdefault("exportCheckboxLabel", "true")
+        params = self._safe_params(params, include_identifiers)
         result = self._post(raw=True, content="record", format="csv", **params)
         return result if isinstance(result, str) else ""
 
