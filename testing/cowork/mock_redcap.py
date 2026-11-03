@@ -40,6 +40,7 @@ TRACKER_FILES = {
     "DATA_REQUEST": "data_requests",
     "DATA_LINKING_REQUEST": "data_linking_requests",
     "SUPPORT_TICKET_REQUEST": "support_tickets",
+    "PATHPRESENTER_REQUEST": "pathpresenter_requests",
 }
 STUDY_ENV = "CRC_TOKEN"
 STUDY_NAME = "syn"
@@ -58,7 +59,7 @@ def build(out: Path, files_root: "Path | None", study_key: bool) -> dict:
     keys: dict = {}
     env_lines: dict = {}
 
-    # the five trackers
+    # the six trackers
     src = FIXTURES / "synthetic-trackers"
     for env_var, title, pid, _marker in ADMIN_TRACKERS:
         name = TRACKER_FILES[env_var]

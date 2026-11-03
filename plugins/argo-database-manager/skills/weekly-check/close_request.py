@@ -36,6 +36,7 @@ QUEUES = {
     "data": "DATA_REQUEST",
     "linking": "DATA_LINKING_REQUEST",
     "support": "SUPPORT_TICKET_REQUEST",
+    "pathpresenter": "PATHPRESENTER_REQUEST",
 }
 
 

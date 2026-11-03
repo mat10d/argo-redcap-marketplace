@@ -284,6 +284,35 @@
         "7": "Given name",
         "8": ""
       }
+    },
+    "PATHPRESENTER_REQUEST": {
+      "records_file": "pathpresenter_requests.json",
+      "metadata_file": "metadata_pathpresenter_requests.json",
+      "project_title": "PathPresenter Initiation Request",
+      "pid": "233",
+      "source_form": "pathpresenter_initiation",
+      "done_marker": "completed",
+      "total": 4,
+      "open": 3,
+      "done": 1,
+      "open_record_ids": [
+        "2",
+        "3",
+        "4"
+      ],
+      "done_record_ids": [
+        "1"
+      ],
+      "open_with_no_details": [
+        "4"
+      ],
+      "form_field_count": 10,
+      "expected_first_label": {
+        "1": "Which PathPresenter is this request for?",
+        "2": "Which PathPresenter is this request for?",
+        "3": "Which PathPresenter is this request for?",
+        "4": ""
+      }
     }
   },
   "long_label": {

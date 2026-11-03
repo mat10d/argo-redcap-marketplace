@@ -21,7 +21,7 @@ from __future__ import annotations
 ARGO_REDCAP_URL = "https://redcap.oauife.edu.ng/api/"
 
 # Stamped by release.py on every release — the runtime answer to "which version am I running?".
-TOOLKIT_VERSION = "0.29.0"
+TOOLKIT_VERSION = "0.30.0"
 
 ADMIN_TRACKERS = [
     ("STUDY_INITIATION_REQUEST", "Study Tracker",             "224", "study_production"),
@@ -29,6 +29,7 @@ ADMIN_TRACKERS = [
     ("DATA_LINKING_REQUEST",     "Data Linking Request",      "222", "completed"),
     ("DATA_REQUEST",             "Data Request",              "223", "completed"),
     ("SUPPORT_TICKET_REQUEST",   "Support Ticket Request",    "225", "completed"),
+    ("PATHPRESENTER_REQUEST",    "PathPresenter Initiation Request", "233", "completed"),
 ]
 
 # The form each tracker's records live on, used by the portfolio when summarising a record.
@@ -38,6 +39,7 @@ SOURCE_FORMS = {
     "DATA_LINKING_REQUEST": "data_linking_request",
     "DATA_REQUEST": "data_request",
     "SUPPORT_TICKET_REQUEST": "support_ticket",
+    "PATHPRESENTER_REQUEST": "pathpresenter_initiation",
 }
 
 # The 7 canonical build steps tracked on a SIR record's build_tracking form.

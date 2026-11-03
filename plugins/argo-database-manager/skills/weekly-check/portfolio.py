@@ -94,6 +94,7 @@ def _load_trackers():
         ("DATA_LINKING_REQUEST",     "Data Linking Request",     "data_linking_request",     "completed", "Yes"),
         ("DATA_REQUEST",             "Data Request",             "data_request",             "completed", "Yes"),
         ("SUPPORT_TICKET_REQUEST",   "Support Ticket Request",   "support_ticket",           "completed", "Yes"),
+        ("PATHPRESENTER_REQUEST",    "PathPresenter Initiation Request", "pathpresenter_initiation", "completed", "Yes"),
     ], fallback_steps, fallback_progress)
 
 
@@ -202,6 +203,11 @@ def summarize(env_var: str, rec: dict) -> str:
         return f"For {rec.get('request_for_name','?')} — {rec.get('database_name','?')} — needed by {rec.get('date_needed_by','?')}"
     if env_var == "SUPPORT_TICKET_REQUEST":
         return f"{rec.get('first_name','?')} {rec.get('surname','?')}: {(rec.get('issue_summary') or '')[:60]}"
+    if env_var == "PATHPRESENTER_REQUEST":
+        # Exported with exportCheckboxLabel, so a ticked box holds its label and an unticked one is blank.
+        kind = " + ".join(k for k, f in (("new database", "request_type___1"),
+                                         ("analysis", "request_type___2")) if rec.get(f))
+        return f"[{kind or '?'}] {(rec.get('project_title') or '(no title)')[:55]} — PI: {rec.get('pi_surname','?')}"
     return str(rec)[:80]
 
 

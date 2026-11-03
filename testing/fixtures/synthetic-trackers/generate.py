@@ -205,6 +205,23 @@ SUPPORT_META = [
          choices="0, Incomplete | 1, Unverified | 2, Complete"),
 ]
 
+PATHPRESENTER_META = [
+    meta("record_id", "pathpresenter_initiation", "text", "Record ID"),
+    meta("pp_instance", "pathpresenter_initiation", "dropdown",
+         "Which PathPresenter is this request for?", choices="1, OAUTHC | 2, MSKCC",
+         section="Request type"),
+    meta("project_title", "pathpresenter_initiation", "text", "Project title:"),
+    meta("pi_surname", "pathpresenter_initiation", "text", "Principal Investigator Surname:"),
+    meta("an_source_db", "pathpresenter_initiation", "text",
+         "Which PathPresenter database are the slides in now?"),
+    meta("assigned_to", "pathpresenter_initiation", "text", "Assigned to"),
+    meta("completed", "pathpresenter_initiation", "yesno", "Completed / resolved", choices=YESNO),
+    meta("resolution_date", "pathpresenter_initiation", "text", "Resolution date", validation="date_ymd"),
+    meta("notes", "pathpresenter_initiation", "notes", "Internal notes"),
+    meta("pathpresenter_initiation_complete", "pathpresenter_initiation", "dropdown", "Complete?",
+         choices="0, Incomplete | 1, Unverified | 2, Complete"),
+]
+
 
 # --------------------------------------------------------------------------------------
 # Synthetic people, places and studies. All fabricated.
@@ -456,6 +473,30 @@ def build_support(rng: random.Random) -> list:
     return records
 
 
+PATHPRESENTER_DONE_IDS = {"1"}
+PATHPRESENTER_NO_DETAIL_IDS = ["4"]
+
+
+def build_pathpresenter(rng: random.Random) -> list:
+    records = []
+    for i in range(1, 5):
+        rid = str(i)
+        rec = blank_record(PATHPRESENTER_META)
+        rec["record_id"] = rid
+        if rid not in PATHPRESENTER_NO_DETAIL_IDS:
+            code, title = STUDIES[(i * 3) % len(STUDIES)]
+            rec["pp_instance"] = ["OAUTHC", "MSKCC"][i % 2]
+            rec["project_title"] = f"{title} — slide review"
+            rec["pi_surname"] = PEOPLE[(i * 2) % len(PEOPLE)][1]
+            if i % 2 == 0:
+                rec["an_source_db"] = code
+        rec["completed"] = "Yes" if rid in PATHPRESENTER_DONE_IDS else "No"
+        rec["pathpresenter_initiation_complete"] = (
+            "Complete" if rid not in PATHPRESENTER_NO_DETAIL_IDS else "Incomplete")
+        records.append(rec)
+    return records
+
+
 # --------------------------------------------------------------------------------------
 # Tracker table — mirrors argo_trackers.ADMIN_TRACKERS / SOURCE_FORMS without importing it
 # (fixtures must stand alone), but the MANIFEST records these values so a drift test can
@@ -476,6 +517,9 @@ TRACKERS = [
     ("SUPPORT_TICKET_REQUEST", "Support Ticket Request", "225", "completed",
      "support_ticket", "support_tickets", SUPPORT_META, build_support,
      SUPPORT_NO_DETAIL_IDS),
+    ("PATHPRESENTER_REQUEST", "PathPresenter Initiation Request", "233", "completed",
+     "pathpresenter_initiation", "pathpresenter_requests", PATHPRESENTER_META,
+     build_pathpresenter, PATHPRESENTER_NO_DETAIL_IDS),
 ]
 
 SIR_BUILD_STEPS = [

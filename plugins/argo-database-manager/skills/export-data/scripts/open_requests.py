@@ -2,10 +2,10 @@
 """What's waiting for the database manager — the open items across the ARGO request trackers.
 
     python3 open_requests.py                          # every queue, open items only
-    python3 open_requests.py --queue people           # one queue: people|data|linking|builds
+    python3 open_requests.py --queue people           # one queue: people|data|linking|builds|pathpresenter
     python3 open_requests.py --record people 12       # one record, every filled field, by label
 
-Reads the trackers with the five keys everyone on the team holds. A queue whose key is missing
+Reads the trackers with the tracker keys everyone on the team holds. A queue whose key is missing
 or failing is reported as unavailable and skipped — the landing never blocks on one bad key.
 
 Field names on the request forms are deliberately NOT hardcoded (they are unverified against the
@@ -35,6 +35,7 @@ QUEUES = {
     "people":  ("STUDY_PERSONELL_REQUEST",  "People requests"),
     "linking": ("DATA_LINKING_REQUEST",     "Linking requests"),
     "data":    ("DATA_REQUEST",             "Data requests"),
+    "pathpresenter": ("PATHPRESENTER_REQUEST", "PathPresenter requests"),
 }
 # Where each queue is fulfilled. People requests have no skill: access is granted by hand on
 # the study project's User Rights page in REDCap, so the line says the page, not a skill.
@@ -43,6 +44,8 @@ ROUTE = {
     "people":  "REDCap itself — the study project's User Rights page (Users & Roles)",
     "linking": "the link-data skill",
     "data":    "the export-data skill",
+    # New PathPresenter databases and analysis studies are set up by hand in PathPresenter.
+    "pathpresenter": "PathPresenter itself — the ARGO PathPresenter team sets the study up there",
 }
 # Triage/bookkeeping fields that say nothing about what the request IS.
 BORING = {"assigned_to", "assignment_date", "completed", "resolution_date", "notes"}
@@ -253,7 +256,7 @@ def main() -> int:
             return 1
         return show_record(key, rid)
 
-    keys = [args.queue] if args.queue else ["builds", "people", "data", "linking"]
+    keys = [args.queue] if args.queue else ["builds", "people", "data", "linking", "pathpresenter"]
     counts = [show_queue(k) for k in keys]
     if not args.queue:
         support = RedcapClient.from_env("SUPPORT_TICKET_REQUEST")
@@ -266,7 +269,7 @@ def main() -> int:
                 pass
     if all(c is None for c in counts):
         print("\nNone of the tracker keys are set up, so there's no queue to show.\n"
-              "The five tracker keys go in your ARGO settings file — double-click\n"
+              "The tracker keys go in your ARGO settings file — double-click\n"
               "'Add keys here' in your ARGO folder to open it.")
         return 1
     return 0

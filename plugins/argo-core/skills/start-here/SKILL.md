@@ -40,7 +40,7 @@ depends on it.
 
 Fold the result into your ONE confirmation line:
 
-- `Settings found …` + all keys verified → "You're set up — your five tracker keys connect."
+- `Settings found …` + all keys verified → "You're set up — your six tracker keys connect."
 - **A key failing** is the exception to brevity: name it plainly ("your Data Request key isn't
   working — the others are fine"), say you can fix it after, then ask the role question anyway.
   Never block on it. **Exception:** if every role they hold is data analyst, say nothing about
@@ -102,7 +102,7 @@ Valid values, comma-separated, exactly these spellings: `project-manager`, `qa-s
 
 **Then, before the role landing — put the settings file on screen.** Anyone naming a **core
 role** (project manager, QA specialist, database manager) is a core team member, and every core
-member should hold the five tracker keys. If none are configured yet, **your next message is the
+member should hold the six tracker keys. If none are configured yet, **your next message is the
 file itself.** Don't declare setup complete and ask whether they'd like to add keys — putting
 the file in front of them *is* the completing act of setup. Present it **unprompted**, by the
 ladder in "Putting the settings file on screen" below (file card first, then the fallbacks in
@@ -112,11 +112,11 @@ order), with one instruction line and one question:
 > done** — or say "later" and I'll carry on without them.
 
 That is the whole message: the file, one instruction line, one question. The question is no
-longer "want me to show you the file?" — the file is already there. Don't explain the five
+longer "want me to show you the file?" — the file is already there. Don't explain the six
 trackers first, don't list what each key is for, and don't wait for permission to present it.
 
 - **They say they've saved it** → verify (the client `--check`), relay the result in one line
-  ("all five keys work" / exactly which one doesn't), then their role landing.
+  ("all six keys work" / exactly which one doesn't), then their role landing.
 - **"Later", "I don't have them yet", or any other decline** → one line saying the REDCap
   administrator issues them, then straight on to the role landing. **Don't raise it again this
   session.** Nothing is blocked without keys.
@@ -147,7 +147,7 @@ configured it fetches the official Word templates, and without it the documents 
 built-in skeletons.
 
 If they ask where things stand across the programme instead, say plainly that the weekly check
-lives with the database manager now, and run [[weekly-check]] for them — it reads the same five
+lives with the database manager now, and run [[weekly-check]] for them — it reads the same six
 trackers.
 
 ### QA specialist → key check, then worklists
@@ -175,7 +175,7 @@ Present the picture in a few lines, then ask **one** question: which one to take
 | Linking request / "match these two studies" | [[link-data]] |
 | Personnel request / "add someone to a project" | the REDCap UI — the study's **User Rights** page. There is no add-users skill; [[weekly-check]] says what to do. |
 
-Keys: the five trackers, plus a study key where one exists — and none of these routes is ever
+Keys: the six trackers, plus a study key where one exists — and none of these routes is ever
 blocked for want of a key; every one has a files-and-UI path.
 
 ### Data analyst → point me at your export
@@ -213,7 +213,7 @@ you, never to be shown to the user.
 ## The one thing to say about access keys, if it comes up
 
 No key is ever required — everything works from files downloaded off the REDCap website
-([[getting-files-from-redcap]]). The standing setup for **everyone on the team is the five
+([[getting-files-from-redcap]]). The standing setup for **everyone on the team is the six
 tracker keys** (they power the weekly check and the shared study dashboard). Beyond that,
 **add a study key for each study you're QAing** — pulls and exports for it then happen right in
 the session. Analysts need none. The REDCap administrator creates keys (ideally tied to accounts
@@ -240,7 +240,7 @@ whether to.
 2. **One instruction line, whichever rung you landed on**: "paste each key after its = sign,
    save, and tell me when you're done." The variable names are already in the file, one per
    tracker, so there is nothing else to explain.
-3. **Wait.** Then verify for them: run the client `--check` and relay the result — "all five
+3. **Wait.** Then verify for them: run the client `--check` and relay the result — "all six
    keys work" or exactly which one doesn't. They say "later" instead → carry on, and don't
    raise it again this session.
 4. If they start typing a key into the chat, stop them and point back at the file. A key pasted

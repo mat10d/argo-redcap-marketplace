@@ -71,7 +71,7 @@ Sometimes the source has `id=41` twice for distinct patients. Re-ID the later oc
 ### 12. No Super API Token at OAU — UI path is primary
 Per-project API tokens are admin-controlled at OAU. The marketplace defaults to CSV-upload-via-UI; API path is an enhancement available once a token is obtained. See [[project-no-super-token]].
 
-### 13. Admin REDCaps (SIR/SPR/etc.) are PIDs 221-225 — DO NOT confuse with new project PIDs
+### 13. Admin REDCaps (SIR/SPR/etc.) are PIDs 221-225 and 233 (PathPresenter) — DO NOT confuse with new project PIDs
 The Hepatectomy build had a moment where PID 242 (new study) was confused with PID 224 (SIR admin). Token confirmation always shows `project_title` — verify before any write.
 
 ### 13b. Push SIR build_tracking + study_metadata as each step lands

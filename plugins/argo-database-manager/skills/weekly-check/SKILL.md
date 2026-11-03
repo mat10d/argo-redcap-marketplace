@@ -1,6 +1,6 @@
 ---
 name: weekly-check
-description: The database manager's standing check — where every ARGO study stands and what's waiting for you. Programme status across the five trackers (which studies exist, how far each build has got, what changed since last time) plus the open queues: studies to build, people requests, data requests, linking requests. Use for "what's waiting for me", "weekly check", "where do things stand", "what's pending", "any new requests", "which studies aren't built yet".
+description: The database manager's standing check — where every ARGO study stands and what's waiting for you. Programme status across the six trackers (which studies exist, how far each build has got, what changed since last time) plus the open queues: studies to build, people requests, data requests, linking requests, PathPresenter requests. Use for "what's waiting for me", "weekly check", "where do things stand", "what's pending", "any new requests", "which studies aren't built yet".
 allowed-tools: Read, Bash, Write, Edit
 ---
 
@@ -32,7 +32,7 @@ ARGO settings file itself — nothing to `source` first.
 ## Part 1 — Programme status
 
 `portfolio.py --diff` compares against the last snapshot, so you see **what changed** — new
-submissions (🆕), studies that reached production — not just a list. It covers all five
+submissions (🆕), studies that reached production — not just a list. It covers all six
 trackers. Give the shape of it in a few lines; don't paste the dashboard unless asked. The
 open-request counts it prints belong to Part 2 — present those item by item there, not as a
 count here.
@@ -102,7 +102,7 @@ Columns that must be there:
 |---|---|
 | Studies to build (SIR) | record, short name, PI, progress (`N/7`), next step |
 | People requests (SPR) | record, first name, last name, email, the study, the role being asked for |
-| Data requests · Linking requests | record, then the summary fields the line carries |
+| Data requests · Linking requests · PathPresenter requests | record, then the summary fields the line carries |
 
 **Next step** is the `next:` the builds line ends with — the first of the 7 flags not ticked,
 which is where [[build-study]] picks up. Say it in words ("Upload the data dictionary").
@@ -133,6 +133,7 @@ Then ask **one** question: which one to take. Then route:
 | **Data requests** | [[export-data]] |
 | **Linking requests** | [[link-data]] |
 | **People requests** | REDCap itself — below. There is no add-users skill. |
+| **PathPresenter requests** | PathPresenter itself — the ARGO PathPresenter team sets up the new database or analysis study there. No skill. |
 | Support tickets | count only — triaged by hand in the Support Ticket project |
 
 **A request missing something stays on the queue.** Name the missing Study Tracker field(s) in
@@ -167,9 +168,9 @@ diff. Every Study Tracker write goes through `sir_update.py` — never a hand-wr
 `import_records` call. (The queue's own footer says to tick the box on the website; for builds,
 `sir_update.py` does it.)
 
-**People, data, linking and support requests** close by ticking `completed`. Either way is fine:
+**People, data, linking, support and PathPresenter requests** close by ticking `completed`. Either way is fine:
 
-- from here: `close_request.py <people|data|linking|support> <record>` — shows the change, asks,
+- from here: `close_request.py <people|data|linking|support|pathpresenter> <record>` — shows the change, asks,
   writes only `completed`; or
 - in the REDCap UI, on the record.
 
@@ -191,7 +192,7 @@ names the real username (`--assigned-to <username>`). No key for that tracker �
 tracker; on the very first run it says "First snapshot — nothing to compare against yet" rather
 than a silence that reads as "nothing changed".
 
-## The five trackers
+## The six trackers
 
 Mirrors `argo_trackers.py` in argo-core, the single source of truth.
 
@@ -202,10 +203,11 @@ Mirrors `argo_trackers.py` in argo-core, the single source of truth.
 | `DATA_LINKING_REQUEST` | Data Linking Request | 222 | `completed` |
 | `DATA_REQUEST` | Data Request | 223 | `completed` |
 | `SUPPORT_TICKET_REQUEST` | Support Ticket Request | 225 | `completed` |
+| `PATHPRESENTER_REQUEST` | PathPresenter Initiation Request | 233 | `completed` |
 
 - **The Study Tracker's done-marker is `study_production`** — the last build step — not
   `study_built` or `study_status`. Older docs said otherwise; the code reads `study_production`.
-- The other four share the `tracking` form's `completed` field. Until that instrument is uploaded
+- The other five share the `tracking` form's `completed` field. Until that instrument is uploaded
   to a project, every record there reads "open" — expected, not an error.
 - The Study Tracker's `internal_tracking` form carries the per-study detail the dashboard shows.
   It replaces the Active Databases Excel sheet.

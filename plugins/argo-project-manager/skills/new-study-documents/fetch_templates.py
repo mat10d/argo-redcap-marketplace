@@ -12,7 +12,7 @@ you always get the current official version, never a stale copy.
 It brings the whole ARGO Templates tree, plus two things the study-launch pipeline needs that
 live outside it: the ARGO QA Plan, and the two Study Start-Up SOPs (NIH / non-NIH).
 
-Needs the Study Tracker access key (STUDY_INITIATION_REQUEST) — one of the five tracker keys you
+Needs the Study Tracker access key (STUDY_INITIATION_REQUEST) — one of the six tracker keys you
 already have. Without it, download the File Repository by hand instead: open the Study Tracker
 in REDCap → File Repository → ARGO Templates (and ARGO Quality Assurance (QA), and ARGO Standard
 Operating Procedures (SOPs) → Study Start-Up) → download, and put the folders in your ARGO folder

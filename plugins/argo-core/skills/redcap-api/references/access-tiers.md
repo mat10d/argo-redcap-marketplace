@@ -16,7 +16,7 @@ Before reading the tiers, note the distinction that matters most in practice:
 
 | | **Admin tracker REDCaps** | **A study's own REDCap project** |
 |---|---|---|
-| Which projects | The 5 trackers: Study Tracker (SIR), SPR, Data Linking, Data Request, Support Ticket | Every individual cohort/study project |
+| Which projects | The 6 trackers: Study Tracker (SIR), SPR, Data Linking, Data Request, Support Ticket, PathPresenter Request | Every individual cohort/study project |
 | Token situation | ARGO holds these already, permanently | Must be issued by a REDCap admin, per user, per project — **rarely happens in practice** |
 | Example scripts | `sir_update.py`, `portfolio.py`, `backfill_sir_from_csv.py` | `fill_new_project.py`, DD upload, `export-data`, `push_updates.py` |
 
@@ -25,13 +25,13 @@ that writes to the SIR needs no per-study access at all — it uses a tracker to
 Do not "simplify" tracker-facing scripts away on the grounds that tokens are hard to get; that
 removes automation without removing any admin dependency.
 
-## Tier 1 — standing access: the 5 admin trackers
+## Tier 1 — standing access: the 6 admin trackers
 
 Configured permanently in the settings file — and **by everyone on the team**, not just whoever runs the weekly portfolio (revised 2026-08-20: the shared dashboard should work from any member's session). This is the only standing credential set.
 
-- `weekly-check/portfolio.py` — read-only weekly pull across all 5 trackers. Writes nothing back
+- `weekly-check/portfolio.py` — read-only weekly pull across all 6 trackers. Writes nothing back
   except a local snapshot file.
-- `open_requests.py` (argo-core, vendored into each skill) — read-only queue view over the four
+- `open_requests.py` (argo-core, vendored into each skill) — read-only queue view over the five
   request trackers, run by the same weekly check.
 - `build-study/sir_update.py` — writes build progress to the **SIR record** (Study Tracker, PID 224).
   One push per build step, no batching. This is what keeps the portfolio's progress column current.
@@ -41,7 +41,7 @@ Low risk: these touch ARGO's own project-management records, never cohort/patien
 
 ### Minimum rights per Tier 1 key — ask the administrator for exactly this, no more
 
-"Read-only tokens for all five" sounds safest but breaks two workflows. What each account
+"Read-only tokens for all six" sounds safest but breaks two workflows. What each account
 actually needs (a key always carries its account's full rights — [[access-tiers]] Tier 3 note):
 
 | Key | PID | API Export | API Import | Why |
@@ -51,6 +51,7 @@ actually needs (a key always carries its account's full rights — [[access-tier
 | `DATA_LINKING_REQUEST` | 222 | yes | no | portfolio reads only |
 | `DATA_REQUEST` | 223 | yes | no | portfolio reads only |
 | `SUPPORT_TICKET_REQUEST` | 225 | yes | no | portfolio reads only; triage is done in the UI |
+| `PATHPRESENTER_REQUEST` | 233 | yes | no | portfolio reads only; added 2026-11-03 when the form gained the analysis-study path |
 
 No Tier 1 account should hold **user rights**, **project design**, or **delete records** — nothing
 in the suite uses them, and `--check` warns when a key's account has them.
@@ -120,7 +121,7 @@ Every record download asks only for fields the data dictionary does **not** flag
 REDCap's export API has no "de-identify" switch (that is a website-only option), but it honours an
 explicit field list, so names and hospital numbers stay on the server. The record ID always comes.
 Enforced in one place, `argo_redcap_client` (`export_records`, `export_records_csv`,
-`record_payload`); the five admin trackers are exempt (no patient data).
+`record_payload`); the six admin trackers are exempt (no patient data).
 
 - **Override: the ARGO linkage lead only, for linkage runs.** It needs two keys: the call asks for
   identifiers (`include_identifiers=True`, `export.py --include-identifiers`) **and** the private
@@ -257,7 +258,7 @@ Cowork, the connected folder's `.env`). Scripts load it themselves — nothing n
 - `REDCAP_URL` — the API endpoint, shared by every project on that REDCap instance
 - One variable per project, named for the project (`STUDY_INITIATION_REQUEST`,
   `STUDY_PERSONELL_REQUEST`, `DATA_LINKING_REQUEST`, `DATA_REQUEST`,
-  `SUPPORT_TICKET_REQUEST`)
+  `SUPPORT_TICKET_REQUEST`, `PATHPRESENTER_REQUEST`)
 - Study keys, where a person holds one, sit in the same file (see the 2026-08-20 Tier 2
   revision above), under the variable name the skill asks for.
 - Never commit this file. Never log a full token — truncate to the last 4 characters.

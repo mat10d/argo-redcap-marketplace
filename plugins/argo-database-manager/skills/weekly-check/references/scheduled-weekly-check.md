@@ -27,7 +27,7 @@ by search at run time, and the report lands wherever the ARGO folder is.
 ````markdown
 ---
 name: argo-weekly-check
-description: Runs the ARGO weekly check — programme status across the five trackers plus the open request queues — and writes the report into the ARGO folder.
+description: Runs the ARGO weekly check — programme status across the six trackers plus the open request queues — and writes the report into the ARGO folder.
 ---
 
 # ARGO weekly check (scheduled)
@@ -63,7 +63,7 @@ Q=$(find /mnt/.remote-plugins /mnt/skills ~/mnt ~/.claude/plugins -name open_req
 python3 "$Q"
 ```
 
-The first prints programme status across the five ARGO trackers and what changed since the last
+The first prints programme status across the six ARGO trackers and what changed since the last
 run, and saves a snapshot so next week can do the same. The second prints the open queues:
 studies to build, people requests, data requests, linking requests.
 

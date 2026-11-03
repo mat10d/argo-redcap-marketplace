@@ -38,7 +38,7 @@ Next, in order:
 
 **Proven live, witnessed in real Cowork sessions:**
 - The full core journey, once, end to end (round 5 + continuation): onboarding → scaffold into
-  the connected folder → key flow (file card, `Add keys here`) → "all five keys work" →
+  the connected folder → key flow (file card, `Add keys here`) → "all six keys work" →
   **live portfolio against REDCap from inside Cowork**. This is the demo. It already happened.
 - Plugins load on every surface tested; `argo-core:start-here` answers every time
   (standalone skill retired on that evidence, 0.14.0).
@@ -48,7 +48,7 @@ Next, in order:
   (`ARGO toolkit X.Y.Z` in --ensure/--check output), release gate on tests.
 
 **Never yet witnessed live (the verification debt):**
-- The polished *returning-user* one-liner ("your five tracker keys connect", no add-keys
+- The polished *returning-user* one-liner ("your six tracker keys connect", no add-keys
   option) — built across 0.15.3–0.16.3, every attempt to see it burned on version lag or bugs.
 - The analyst round (Table 1 from the staged CRC export). Staged repeatedly, never run.
 - QA and builder rounds. Never run.
@@ -193,7 +193,7 @@ Protocol per round, no exceptions:
 
 | # | Round | Prompt | Pass |
 |---|---|---|---|
-| A | returning | "help me with ARGO" | one-liner incl. "five tracker keys connect" + stamp; NO add-keys option; routing question; nothing else |
+| A | returning | "help me with ARGO" | one-liner incl. "six tracker keys connect" + stamp; NO add-keys option; routing question; nothing else |
 | B | analyst | staged synthetic export → Table 1 | routes to run-analysis, no key talk, script + table in data-analyst/, no record rows in chat |
 | C | qa | staged export + qa_fields.yaml → worklists | no-key path, per-DAG xlsx in qa-specialist/, yellow/amber semantics correct |
 | D | builder | toy concept note → SOP + questionnaire docx | mines the note, [TODO]s not inventions, real .docx in project-manager/new-studies/ |

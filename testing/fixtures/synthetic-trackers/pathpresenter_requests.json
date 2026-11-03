@@ -1,0 +1,50 @@
+[
+  {
+    "record_id": "1",
+    "pp_instance": "MSKCC",
+    "project_title": "Made-up Maternal Outcomes Study \u2014 slide review",
+    "pi_surname": "Sampleton",
+    "an_source_db": "",
+    "assigned_to": "",
+    "completed": "Yes",
+    "resolution_date": "",
+    "notes": "",
+    "pathpresenter_initiation_complete": "Complete"
+  },
+  {
+    "record_id": "2",
+    "pp_instance": "OAUTHC",
+    "project_title": "Sample Oncology Biobank Registry \u2014 slide review",
+    "pi_surname": "Fixtura",
+    "an_source_db": "SYNTH-G",
+    "assigned_to": "",
+    "completed": "No",
+    "resolution_date": "",
+    "notes": "",
+    "pathpresenter_initiation_complete": "Complete"
+  },
+  {
+    "record_id": "3",
+    "pp_instance": "MSKCC",
+    "project_title": "Invented Sickle Cell Care Study \u2014 slide review",
+    "pi_surname": "Stubbins",
+    "an_source_db": "",
+    "assigned_to": "",
+    "completed": "No",
+    "resolution_date": "",
+    "notes": "",
+    "pathpresenter_initiation_complete": "Complete"
+  },
+  {
+    "record_id": "4",
+    "pp_instance": "",
+    "project_title": "",
+    "pi_surname": "",
+    "an_source_db": "",
+    "assigned_to": "",
+    "completed": "No",
+    "resolution_date": "",
+    "notes": "",
+    "pathpresenter_initiation_complete": "Incomplete"
+  }
+]
