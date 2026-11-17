@@ -36,6 +36,12 @@ the signed consent + eligibility checklist and the completed paper questionnaire
 the record ID, so don't add your own (`exercise_id`, `study_id`...). `hospital_number` comes next,
 as the first field of the study's own first form. Surveys and training studies skip all of this.
 
+A PATHOLOGY study (slides in PathPresenter) takes the ARGO slide block — `dd.slide_block(stains)`
+(JSON spec: an entry `{"slide_block": ["H&E", "CD8"]}`) — and, when retrospective, the case key
+`dd.case_key()` (histology_number, identifier). The standard and its reasons live in
+pathology.py; the slide-tracker fields it writes carry no missing-data codes (they record the
+glass and the upload, not the patient). Validate with `validate_dd.py --pathology`.
+
 `yesno` is refused at build time — it cannot hold MDC codes. Use `radio` with
 "1, Yes | 0, No" and dd_builder adds the MDC choices for you.
 
@@ -66,6 +72,10 @@ Always run validate_dd.py on the output before delivering.
 import csv
 import json
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pathology  # noqa: E402  (same folder: the slide-block standard)
 
 MDC_CHOICES = ("-666, Patient does not know | -777, Patient refused to answer | "
                "-888, Missing in case notes | -999, Other missing")
@@ -119,7 +129,8 @@ class DD:
                 "clinical field. Use type 'radio' with choices \"1, Yes | 0, No\" instead — "
                 "this builder adds the missing-data codes to it for you.")
         is_first = not self.rows  # first field is the record identifier — never gets MDC
-        if not is_first and not self.survey and type not in EXEMPT_TYPES and var not in EXEMPT_VARS:
+        if (not is_first and not self.survey and type not in EXEMPT_TYPES
+                and var not in EXEMPT_VARS and not pathology.is_slide_tracker(var)):
             if mdc:
                 if type in CHOICE_TYPES:
                     choices = (choices + " | " + MDC_CHOICES) if choices else MDC_CHOICES
@@ -135,6 +146,14 @@ class DD:
         self.rows.append([var, form or self.form, section, type, label, choices, note, valid,
                           min, max, identifier, branching, required, align, qnum, matrix,
                           "", annotation])
+
+    def slide_block(self, stains, form=None):
+        """The ARGO slide block for these stains (pathology.py has the standard)."""
+        pathology.slide_block(self, stains, form)
+
+    def case_key(self, form=None):
+        """histology_number, identifier: the case key of a retrospective pathology study."""
+        pathology.case_key(self, form)
 
     def write(self, path):
         with open(path, "w", newline="") as f:
@@ -167,6 +186,9 @@ def main():
         sys.exit(f"I can't build this: {e}.")
     for n, fld in enumerate(spec, 1):
         try:
+            if "slide_block" in fld:
+                dd.slide_block(fld["slide_block"], fld.get("form"))
+                continue
             dd.field(**{k: v for k, v in fld.items()})
         except (TypeError, ValueError) as e:
             sys.exit(f"I can't build entry {n} of {sys.argv[1]}: {e}")

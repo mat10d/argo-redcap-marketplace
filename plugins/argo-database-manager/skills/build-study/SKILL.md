@@ -1,6 +1,6 @@
 ---
 name: build-study
-description: Fulfil a build request — turn a submitted study request into a working REDCap database. Checks the request is ready to build, produces the paste-ready create-project sheet, builds or audits the data dictionary, sets up roles and study files, and ticks each step off on the Study Tracker as it lands so the tracker stays honest. Works with or without an access key. Use when taking a "build this study" item off your request queue, when a study request (SIR) has come in, when picking a half-finished build back up, or when someone asks you to review, audit or fix an existing data dictionary.
+description: Fulfil a build request — turn a submitted study request into a working REDCap database. Checks the request is ready to build, produces the paste-ready create-project sheet, builds or audits the data dictionary, sets up roles and study files, and ticks each step off on the Study Tracker as it lands so the tracker stays honest. Also builds pathology studies — slides in PathPresenter with their linked REDCap — from a PathPresenter request, including analysis studies on slides already in PathPresenter. Works with or without an access key. Use when taking a "build this study" or PathPresenter request off your queue, when a study request (SIR) has come in, when picking a half-finished build back up, or when someone asks you to review, audit or fix an existing data dictionary.
 allowed-tools: Read, Bash, Write, Glob, Edit, Grep
 ---
 
@@ -158,6 +158,73 @@ the DD; they are needed for Step 6 and before production.
 **Auditing an existing DD (Path B) without the questionnaire:** run `validate_dd.py`, and say the
 label-by-label comparison waits for the questionnaire. That isn't a build, so it isn't blocked —
 but it isn't a finished audit either.
+
+## Pathology studies — slides in PathPresenter (enforced)
+
+A study whose slides go to PathPresenter is **two systems joined only by a file name**: REDCap
+holds identity and the slide tracker; PathPresenter holds the images, their metadata and the
+readers' eCRF. The standard is fixed (P20 aim 1/2, the PD-1 trial, decided 2026-11-17) and lives
+in `pathology.py`; don't redesign it per study.
+
+**It starts from a PathPresenter request (PID 233). No request, no pathology build.** Run, in
+Step 1:
+
+```bash
+pathology.py plan <RID> --out database-manager/<study>
+```
+
+It finds the PathPresenter request(s) linked to this SIR by title and says which **path** each
+takes, in `PATHOLOGY_PLAN.md`:
+
+| Path | The request | What you build |
+|---|---|---|
+| **A** | New PathPresenter database, REDCap request in, project not built | The full build below |
+| **B** | New PathPresenter database for a REDCap that is already built | No rebuild: an amendment adding the slide block (Path B audit, draft-mode upload), plus the PathPresenter side |
+| **C** | New database, no REDCap request | Nothing. Ask the requester for the Study Initiation request under the same title |
+| **D** | Analysis study on slides already in PathPresenter | No REDCap build: `pathology.py check-slide-list <file>` on the uploaded list (it must name slides by file name / Pathology REDCap ID and carry no identifier columns), then the PathPresenter side |
+| **E** | Both boxes ticked | A or B, then D |
+
+A request filed before the form asked for the instance or the request type is read as a new
+database on **OAU (argo-ccr)**, the default for Nigerian slides; that and every other gap
+(no stain list, no scoring protocol) goes into `OPEN_QUESTIONS.md`, never a guess in the build.
+
+**The REDCap side (paths A, B):**
+- **Case key:** `histology_number`, `Identifier? = y` — it finds the glass and names the file,
+  and never downloads. No names. A request answering "contains PHI: No" still gets it; say so on
+  the Outstanding list.
+- **Retrospective:** a case form (record ID, then `dd.case_key()`), then the slide block, then a
+  clinical form if the study collects clinical data. **Prospective:** `--patient-level`, then
+  patient, then specimen with the slide block inside (as PD-1).
+- **The slide block:** `dd.slide_block(["H&E", "CD3", "CD8"])` (JSON: `{"slide_block": [...]}`) —
+  `slide_found`, `slide_type` (one box per stain), `slide_rounds_imaged`,
+  `slide_name_<stain>_1..3`, `slide_retrieved`, staining and imaging site, `slide_pathpresenter`,
+  `qa_pathpresenter`. H&E is always a stain. The slide-tracker fields carry no MDC.
+- **Readers' results stay in PathPresenter** (eCRF export). Don't build per-reader score forms in
+  REDCap.
+- Validate with `validate_dd.py --pathology --stains "H&E,CD3,CD8"` — the stains as the request
+  names them.
+
+**The hard stop, for a pathology build:** the ethics approval letter and the protocol, as always.
+The PathPresenter request stands in for the questionnaire **for the slide part**. A clinical form
+still needs its abstraction proforma; until it arrives, build without that form only if the PI
+has said the study is slides-only — otherwise stop as in Step 1b.
+
+**The PathPresenter side (every path but C):**
+
+```bash
+pathology.py setup <PathPresenter request> --out database-manager/<study>/pathpresenter [--study-code CODE]
+```
+
+Writes the setup checklist (instance, dataset code — a proposal until the administrator assigns
+it — staging folders, test slide, metadata import, eCRF, reader accounts, weekly
+reconciliation), `ECRF_SPEC.md` drafted from the request, and the metadata import template
+(`Name, Pathology REDCap ID, Slide type, …, Slide stain, Scanner used, Cut location, Stain
+location`). **File names are histology number, then stain:** `H661-26-CD8.svs`, a second slide
+of the stain `H661-26-CD8-2.svs`.
+
+**Existing pathology studies** (built before the standard): `pathology.py audit <dd.csv>` lists
+how a dictionary differs from the standard. It reports; it never restructures — aim 2's numbered
+slots and aim 1's one-name-per-stain are left as built.
 
 ## Step 2 — Create project → `project_created`
 
@@ -452,6 +519,7 @@ none is a routine close-out:
 
 ## Scripts in this skill
 
+`pathology.py` (pathology studies: plan, setup, check-slide-list, audit) ·
 `fill_new_project.py` (Step 2) · `dd_builder.py` + `validate_dd.py` (Step 3) ·
 `make_roles_csv.py` (Step 4) · `validate_import.py` (Step 5) · `setup_brief.py` (Step 6) ·
 `sir_update.py` (the tracker tool) · `backfill_sir_from_csv.py` — a one-off bulk load from the

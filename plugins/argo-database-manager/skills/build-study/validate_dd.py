@@ -17,11 +17,20 @@ validated psychometric / Likert scales, which ARGO policy exempts.
 A self-completed survey carries no MDC at all (ARGO policy, 2026-10-09): `--survey` skips every
 MDC check.
 
-Usage: python3 validate_dd.py [--patient-level] [--survey] <path_to_csv>
+`--pathology` (a study with slides in PathPresenter) requires the ARGO slide block and the case key
+`histology_number` flagged as an identifier; `--stains "H&E,CD8"` also checks the stain list
+against the PathPresenter request. The slide-tracker fields carry no MDC. The standard lives in
+pathology.py, next to this file.
+
+Usage: python3 validate_dd.py [--patient-level] [--survey] [--pathology [--stains S,S]] <path_to_csv>
 """
 import csv
 import sys
 import re
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pathology  # noqa: E402  (same folder: the slide-block standard)
 
 VALID_FIELD_TYPES = {"text", "notes", "radio", "dropdown", "calc", "file",
                      "checkbox", "yesno", "truefalse", "descriptive", "slider"}
@@ -83,7 +92,7 @@ INTAKE_FIELDS = [("redcap_id", "text"), ("patient_consent", "file"),
                  ("patient_questionnaire", "file")]
 
 
-def validate(filepath, patient_level=False, survey=False):
+def validate(filepath, patient_level=False, survey=False, pathology_study=False, stains=None):
     errors = []
     warnings = []
     var_names_seen = set()
@@ -127,6 +136,12 @@ def validate(filepath, patient_level=False, survey=False):
                 errors.append("hospital_number must be type 'text'")
             if hosp_row[COL["Identifier?"]] != "y":
                 errors.append("hospital_number must have Identifier? = y (PII)")
+
+    if pathology_study:
+        meta = [{"field_name": r[COL["Variable / Field Name"]], "identifier": r[COL["Identifier?"]],
+                 "select_choices_or_calculations": r[COL["Choices, Calculations, OR Slider Labels"]]}
+                for r in rows if len(r) == 18]
+        errors.extend(pathology.check_rows(meta, stains))
 
     # Matrix groups with the MDC waiver on any of their fields — the whole group is exempt.
     mdc_exempt_groups = {
@@ -252,6 +267,7 @@ def validate(filepath, patient_level=False, survey=False):
                 and not mdc_waived
                 and field_type not in MDC_EXEMPT_TYPES
                 and var_name not in MDC_EXEMPT_VARS
+                and not pathology.is_slide_tracker(var_name)
                 and form_name not in MDC_EXEMPT_FORMS):
             is_date = validation.startswith("date") if validation else False
             is_choice_field = field_type in ("radio", "dropdown", "checkbox")
@@ -299,21 +315,30 @@ def main():
         args = [a for a in args if a != "--patient-level"]
     survey = "--survey" in args
     args = [a for a in args if a != "--survey"]
+    pathology_study = "--pathology" in args
+    args = [a for a in args if a != "--pathology"]
+    stains = None
+    if "--stains" in args:
+        i = args.index("--stains")
+        stains = [s for s in args[i + 1].split(",") if s.strip()] if i + 1 < len(args) else []
+        args = args[:i] + args[i + 2:]
     if not args:
-        print("Usage: python3 validate_dd.py [--patient-level] [--survey] <csv_file> [csv_file2 ...]")
+        print("Usage: python3 validate_dd.py [--patient-level] [--survey] [--pathology [--stains S,S]] <csv_file> [csv_file2 ...]")
         print("  --patient-level   require the eligibility_consent form and hospital_number (patient studies)")
         print("  --survey          a self-completed survey: no missing-data codes expected")
-        print("  --survey          a self-completed survey: no missing-data codes expected")
+        print("  --pathology       require the ARGO slide block and histology_number (slides in PathPresenter)")
         sys.exit(1)
 
     total_errors = 0
     for filepath in args:
         print(f"\n{'='*60}")
-        print(f"Validating: {filepath}  (patient-level: {patient_level}, survey: {survey})")
+        print(f"Validating: {filepath}  (patient-level: {patient_level}, survey: {survey}, "
+              f"pathology: {pathology_study})")
         print(f"{'='*60}")
 
         try:
-            errors, warnings = validate(filepath, patient_level=patient_level, survey=survey)
+            errors, warnings = validate(filepath, patient_level=patient_level, survey=survey,
+                                        pathology_study=pathology_study, stains=stains)
         except FileNotFoundError:
             print(f"  FILE NOT FOUND: {filepath}")
             total_errors += 1
