@@ -324,6 +324,63 @@ def study_code(pp: dict, sir: "dict | None" = None) -> str:
     return (caps[0] if caps else "".join(w[0] for w in words[:4])).upper()[:8] or "STUDY"
 
 
+# PathPresenter permissions (decided 2026-11-17, from the vendor's role table and sharing
+# workflows; pathpresenter-roles.md). Two layers: an ACCOUNT role per person, and per-DATASET
+# sharing. Only the ARGO admin can create anything — every role that could manage access can
+# also create datasets — so everyone else is a Guest and the per-study jobs live on the dataset.
+# Nothing is shared organisation-wide; downloads and the slide-label photo are off; readers see
+# only stain and slide type, and never each other's annotations (that switch lives on the
+# annotation project, not the dataset). Slides can't be moved or copied between datasets
+# (tried as Data Contributor, Honest Broker and Admin, 2026-11-17): an analysis study is built on
+# the dataset the slides already sit in.
+DATASET_SWITCHES = [
+    ("Grant access to all users within your organization", "OFF"),
+    ("Allow access to External User", "OFF"),
+    ("General permissions for all External Institute User", "OFF"),
+    ("Access", "specific users only, each Read-Only or Approved as below"),
+    ("Download permission", "OFF for everyone; the ARGO admin grants it per request"),
+    ("Can View Label", "OFF for everyone: the photo of the glass slide's label can carry identifiers"),
+    ("Metadata fields visible (readers, viewers)", "stain and slide type only"),
+    ("Metadata fields visible (PM, RA)", "all"),
+]
+# Set on the annotation project, not the dataset.
+PROJECT_SWITCHES = [
+    ("Annotation review permission (readers)",
+     "OFF, so double reads stay independent; the PI may turn it on for a consensus read"),
+    ("Additional Project Owner", "none by default; the ARGO admin owns and builds the project"),
+]
+COPY_SLIDES = ("Slides can't be moved or copied between datasets. An analysis study's annotation "
+               "project is built on the dataset the slides already sit in, using only the listed slides.")
+# Account roles: Guest is the default (pathpresenter-roles.md). A person from another
+# institution than the instance's is also an external-institute user of that institution.
+GUEST = "Guest (external-institute user if from another site)"
+
+
+def permissions(pp: dict) -> list:
+    """(who, from the request; account role; on the dataset) for everyone the request names."""
+    def val(k):
+        return str(pp.get(k, "")).strip()
+    rows = [("ARGO PathPresenter admin", "Admin",
+             "Owner + Dataset Access Manager; builds the annotation project and eCRF")]
+    pi = val("pi_user_name") or " ".join(x for x in (val("pi_first_name"), val("pi_surname")) if x)
+    if pi:
+        rows.append((f"{pi} (PI)", GUEST, "Approved; gets results as the admin's export"))
+    if val("pm_name"):
+        rows.append((f"{val('pm_name')} (PM)", GUEST, "Approved + Metadata Entry Specialist + Data Contributor"))
+    if val("ra_name"):
+        rows.append((f"{val('ra_name')} (RA)", GUEST,
+                     "Data Contributor (uploads slides only)"))
+    readers = [val(f"contributor_{n}") for n in range(1, 5)] + [val("an_labelers")]
+    for r in [r for r in readers if r]:
+        rows.append((f"{r} (reader)", GUEST,
+                     "Approved; assigned to the annotation project; sees stain and slide type "
+                     "only; no annotation review"))
+    for v in [val(f"viewer_{n}") for n in range(1, 5)]:
+        if v:
+            rows.append((f"{v} (viewer)", "Guest", "Read-Only"))
+    return rows
+
+
 def setup(pp: dict, sir: "dict | None", out: Path, code: "str | None") -> list:
     out.mkdir(parents=True, exist_ok=True)
     path = classify(pp, sir)
@@ -379,23 +436,36 @@ def setup(pp: dict, sir: "dict | None", out: Path, code: "str | None") -> list:
              f"`{example_name(stains[0], 2)}`. Never a patient name or hospital number. The "
              "label image must not show a name.", "",
              "| # | Step | Who | Done |", "|---|---|---|---|"]
-    rows = [("Create the dataset and folder on the instance above", "PathPresenter admin")]
     if path == "D":
-        rows += [("Check the slide list holds Pathology REDCap IDs / file names only "
-                  "(`pathology.py check-slide-list`)", "database manager"),
-                 (f"Copy the listed slides from {pp.get('an_source_db') or '[source dataset]'} "
-                  "into the new dataset", "PathPresenter admin")]
+        rows = [("Check the slide list holds Pathology REDCap IDs / file names only "
+                 "(`pathology.py check-slide-list`)", "database manager"),
+                (f"Build the annotation project on {pp.get('an_source_db') or '[source dataset]'} "
+                 "with the listed slides only; no new dataset (slides can't be moved)",
+                 "PathPresenter admin"),
+                ("Share that dataset with this study's readers: Approved, stain and slide type only",
+                 "PathPresenter admin")]
     else:
+        rows = [("Create the dataset and folder on the instance above", "PathPresenter admin")]
         rows += [("Scanner staging folder D:\\ARGO_SCANS\\" + code +
                   " with 01_TO_CHECK / 02_TO_UPLOAD / 03_UPLOADED", "scanning site"),
                  ("Upload one test slide end to end, named by the rule above", "scanning site"),
                  ("Import the metadata template (Pathology REDCap ID, stain, scanner, locations)",
                   "RA")]
     rows += [("Build the eCRF and labels from ECRF_SPEC.md", "PathPresenter admin"),
-             ("Reader accounts, with roles (labeler / viewer)", "PathPresenter admin"),
+             ("Accounts, dataset and project permissions exactly as the tables below", "PathPresenter admin"),
              ("Weekly: export the dataset and reconcile it against the REDCap slide names",
               "database manager")]
     lines += [f"| {n} | {s} | {w} | ☐ |" for n, (s, w) in enumerate(rows, 1)]
+    lines += ["", "## Dataset sharing settings", "", "| Setting | Value |", "|---|---|"]
+    lines += [f"| {k} | {v} |" for k, v in DATASET_SWITCHES]
+    lines += ["", "## Annotation project settings", "", "| Setting | Value |", "|---|---|"]
+    lines += [f"| {k} | {v} |" for k, v in PROJECT_SWITCHES]
+    lines += ["", COPY_SLIDES]
+    lines += ["", "## People", "",
+              "Names as the request gives them. A person with no PathPresenter account is "
+              "requested on the Study Personnel Request (platform: PathPresenter).", "",
+              "| Who | Account role | On this dataset |", "|---|---|---|"]
+    lines += [f"| {w} | {r} | {d} |" for w, r, d in permissions(pp)]
     checklist.write_text("\n".join(lines) + "\n")
     written.append(checklist)
     return written

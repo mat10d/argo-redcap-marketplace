@@ -219,7 +219,14 @@ Writes the setup checklist (instance, dataset code — a proposal until the admi
 it — staging folders, test slide, metadata import, eCRF, reader accounts, weekly
 reconciliation), `ECRF_SPEC.md` drafted from the request, and the metadata import template
 (`Name, Pathology REDCap ID, Slide type, …, Slide stain, Scanner used, Cut location, Stain
-location`). **File names are histology number, then stain:** `H661-26-CD8.svs`, a second slide
+location`), plus the dataset's sharing settings and who gets which PathPresenter role
+([[pathpresenter-roles]]: only the ARGO admin creates datasets, annotation projects and eCRFs,
+so the admin is Admin and everyone else — PI included — is a Guest with a job on the dataset;
+every dataset is shared with named people only, downloads and the slide-label photo off,
+readers seeing stain and slide type only and never each other's annotations). **Slides can't be
+moved or copied between datasets**, so an analysis study (path D) gets no new dataset: its
+annotation project is built on the source dataset, using only the listed slides. **File names
+are histology number, then stain:** `H661-26-CD8.svs`, a second slide
 of the stain `H661-26-CD8-2.svs`.
 
 **Existing pathology studies** (built before the standard): `pathology.py audit <dd.csv>` lists
@@ -540,4 +547,4 @@ changes into a Word document. Don't hand-roll that file.
 
 [[build-pitfalls]] (read first) · [[mdc-rules]] · [[dd-column-spec]] · [[token-optional]] ·
 [[token-confirmation]] · [[record-id-safety]] · [[redcap-date-import]] · [[redcap-api-gotchas]] ·
-[[standard-roles]] · [[decision-protocol]]
+[[standard-roles]] · [[pathpresenter-roles]] · [[decision-protocol]]

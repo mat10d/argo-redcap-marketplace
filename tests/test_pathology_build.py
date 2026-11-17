@@ -199,14 +199,65 @@ class ThePathPresenterSide(unittest.TestCase):
         self.assertIn("proposed", checklist)
         self.assertIn("Reader One", ecrf)
 
-    def test_an_analysis_setup_copies_slides_instead_of_scanning(self):
+    def test_an_analysis_setup_builds_on_the_source_dataset(self):
         with tempfile.TemporaryDirectory() as tmp:
             P.setup(ANALYSIS, None, Path(tmp), "SYN")
             checklist = (Path(tmp) / "PATHPRESENTER_SETUP.md").read_text()
-        self.assertIn("Copy the listed slides from SYNTH", checklist)
+        self.assertIn("Build the annotation project on SYNTH", checklist)
+        self.assertNotIn("Create the dataset", checklist)
         self.assertIn("check-slide-list", checklist)
         self.assertNotIn("ARGO_SCANS", checklist)
         self.assertIn("MSK (argo-research)", checklist)
+
+
+class ThePermissions(unittest.TestCase):
+    """Only the ARGO admin can create anything in PathPresenter (2026-11-17): every account
+    role that could manage access can also create datasets, so nobody else gets one."""
+    CREATES_DATASETS = ("Principal Investigator", "Honest Broker", "Institutional Admin")
+
+    def test_only_the_admin_gets_a_role_that_creates_datasets(self):
+        req = dict(NEW_DB, pi_user_name="Pat Lead", pm_name="Sam Manager", ra_name="Ade Upload",
+                   viewer_1="Viv Viewer")
+        rows = P.permissions(req)
+        self.assertEqual(rows[0][1], "Admin")
+        for who, role, _ in rows[1:]:
+            self.assertTrue(role.startswith("Guest"), f"{who}: {role}")
+            self.assertFalse(any(r in role for r in self.CREATES_DATASETS), who)
+
+    def test_the_admin_is_the_only_access_manager(self):
+        rows = P.permissions(dict(NEW_DB, pm_name="Sam Manager"))
+        managers = [w for w, _r, d in rows if "Access Manager" in d]
+        self.assertEqual(managers, ["ARGO PathPresenter admin"])
+
+    def test_every_dataset_is_closed_by_default(self):
+        switches = dict(P.DATASET_SWITCHES)
+        for k in ("Grant access to all users within your organization",
+                  "Allow access to External User",
+                  "General permissions for all External Institute User"):
+            self.assertEqual(switches[k], "OFF")
+        self.assertTrue(switches["Download permission"].startswith("OFF"))
+        self.assertTrue(switches["Can View Label"].startswith("OFF"))
+        self.assertEqual(switches["Metadata fields visible (readers, viewers)"],
+                         "stain and slide type only")
+
+    def test_readers_are_blind_to_each_other(self):
+        project = dict(P.PROJECT_SWITCHES)
+        self.assertTrue(project["Annotation review permission (readers)"].startswith("OFF"))
+
+    def test_the_setup_checklist_carries_both_tables(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            P.setup(NEW_DB, SIR_NEW, Path(tmp), "SYN")
+            text = (Path(tmp) / "PATHPRESENTER_SETUP.md").read_text()
+        self.assertIn("## Dataset sharing settings", text)
+        self.assertIn("## Annotation project settings", text)
+        self.assertIn(P.COPY_SLIDES, text)
+        self.assertIn("| Reader One (reader) | Guest", text)
+
+    def test_the_roles_page_states_the_rule(self):
+        page = (REPO / "plugins/argo-core/skills/redcap-api/references/pathpresenter-roles.md").read_text()
+        self.assertIn("Nobody but the ARGO admin creates datasets", page)
+        for role in self.CREATES_DATASETS:
+            self.assertRegex(page, rf"\| {role} \|.*\*\*Not used\*\*")
 
 
 class TheSlideListCheck(unittest.TestCase):
