@@ -223,9 +223,10 @@ location`), plus the dataset's sharing settings and who gets which PathPresenter
 ([[pathpresenter-roles]]: only the ARGO admin creates datasets, annotation projects and eCRFs,
 so the admin is Admin and everyone else — PI included — is a Guest with a job on the dataset;
 every dataset is shared with named people only, downloads and the slide-label photo off,
-readers seeing stain and slide type only and never each other's annotations). **Slides can't be
-moved or copied between datasets**, so an analysis study (path D) gets no new dataset: its
-annotation project is built on the source dataset, using only the listed slides. **File names
+readers seeing stain and slide type only and never each other's annotations). **Only a
+dataset's owner or its Dataset Access Manager can copy slides out of it**, so for an analysis
+study (path D) the ARGO admin copies the listed slides into the new dataset, then the file list
+is checked against the slide list. **File names
 are histology number, then stain:** `H661-26-CD8.svs`, a second slide
 of the stain `H661-26-CD8-2.svs`.
 

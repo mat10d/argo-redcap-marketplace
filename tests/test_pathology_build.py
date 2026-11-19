@@ -199,12 +199,12 @@ class ThePathPresenterSide(unittest.TestCase):
         self.assertIn("proposed", checklist)
         self.assertIn("Reader One", ecrf)
 
-    def test_an_analysis_setup_builds_on_the_source_dataset(self):
+    def test_an_analysis_setup_copies_slides_instead_of_scanning(self):
         with tempfile.TemporaryDirectory() as tmp:
             P.setup(ANALYSIS, None, Path(tmp), "SYN")
             checklist = (Path(tmp) / "PATHPRESENTER_SETUP.md").read_text()
-        self.assertIn("Build the annotation project on SYNTH", checklist)
-        self.assertNotIn("Create the dataset", checklist)
+        self.assertIn("Copy the listed slides from SYNTH", checklist)
+        self.assertIn("exactly the listed slides", checklist)
         self.assertIn("check-slide-list", checklist)
         self.assertNotIn("ARGO_SCANS", checklist)
         self.assertIn("MSK (argo-research)", checklist)

@@ -27,10 +27,10 @@ those four are eligible as Dataset Access Manager.
 
 | Account role | What it can do, in plain words | At ARGO |
 |---|---|---|
-| **Admin** | Everything: people, datasets, annotation projects, eCRFs, institutes, Results, audit log, settings | **The ARGO admin only** |
+| **Admin** | People, institutes, annotation projects, eCRFs, Results, audit log, settings; creates datasets. Sees only the datasets it owns or is shared | **The ARGO admin only** |
 | **Guest** | Sees only what is shared with it; annotates projects it is assigned to | **Everyone else**: PIs, PMs, RAs, readers, viewers |
-| **Internal Researcher** | Sees only what is shared; annotates; creates its own eCRFs; co-owns a project if added | PathPresenter vendor support only |
-| Principal Investigator | Creates datasets and annotation projects; sees Results | **Not used**: can create datasets |
+| **Internal Researcher** | Sees only what is shared; annotates; creates its own eCRFs; can be Additional Project Owner; can't be Dataset Access Manager | PathPresenter vendor support only |
+| Principal Investigator | Creates datasets and annotation projects; sees Results; can be Dataset Access Manager and Additional Project Owner | **Not used** while it can create datasets (see "Pending" below) |
 | Honest Broker | Creates, edits and deletes datasets | **Not used**: can create and delete datasets |
 | Institutional Admin | Manages one institution's users; creates datasets | **Not used** |
 | External User | Self-registers on the login page | **Not used**: the ARGO admin creates every account |
@@ -40,10 +40,14 @@ What follows from this:
   the admin.
 - **The ARGO admin builds every annotation project and eCRF** (a Guest can't own one), and
   readers' **results leave PathPresenter as the admin's export** (only Admin and PI see Results).
-- **Slides can't be moved or copied between datasets.** Data Contributor, Honest Broker and Admin
-  all failed on our instance (2026-11-17). An analysis study therefore gets no new dataset: its
-  annotation project is built on the dataset the slides already sit in, using only the listed
-  slides, and that dataset is shared with the study's readers.
+- **A dataset belongs to the person who created it, not to a role.** Even an Admin doesn't see
+  a dataset until its owner shares it (PathPresenter, 2026-11-19).
+- **Only a dataset's owner or its Dataset Access Manager can copy slides out of it**; Data
+  Contributor and Metadata Entry Specialist can't, whatever the account role. So the ARGO admin
+  copies the listed slides into an analysis study's new dataset. If someone else owns the source
+  dataset, they first make the ARGO admin its Dataset Access Manager.
+- **Additional Project Owner** can only be an Admin, Principal Investigator or Internal
+  Researcher; not a Guest or Honest Broker.
 - Accounts created before this rule with a dataset-creating role (Honest Broker, extra Admins) are
   moved to Guest once their uploads are confirmed to work through the dataset jobs below.
 
@@ -52,7 +56,7 @@ What follows from this:
 | On the dataset | What it gives | Typical holder |
 |---|---|---|
 | **Owner** | The dataset creator: all dataset operations | ARGO admin, always |
-| **Dataset Access Manager** | Approves read-only users' requests to view or download | ARGO admin (no other eligible role is given out) |
+| **Dataset Access Manager** | Approves read-only users' requests to view or download; copies slides out of the dataset. Only Admin, Institutional Admin, PI or Honest Broker accounts | ARGO admin (no other eligible role is given out) |
 | **Metadata (Entry) Specialist** | Edits slide metadata only | PM, or the RA who keeps the metadata |
 | **Data Contributor** | Uploads slides to this dataset only | PM, scanning-site RA |
 | **Approved** access | Opens and views the slides directly | PI, readers |
@@ -91,7 +95,7 @@ shared the dataset one by one, never through the "all external institute users" 
 
 | Person on the request | Account role | On the dataset |
 |---|---|---|
-| ARGO admin | Admin | Owner + Dataset Access Manager; builds the annotation project and eCRF |
+| ARGO admin | Admin | Owner + Dataset Access Manager; builds the annotation project and eCRF; copies slides |
 | PI | Guest | Approved; gets results as the admin's export |
 | PM / coordinator | Guest | Approved + Metadata Entry Specialist + Data Contributor |
 | RA who uploads | Guest | Data Contributor (+ Metadata Entry Specialist if they keep metadata) |
@@ -100,3 +104,28 @@ shared the dataset one by one, never through the "all external institute users" 
 
 Someone without a PathPresenter account is requested on the Study Personnel Request (platform:
 PathPresenter); the ARGO admin creates it with the account role above.
+
+## Pending: dataset creation for Admin only
+
+Asked of PathPresenter on 2026-11-19: can dataset creation be turned off for every account role
+but Admin on both portals (argo-ccr and argo-research)? Their access-control team is checking.
+No role today lets a PM copy slides and manage people without also creating datasets.
+
+**If they turn it off**, PMs and PIs move up, and every existing dataset is re-set to match:
+
+| Person | Account role | On their study's dataset |
+|---|---|---|
+| PM | Principal Investigator | Dataset Access Manager + Metadata Entry Specialist + Data Contributor; Additional Project Owner on the annotation project |
+| Study PI | Principal Investigator | Dataset Access Manager; Additional Project Owner; sees Results directly |
+| RA, reader, viewer | Guest | Unchanged |
+
+Then, on each portal, dataset by dataset:
+1. Its current owner shares it with the ARGO admin as Dataset Access Manager, if the admin
+   doesn't own it.
+2. The people on it are set exactly as the table above and the "Who gets what" table.
+3. Accounts that held a dataset-creating role only to work around this (Honest Broker, extra
+   Admins) go to Guest or Principal Investigator by their job.
+
+**If they can't**, the tables above stand: the ARGO admin copies slides and manages access, and
+PMs stay Guest.
+

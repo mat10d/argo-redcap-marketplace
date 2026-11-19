@@ -330,9 +330,9 @@ def study_code(pp: dict, sir: "dict | None" = None) -> str:
 # also create datasets — so everyone else is a Guest and the per-study jobs live on the dataset.
 # Nothing is shared organisation-wide; downloads and the slide-label photo are off; readers see
 # only stain and slide type, and never each other's annotations (that switch lives on the
-# annotation project, not the dataset). Slides can't be moved or copied between datasets
-# (tried as Data Contributor, Honest Broker and Admin, 2026-11-17): an analysis study is built on
-# the dataset the slides already sit in.
+# annotation project, not the dataset). Copying slides between datasets needs the dataset's
+# owner or its Dataset Access Manager — no other dataset job, whatever the account role
+# (PathPresenter, 2026-11-19) — so the ARGO admin, who owns every dataset, copies them.
 DATASET_SWITCHES = [
     ("Grant access to all users within your organization", "OFF"),
     ("Allow access to External User", "OFF"),
@@ -349,8 +349,9 @@ PROJECT_SWITCHES = [
      "OFF, so double reads stay independent; the PI may turn it on for a consensus read"),
     ("Additional Project Owner", "none by default; the ARGO admin owns and builds the project"),
 ]
-COPY_SLIDES = ("Slides can't be moved or copied between datasets. An analysis study's annotation "
-               "project is built on the dataset the slides already sit in, using only the listed slides.")
+COPY_SLIDES = ("Copying slides between datasets: only the source dataset's owner or its Dataset "
+               "Access Manager can, so the ARGO admin does it. If someone else owns the source "
+               "dataset, they first make the ARGO admin its Dataset Access Manager.")
 # Account roles: Guest is the default (pathpresenter-roles.md). A person from another
 # institution than the instance's is also an external-institute user of that institution.
 GUEST = "Guest (external-institute user if from another site)"
@@ -436,16 +437,16 @@ def setup(pp: dict, sir: "dict | None", out: Path, code: "str | None") -> list:
              f"`{example_name(stains[0], 2)}`. Never a patient name or hospital number. The "
              "label image must not show a name.", "",
              "| # | Step | Who | Done |", "|---|---|---|---|"]
+    rows = [("Create the dataset and folder on the instance above", "PathPresenter admin")]
     if path == "D":
-        rows = [("Check the slide list holds Pathology REDCap IDs / file names only "
-                 "(`pathology.py check-slide-list`)", "database manager"),
-                (f"Build the annotation project on {pp.get('an_source_db') or '[source dataset]'} "
-                 "with the listed slides only; no new dataset (slides can't be moved)",
-                 "PathPresenter admin"),
-                ("Share that dataset with this study's readers: Approved, stain and slide type only",
-                 "PathPresenter admin")]
+        rows += [("Check the slide list holds Pathology REDCap IDs / file names only "
+                  "(`pathology.py check-slide-list`)", "database manager"),
+                 (f"Copy the listed slides from {pp.get('an_source_db') or '[source dataset]'} "
+                  "into the new dataset (owner or Dataset Access Manager of the source only)",
+                  "PathPresenter admin"),
+                 ("Check the new dataset holds exactly the listed slides: download its file names "
+                  "and compare them with the slide list", "database manager")]
     else:
-        rows = [("Create the dataset and folder on the instance above", "PathPresenter admin")]
         rows += [("Scanner staging folder D:\\ARGO_SCANS\\" + code +
                   " with 01_TO_CHECK / 02_TO_UPLOAD / 03_UPLOADED", "scanning site"),
                  ("Upload one test slide end to end, named by the rule above", "scanning site"),
