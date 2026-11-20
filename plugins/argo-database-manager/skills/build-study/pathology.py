@@ -442,7 +442,8 @@ def setup(pp: dict, sir: "dict | None", out: Path, code: "str | None") -> list:
         rows += [("Check the slide list holds Pathology REDCap IDs / file names only "
                   "(`pathology.py check-slide-list`)", "database manager"),
                  (f"Copy the listed slides from {pp.get('an_source_db') or '[source dataset]'} "
-                  "into the new dataset (owner or Dataset Access Manager of the source only)",
+                  "into the new dataset: select them, copy to My Datasets, then from My Datasets to the "
+                  "new dataset (owner or Dataset Access Manager of the source only)",
                   "PathPresenter admin"),
                  ("Check the new dataset holds exactly the listed slides: download its file names "
                   "and compare them with the slide list", "database manager")]
